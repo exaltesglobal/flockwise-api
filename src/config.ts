@@ -1,4 +1,5 @@
 // All settings come from environment variables (Hostinger: Websites > your app > Environment variables).
+import type { LyricsFeed } from './core/engine.js';
 const env = process.env;
 
 function bool(v: string | undefined) {
@@ -72,6 +73,12 @@ export const config = {
   anthropic: { apiKey: env.ANTHROPIC_API_KEY ?? '', model: env.ANTHROPIC_MODEL ?? 'claude-opus-5-5' },
   /** Flockwise's Canva app (canva.com/developers): churches connect their own Canva through it. */
   canva: env.CANVA_CLIENT_ID && env.CANVA_CLIENT_SECRET ? { clientId: env.CANVA_CLIENT_ID, clientSecret: env.CANVA_CLIENT_SECRET } : null,
+  /**
+   * Licensed lyrics services Flockwise has an agreement with (SongSelect partner API, a publisher,
+   * an Indian label), as a JSON list: [{"id":"…","name":"…","url":"https://…","key":"…","covers":"all"|"ccli"}].
+   * Each answers the lyrics-feed contract in docs/SONG-CATALOG.md.
+   */
+  lyricsFeeds: parseFeeds(env.LYRICS_FEEDS),
   /** Chitthi (Agape Labs' WhatsApp platform). Each church connects its own workspace key in Settings. */
   chitthiUrl: (env.CHITTHI_URL ?? 'https://app.chitthi.live').replace(/\/$/, ''),
 };
@@ -98,5 +105,18 @@ export function assertConfig() {
   if (problems.length) {
     console.error(`Configuration problems:\n - ${problems.join('\n - ')}`);
     if (config.production) process.exit(1);
+  }
+}
+
+function parseFeeds(raw: string | undefined): LyricsFeed[] {
+  if (!raw?.trim()) return [];
+  try {
+    const list = JSON.parse(raw) as Partial<LyricsFeed>[];
+    return (Array.isArray(list) ? list : [])
+      .filter((f) => f && typeof f.url === 'string' && f.url.startsWith('https://') && typeof f.key === 'string')
+      .map((f, i) => ({ id: String(f.id || `feed${i + 1}`), name: String(f.name || f.id || 'Lyrics service'), url: f.url!, key: f.key!, covers: f.covers === 'ccli' ? 'ccli' : 'all' }));
+  } catch {
+    console.error('LYRICS_FEEDS is not valid JSON; licensed lyrics are switched off.');
+    return [];
   }
 }

@@ -346,6 +346,12 @@ export type Song = {
   lyricsAlt?: string;
   /** Default section order. */
   arrangement?: string[];
+  /** The shared song database entry this song was added from. */
+  catalogId?: string;
+  /** Copyright line to show with the words, e.g. "Public domain" or "© 2011 Thankyou Music". */
+  copyright?: string;
+  /** The licensed lyrics service the words came from, when not public domain. */
+  licensedFrom?: string;
 };
 export type SongView = Song & { timesUsed: number; lastUsedAt: string | null };
 export type ServiceSummary = { event: AdminEvent; items: number; minutes: number; songs: string[]; theme: string; volunteers: { filled: number; needed: number } };
@@ -1116,7 +1122,7 @@ export type AccountsSummary = {
 
 export type Collections = {
   settings: ChurchSettings & { id: string };
-  integrations: ChitthiConfig | RazorpayConfig | RazorpaySetup | WaBotConfig | EmailAccountConfig | ZoomConfig | GcsConfig | CanvaConfig;
+  integrations: ChitthiConfig | RazorpayConfig | RazorpaySetup | WaBotConfig | EmailAccountConfig | ZoomConfig | GcsConfig | CanvaConfig | SongLicenceConfig;
   media: MediaItem;
   canvaDesigns: CanvaDesign;
   kycFiles: KycFile;
@@ -1871,3 +1877,71 @@ export type NetworkOverview = {
   giving: { currency: Currency; churches: number; months: { month: string; amount: number }[]; total: number };
 };
 export type NetworkSummary = { id: string; name: string; kind: NetworkKind; churches: number };
+
+// ---------- shared song database ----------
+
+/** Languages the song database is organised by (ISO 639-1). */
+export type SongLanguage = 'en' | 'hi' | 'te' | 'ta' | 'ml' | 'kn' | 'mr' | 'bn' | 'pa' | 'gu' | 'or' | 'ur';
+export const SONG_LANGUAGES: { id: SongLanguage; label: string }[] = [
+  { id: 'en', label: 'English' }, { id: 'hi', label: 'Hindi' }, { id: 'te', label: 'Telugu' }, { id: 'ta', label: 'Tamil' }, { id: 'ml', label: 'Malayalam' }, { id: 'kn', label: 'Kannada' },
+  { id: 'mr', label: 'Marathi' }, { id: 'bn', label: 'Bengali' }, { id: 'pa', label: 'Punjabi' }, { id: 'gu', label: 'Gujarati' }, { id: 'or', label: 'Odia' }, { id: 'ur', label: 'Urdu' },
+];
+/**
+ * A song in the shared Flockwise song database. Public-domain songs carry their words; copyrighted
+ * songs carry credits only, and their words come from a licensed lyrics service when one is set up.
+ */
+export type CatalogSong = {
+  id: string;
+  title: string;
+  /** Other titles people search by: a first line, an English or transliterated title. */
+  aka?: string[];
+  language: SongLanguage;
+  /** Who wrote (or translated) the words, as credited. */
+  writers: string;
+  /** Who wrote the music. */
+  music?: string;
+  /** Year written or first published. */
+  year?: number;
+  rights: 'public-domain' | 'copyrighted';
+  /** Copyright line to print with the words. */
+  copyright: string;
+  /** CCLI song number, for reporting. */
+  ccli?: string;
+  defaultKey: string;
+  bpm: number | null;
+  /** Hymn tune name, e.g. NEW BRITAIN. */
+  tune?: string;
+  /** Themes and seasons: Grace, Easter, Christmas, Communion... */
+  themes: string[];
+  lyrics?: string;
+  chordChart?: string;
+  arrangement?: string[];
+  /** Where the words came from, e.g. "Open Hymnal Project" or a hymnbook and edition. */
+  source?: string;
+  links?: { name: string; url: string }[];
+};
+/** A row in the database list: no words, plus whether this church already has the song. */
+export type CatalogSongRow = Omit<CatalogSong, 'lyrics' | 'chordChart'> & { hasLyrics: boolean; hasChords: boolean; inLibrary: string | null; licensedAvailable: boolean };
+export type CatalogSongDetail = CatalogSong & { inLibrary: string | null; licensedAvailable: boolean };
+export type CatalogList = { songs: CatalogSongRow[]; total: number; languages: { id: SongLanguage; label: string; songs: number }[] };
+
+/** The church's song licences: CCLI numbers for reports and projected credits. */
+export type SongLicenceConfig = {
+  id: 'songLicence';
+  /** CCLI Church Copyright Licence number. */
+  ccliLicence: string;
+  /** CCLI Streaming Licence number, for online services. */
+  streamingLicence: string;
+  /** Other licence holders, e.g. an Indian publisher or OneLicense. */
+  otherLicences: string;
+  updatedAt: string;
+};
+/** A licensed lyrics service Flockwise has an agreement with (SongSelect, a publisher, a label). */
+export type LyricsFeedInfo = { id: string; name: string; /** 'ccli': asked only about songs with a CCLI number. */ covers: 'all' | 'ccli' };
+export type SongLicenceStatus = {
+  licence: SongLicenceConfig | null;
+  /** Licensed lyrics services this server is connected to. */
+  feeds: LyricsFeedInfo[];
+};
+/** Words for a copyrighted song from a licensed lyrics service. */
+export type LicensedLyrics = { lyrics: string; chordChart?: string; copyright?: string; defaultKey?: string; feedId: string; feedName: string };

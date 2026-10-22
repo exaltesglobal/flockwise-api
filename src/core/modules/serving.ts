@@ -351,13 +351,13 @@ export function registerServing(r: Router) {
   });
   r.post('/admin/songs', { perm: 'services' }, (ctx) => {
     requireFields(ctx.body, ['title']);
-    const s = ctx.db.put('songs', { id: ctx.id('sg'), title: String(ctx.body.title), author: String(ctx.body.author ?? ''), defaultKey: String(ctx.body.defaultKey ?? ''), bpm: ctx.body.bpm ? Number(ctx.body.bpm) : null, ccli: String(ctx.body.ccli ?? ''), tags: Array.isArray(ctx.body.tags) ? ctx.body.tags.map(String) : [], lyrics: String(ctx.body.lyrics ?? ''), chordChart: String(ctx.body.chordChart ?? ''), lyricsAlt: String(ctx.body.lyricsAlt ?? ''), arrangement: cleanArrangement(ctx.body.arrangement), attachments: cleanAttachments(ctx, ctx.body.attachments) });
+    const s = ctx.db.put('songs', { id: ctx.id('sg'), title: String(ctx.body.title), author: String(ctx.body.author ?? ''), defaultKey: String(ctx.body.defaultKey ?? ''), bpm: ctx.body.bpm ? Number(ctx.body.bpm) : null, ccli: String(ctx.body.ccli ?? ''), tags: Array.isArray(ctx.body.tags) ? ctx.body.tags.map(String) : [], lyrics: String(ctx.body.lyrics ?? ''), chordChart: String(ctx.body.chordChart ?? ''), lyricsAlt: String(ctx.body.lyricsAlt ?? ''), copyright: String(ctx.body.copyright ?? '').slice(0, 300), arrangement: cleanArrangement(ctx.body.arrangement), attachments: cleanAttachments(ctx, ctx.body.attachments) });
     ctx.audit('created', 'song', s.id, `Added song ${s.title}`);
     return s;
   });
   r.patch('/admin/songs/:id', { perm: 'services' }, (ctx) => {
     const s = find(ctx, 'songs', ctx.params[0], 'Song');
-    return ctx.db.put('songs', { ...s, ...pick(ctx.body, ['title', 'author', 'defaultKey', 'bpm', 'ccli', 'tags', 'lyrics', 'chordChart', 'lyricsAlt']), ...(ctx.body.arrangement !== undefined ? { arrangement: cleanArrangement(ctx.body.arrangement) } : {}), ...(ctx.body.attachments !== undefined ? { attachments: cleanAttachments(ctx, ctx.body.attachments) } : {}) });
+    return ctx.db.put('songs', { ...s, ...pick(ctx.body, ['title', 'author', 'defaultKey', 'bpm', 'ccli', 'tags', 'lyrics', 'chordChart', 'lyricsAlt', 'copyright']), ...(ctx.body.arrangement !== undefined ? { arrangement: cleanArrangement(ctx.body.arrangement) } : {}), ...(ctx.body.attachments !== undefined ? { attachments: cleanAttachments(ctx, ctx.body.attachments) } : {}) });
   });
   r.del('/admin/songs/:id', { perm: 'services' }, (ctx) => {
     ctx.db.del('songs', ctx.params[0]);

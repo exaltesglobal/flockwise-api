@@ -242,6 +242,20 @@ Every change is written to the activity log (`GET /admin/audit?q=&cursor=`).
 | PATCH | `/admin/songs/:id` | `services` |
 | DELETE | `/admin/songs/:id` | `services` |
 
+Songs take an optional `copyright` line, and songs added from the song database keep `catalogId` (and `licensedFrom` when the words came from a licensed lyrics feed).
+
+### Song database (shared by every church)
+
+Public-domain hymns any church can search and copy into its library. See [SONG-CATALOG.md](SONG-CATALOG.md).
+
+| Method | Path | Needs |
+|---|---|---|
+| GET | `/admin/song-catalog?q=&lang=&theme=&limit=&offset=` | `services` or `volunteers`. Searches titles, other titles, tunes, writers, themes, then lines of the words. Rows leave the words out and say `inLibrary` (the church's song id) |
+| GET | `/admin/song-catalog/:id` | `services` or `volunteers`. The full song with words |
+| POST | `/admin/song-catalog/:id/add` | `services`. Copies it into the library, once: `{ song, created, licensed }` |
+| GET | `/admin/song-catalog/licence` | `services` or `settings`. The church's CCLI licence numbers and the licensed lyrics feeds on this server |
+| PUT | `/admin/song-catalog/licence` | `settings`. `{ ccliLicence, streamingLicence, otherLicences }`, digits only for CCLI numbers |
+
 ### Forms and registrations
 
 Forms can sell ticket types (prices in minor units), apply discount codes, cap places and keep a waitlist. A paid registration is a pending payment to the hidden "Event registrations" fund with `formResponseId` set; the payment webhook confirms it. Free forms promote the waitlist automatically when someone cancels.
