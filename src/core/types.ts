@@ -1672,6 +1672,8 @@ export type FamilyCheckinEvent = {
   members: { id: string; name: string; isChild: boolean; roomName: string | null; allergies: string | null; checkedIn: boolean; securityCode: string | null }[];
 };
 export type FamilyCheckinResult = { securityCode: string | null; checkedIn: string[]; event: FamilyCheckinEvent };
+/** The door QR a leader shows on their phone; members scan it to be marked present. */
+export type DoorQr = { token: string; path: string; rotatesInSeconds: number; present: number; scanned: number; recent: { name: string; at: string }[] };
 
 // ----- church networks and dioceses: combined, anonymous stats across many churches -----
 export type NetworkKind = 'network' | 'diocese' | 'denomination' | 'association';

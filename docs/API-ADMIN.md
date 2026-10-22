@@ -614,3 +614,17 @@ The mobile app is for team members only: no church members or guests sign in the
 | DELETE | `/admin/team-logins/:personId` | Switches the login off and revokes the person's app sessions. |
 
 Demo: the demo member (`priya@example.com`) has a login with password `demo1234` and no forced change.
+
+## Door QR attendance
+
+A leader opens the door code on their phone at the entrance (Check-in › Door QR). Members scan it with their camera; the link opens the Flockwise app at `/app/door?e=<eventId>&t=<token>`, which marks them (and any family members they tick) present. The code changes every minute and is tied to the event; it is accepted for three minutes after it was shown. Each scan is a normal check-in with method `qr`.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/admin/checkin/:eventId/door` | Perm `checkin`. `{token, path, rotatesInSeconds, present, scanned, recent: [{name, at}]}`. Poll it to keep the QR fresh. |
+| GET | `/door/:eventId?t=` | Signed in (member scope, so the team app works too). The family check-in view for this event. 410 `door_expired` for an old or wrong code, 422 `not_open` outside three hours before to one hour after the event. |
+| POST | `/door/:eventId` | `{token, personIds?}` (defaults to the signed-in person) → `FamilyCheckinResult`. Scanning twice does not double count. |
+
+## Plans (22 Oct 2026)
+
+Priced at half of Elvanto for the same number of people, with no setup fee. Seed free up to 50 people; Grow ₹7,999 / $99 (500 people); Thrive ₹13,999 / $169 (2,500); Cathedral ₹16,999 / $199 (unlimited). Yearly is ten months. Source of truth: `src/core/plans.ts`.

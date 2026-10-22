@@ -140,7 +140,7 @@ test('upgrading starts a Razorpay subscription and the webhook turns the plan on
   assert.equal(out.checkoutUrl, 'https://rzp.io/i/plan');
   const plan = calls.find((c) => c.url === '/v1/plans')!;
   assert.equal(plan.body.period, 'yearly');
-  assert.equal(plan.body.item.amount, 1_499_000);
+  assert.equal(plan.body.item.amount, 7_999_000);
   const sub = calls.find((c) => c.url === '/v1/subscriptions')!;
   assert.equal(sub.body.notes.church_id, grace.church.id);
 
@@ -190,7 +190,7 @@ test('the Flockwise team panel: sign-in, overview, plan changes, pausing and sup
   const ov = await ok(await req('GET', '/v1/platform/overview', undefined, { token: team }));
   assert.equal(ov.churches, 2);
   assert.equal(ov.paying, 1);
-  assert.equal(ov.mrr.INR, Math.round(1_499_000 / 12));
+  assert.equal(ov.mrr.INR, Math.round(7_999_000 / 12));
   const list = await ok(await req('GET', '/v1/platform/churches?q=grace', undefined, { token: team }));
   assert.equal(list.length, 1);
   assert.equal(list[0].plan, 'grow');

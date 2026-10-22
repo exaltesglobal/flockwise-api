@@ -1,6 +1,8 @@
 // Flockwise subscription plans: prices, limits and which features each plan opens.
 // Change prices and limits here; the church office, the sign-up page and the Flockwise
 // team panel all read this one table.
+// Pricing rule (Anup, 22 Oct 2026): half of Elvanto for the same number of people, no setup fee.
+// Elvanto (Oct 2026, USD/month): 500 adults $203, 2,500 $338, unlimited $413, plus $149 setup.
 import type { Db } from './db.js';
 import { ApiError } from './errors.js';
 
@@ -28,14 +30,14 @@ export const PLANS: Record<PlanId, Plan> = {
     name: 'Seed',
     tagline: 'House churches and church plants',
     price: { INR: { monthly: 0, yearly: 0 }, USD: { monthly: 0, yearly: 0 } },
-    limits: { people: 100, staff: 2, campuses: 1, aiCredits: 20 },
+    limits: { people: 50, staff: 2, campuses: 1, aiCredits: 20 },
     highlights: ['People, households and directory', 'Member app in 6 languages', 'Events, announcements and prayer wall', 'Online giving with no platform fee', 'Email messages and birthday greetings'],
   },
   grow: {
     id: 'grow',
     name: 'Grow',
     tagline: 'Growing local churches',
-    price: { INR: { monthly: 149_900, yearly: 1_499_000 }, USD: { monthly: 2_900, yearly: 29_000 } },
+    price: { INR: { monthly: 799_900, yearly: 7_999_000 }, USD: { monthly: 9_900, yearly: 99_000 } },
     limits: { people: 500, staff: 10, campuses: 1, aiCredits: 200 },
     highlights: ['Kids check-in, kiosk and labels', 'Volunteer rotas and groups', 'Forms, registrations and paid tickets', '80G receipts, pledges and statements', 'SMS and WhatsApp at cost, automations', 'Care, prayer and sermons library'],
   },
@@ -43,7 +45,7 @@ export const PLANS: Record<PlanId, Plan> = {
     id: 'thrive',
     name: 'Thrive',
     tagline: 'Mid-sized and multi-service churches',
-    price: { INR: { monthly: 399_900, yearly: 3_999_000 }, USD: { monthly: 7_900, yearly: 79_000 } },
+    price: { INR: { monthly: 1_399_900, yearly: 13_999_000 }, USD: { monthly: 16_900, yearly: 169_000 } },
     limits: { people: 2_500, staff: 30, campuses: 3, aiCredits: 1_000 },
     highlights: ['Worship planning, chord charts and CCLI', 'Lyrics on the projector, stage display and studio', 'Follow-up workflows and custom fields', 'Calendar with room booking', 'Insights and AI assistant'],
   },
@@ -51,8 +53,8 @@ export const PLANS: Record<PlanId, Plan> = {
     id: 'cathedral',
     name: 'Cathedral',
     tagline: 'Mega churches, dioceses and networks',
-    price: { INR: { monthly: 999_900, yearly: 9_999_000 }, USD: { monthly: 19_900, yearly: 199_000 } },
-    limits: { people: 10_000, staff: UNLIMITED, campuses: UNLIMITED, aiCredits: 5_000 },
+    price: { INR: { monthly: 1_699_900, yearly: 16_999_000 }, USD: { monthly: 19_900, yearly: 199_000 } },
+    limits: { people: UNLIMITED, staff: UNLIMITED, campuses: UNLIMITED, aiCredits: 5_000 },
     highlights: ['Unlimited campuses and logins', 'API access, MCP and integrations', 'Weekly AI pastor briefing', 'Priority support and data migration'],
   },
 };

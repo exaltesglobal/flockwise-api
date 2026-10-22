@@ -15,7 +15,7 @@ const text = (v: unknown, max: number) => String(v ?? '').trim().slice(0, max);
 const orNull = (v: unknown, max: number) => text(v, max) || null;
 
 /** The signed-in adult. Children see their own things but don't manage the family. */
-function parent(ctx: Ctx): Person {
+export function parent(ctx: Ctx): Person {
   const me = find(ctx, 'people', ctx.me(), 'Profile');
   if (isChild(ctx, me)) throw new ApiError(403, 'forbidden', 'Ask a parent to manage the family.');
   return me;
@@ -73,7 +73,7 @@ function detailsFrom(ctx: Ctx, b: Record<string, unknown>, adult: boolean): Part
   return out;
 }
 
-function checkinEvent(ctx: Ctx, me: Person, ev: Collections['events']): FamilyCheckinEvent {
+export function checkinEvent(ctx: Ctx, me: Person, ev: Collections['events']): FamilyCheckinEvent {
   const t = ctx.now.getTime();
   const opens = new Date(ev.startsAt).getTime() - OPENS_MS;
   const done = checkinsFor(ctx, ev.id);
