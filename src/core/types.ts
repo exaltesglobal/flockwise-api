@@ -963,6 +963,7 @@ export type Collections = {
   consentLog: ConsentEvent;
   dataRequests: DataRequest;
   parentPages: ParentPage;
+  bulletins: Bulletin;
   apiKeys: ApiKeyRecord;
   automations: Automations & { id: string };
   greetings: Greeting;
@@ -1023,7 +1024,7 @@ export const KINDS = [
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys',
-  'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages',
+  'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
 ] as const satisfies readonly Kind[];
 
 // ----- assisted Razorpay setup: Flockwise's team opens the church's Razorpay account and does its KYC -----
@@ -1249,4 +1250,37 @@ export type ParentPage = {
   at: string;
   by: string;
   resolvedAt: string | null;
+};
+
+// ---------- digital bulletin ----------
+
+export type BulletinSection = 'order' | 'announcements' | 'events' | 'celebrations' | 'serving' | 'giving';
+export type Bulletin = {
+  id: string;
+  eventId: string | null;
+  /** The Sunday (or service day) it is for. YYYY-MM-DD. */
+  date: string;
+  title: string;
+  /** A short word from the pastor at the top. */
+  intro: string;
+  /** Scripture or a verse for the week. */
+  verse: string;
+  sections: BulletinSection[];
+  status: 'draft' | 'published';
+  publishedAt: string | null;
+  /** In the share link, so people can open it from WhatsApp without signing in. */
+  shareKey: string;
+  createdAt: string;
+  updatedAt: string;
+};
+export type BulletinView = Bulletin & {
+  church: { name: string; address: string; logoUrl: string | null; phone: string; website: string };
+  service: { title: string; startsAt: string; location: string; theme: string } | null;
+  order: { kind: PlanItemKind; title: string; person: string }[];
+  announcements: { id: string; title: string; body: string }[];
+  events: { id: string; title: string; startsAt: string; location: string }[];
+  celebrations: { name: string; kind: CelebrationKind; date: string; years: number | null }[];
+  serving: { team: string; names: string[] }[];
+  giving: { url: string; campaigns: PublicCampaign[] };
+  shareUrl: string;
 };

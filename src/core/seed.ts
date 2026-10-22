@@ -325,6 +325,9 @@ export function seedDemo(db: Db, env: Env) {
   db.put('donations', gift({ donorId: DEMO_MEMBER, donorName: 'Priya Thomas', fundId: 'fd_harvest', amount: 500000, createdAt: at(-3, 20), method: 'upi' }));
   db.put('meta', { id: `receipt:${fy(now)}`, value: String(receipt) });
 
+  // ----- this Sunday's bulletin -----
+  db.put('bulletins', { id: 'bl_1', eventId: 'ev_1', date: at(toSunday, 9).slice(0, 10), title: 'Sunday Worship (English)', intro: 'Welcome to Grace Church! If this is your first Sunday with us, please stop by the welcome desk after the service. We would love to meet you.', verse: '“Bring the whole tithe into the storehouse… and see if I will not throw open the floodgates of heaven.” Malachi 3:10', sections: ['order', 'announcements', 'events', 'celebrations', 'serving', 'giving'], status: 'published', publishedAt: at(-1, 18), shareKey: 'demo7bulln', createdAt: at(-2, 10), updatedAt: at(-1, 18) });
+
   // ----- announcements -----
   db.put('announcements', { id: 'an_1', title: 'Christmas choir auditions', body: 'Auditions for the Christmas choir are open after both services this Sunday. Speak to Pastor Samuel at the welcome desk.', publishedAt: at(-1, 9), status: 'published', imageUrl: null });
   db.put('announcements', { id: 'an_2', title: 'Blood donation drive', body: 'Together with a city blood bank we are hosting a donation camp in the fellowship hall. Please bring a photo ID.', publishedAt: at(-3, 18), status: 'published', imageUrl: null });

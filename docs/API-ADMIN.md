@@ -462,3 +462,19 @@ The kids' team can ask a checked-in child's parents to come during the service. 
 - `GET /admin/checkin/checkins/:id/parents` lists who would get it.
 - `POST /admin/checkin/checkins/:id/page { reason: 'come' | 'pickup' | 'feeding' | 'custom', note? }` sends it and returns the page with who it reached (`sentTo[].ok`).
 - `GET /admin/checkin/:eventId/pages` lists the event's pages. `POST /admin/checkin/pages/:id/resolve` marks that the parent came.
+
+## Digital bulletin
+
+A weekly bulletin built from the next service's plan, recent notices, the coming week's events, birthdays and anniversaries, today's serving teams and the giving link with live special offerings. Permission: `comms`.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/admin/bulletins` | All bulletins, newest Sunday first. |
+| POST | `/admin/bulletins` | `{eventId?}`. Drafts one for that service (default: the next service). Sections copy from the last published bulletin. Returns a `BulletinView`. |
+| GET | `/admin/bulletins/:id` | `BulletinView`: the bulletin plus `church`, `service`, `order`, `announcements`, `events`, `celebrations`, `serving`, `giving` and `shareUrl`. |
+| PATCH | `/admin/bulletins/:id` | Any of `title`, `intro`, `verse`, `date`, `eventId`, `sections` (`order`, `announcements`, `events`, `celebrations`, `serving`, `giving`) and `status` (`draft` or `published`). |
+| DELETE | `/admin/bulletins/:id` | |
+
+Members: `GET /bulletins` (last 12 published, `{id, title, date}`), `GET /bulletins/latest` (or `null`), `GET /bulletins/:id`.
+
+Public: `GET /public/bulletins/:id?k=<shareKey>` for the WhatsApp link. Only published bulletins open. Birthdays and serving names are never on the public link, and celebrations only include adults who allow the directory.
