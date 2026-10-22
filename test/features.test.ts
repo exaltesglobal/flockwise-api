@@ -147,6 +147,7 @@ test('headcounts, volunteer check-in, live service and CCLI report', async () =>
 
 test('group space, sermons and the public church page', async () => {
   const a = await signIn('admin', 'pastor@gracechurch.in');
+  await call(a, 'PUT', '/admin/public-page', { enabled: false });
   await assert.rejects(call(null, 'GET', '/public/church'), /not published/);
   await call(a, 'PUT', '/admin/public-page', { enabled: true, tagline: 'A church for the city' });
   await call(a, 'POST', '/admin/sermons', { title: 'Grace upon grace', speaker: 'Ps. John', date: '2026-10-18', videoUrl: 'https://youtube.com/watch?v=x' });
