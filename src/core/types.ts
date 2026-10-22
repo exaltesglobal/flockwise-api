@@ -246,7 +246,7 @@ export type Pledge = { id: string; personId: string; personName: string; fundId:
 export type PledgeView = Pledge & { given: number; currency: Currency; /** The AutoPay paying this pledge, if any. */ autopay?: { id: string; status: RecurringStatus; amount: number } | null };
 
 export type GivingStatement = {
-  church: { name: string; address: string; pan: string | null; registration80g: string | null };
+  church: { name: string; address: string; logoUrl: string | null; pan: string | null; registration80g: string | null };
   donor: { id: string; name: string; pan: string | null; address: string | null };
   financialYear: string;
   currency: Currency;

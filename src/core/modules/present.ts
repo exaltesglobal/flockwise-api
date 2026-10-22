@@ -178,7 +178,8 @@ function view(ctx: Ctx, ev: Collections['events'], staff = true): PresentationVi
   return {
     event: { id: ev.id, title: ev.title, startsAt: ev.startsAt, endsAt: ev.endsAt },
     churchName: c.name,
-    logoUrl: c.logoUrl ?? null,
+    // The projector is a dark surface: prefer the brand kit's dark logo.
+    logoUrl: c.brand?.logoDarkUrl || c.logoUrl || null,
     slides,
     state: { ...state, index: Math.min(state.index, Math.max(0, slides.length - 1)) },
     theme,

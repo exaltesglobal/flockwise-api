@@ -117,7 +117,7 @@ function statement(ctx: Ctx, personId: string, fy?: string): GivingStatement {
     .sort((x, y) => giftDate(x).localeCompare(giftDate(y)));
   const rows = gifts.map((d) => ({ id: d.id, date: giftDate(d), fundName: d.fundName, amount: d.amount, method: d.method, receiptNumber: d.receiptNumber, eligible80g: eligible80g(ctx, d) }));
   return {
-    church: { name: s.name, address: s.address, pan: s.receipts80g.pan, registration80g: s.receipts80g.enabled ? s.receipts80g.registrationNumber : null },
+    church: { name: s.name, address: s.address, logoUrl: s.logoUrl ?? null, pan: s.receipts80g.pan, registration80g: s.receipts80g.enabled ? s.receipts80g.registrationNumber : null },
     donor: { id: p.id, name: fullName(p), pan: gifts.map((g) => g.pan).find(Boolean) ?? null, address: p.address },
     financialYear: range.label,
     currency: s.currency,
