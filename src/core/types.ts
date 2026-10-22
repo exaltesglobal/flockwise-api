@@ -480,6 +480,8 @@ export type ChurchSettings = Church & {
   childAgeLimit: number;
   publicPage?: PublicPage;
   presentation?: Partial<PresentationTheme>;
+  /** OBS Studio: which scene goes with each kind of plan item. */
+  obs?: Partial<ObsSettings>;
   /** Secret in the projector, stage and OBS overlay links so those screens need no sign-in. */
   screenKey?: string;
   /** AI requests allowed each month (the plan's allowance). */
@@ -785,6 +787,50 @@ export type PresentationState = {
   /** When the countdown ends (defaults to the service start). */
   countdownTo?: string | null;
 };
+/** One plan item for the musicians' phones: the full chart in the service key, plus who and what. */
+export type BandItem = {
+  itemIndex: number;
+  id: string;
+  kind: PlanItemKind;
+  title: string;
+  person: string;
+  minutes: number;
+  notes: string;
+  /** Key for this service (the plan item's key, else the song's). */
+  key: string | null;
+  /** The key the chart is written in. */
+  songKey: string | null;
+  bpm: number | null;
+  author: string;
+  /** ChordPro chart (or plain lyrics / reading text when the song has no chords), in songKey. */
+  chart: string;
+  hasChords: boolean;
+  /** Section order for this service, when it differs from the chart. */
+  arrangement: string[];
+};
+/** What the stream does as the presenter moves through the plan. Lives in church settings; the browser on the media desk talks to OBS. */
+export type ObsSettings = {
+  /** OBS scene names by plan-item kind, plus the countdown and blank screens. Blank = leave the scene alone. */
+  scenes: Partial<Record<ObsMoment, string>>;
+  /** Switch scenes automatically as the presenter moves through the plan. */
+  autoSwitch: boolean;
+  /** Put the lyrics bar on the stream whenever a song is on screen, and take it off after. */
+  lyricsOnSongs: boolean;
+};
+export type ObsMoment = PlanItemKind | 'countdown' | 'blank';
+export const OBS_MOMENTS: { id: ObsMoment; label: string; hint: string }[] = [
+  { id: 'countdown', label: 'Before the service', hint: 'Countdown and announcements' },
+  { id: 'song', label: 'Songs', hint: 'Worship team wide shot' },
+  { id: 'reading', label: 'Scripture readings', hint: 'Lectern' },
+  { id: 'sermon', label: 'Sermon', hint: 'Pulpit close-up' },
+  { id: 'prayer', label: 'Prayer', hint: '' },
+  { id: 'announcement', label: 'Announcements', hint: '' },
+  { id: 'offering', label: 'Offering', hint: 'UPI QR on screen' },
+  { id: 'video', label: 'Videos', hint: 'Full-screen media' },
+  { id: 'other', label: 'Other items', hint: '' },
+  { id: 'blank', label: 'Screens blank', hint: 'e.g. a wide shot or holding card' },
+];
+
 export type PresentationView = {
   event: { id: string; title: string; startsAt: string; endsAt: string };
   churchName: string;
@@ -797,6 +843,10 @@ export type PresentationView = {
   announcements: { title: string; body: string }[];
   /** Lower-thirds suggested from the plan (preacher, readers, references). */
   suggestedLowerThirds: LowerThird[];
+  /** Every item with its chart, for the musicians' view. */
+  charts: BandItem[];
+  /** OBS scene plan for the media desk. */
+  obs: ObsSettings;
   /** Key for the sign-in-free screen links (projector PC, OBS Browser Source). Office logins only. */
   screenKey?: string;
 };

@@ -584,6 +584,8 @@ export function seedDemo(db: Db, env: Env) {
   ];
   hymns.forEach(([title, author, key, bpm, lyrics, arrangement], i) =>
     db.put('songs', { id: `sg_h${i + 1}`, title, author, defaultKey: key, bpm, ccli: '', tags: ['Hymn'], lyrics, arrangement }));
+  // A simple folk harmonisation of Amazing Grace (public domain) so the musicians' view has chords to show.
+  db.put('songs', { ...db.get('songs', 'sg_h1')!, chordChart: '{title: Amazing Grace}\n{key: G}\n\n[Verse 1]\nA[G]mazing grace! How [G7]sweet the [C]sound\nThat [G]saved a wretch like [D]me!\nI [G]once was lost, but [G7]now am [C]found;\nWas [G]blind, but [D]now I [G]see.\n\n[Verse 2]\n’Twas [G]grace that taught my [G7]heart to [C]fear,\nAnd [G]grace my fears re[D]lieved;\nHow [G]precious did that [G7]grace ap[C]pear\nThe [G]hour I [D]first be[G]lieved.\n\n[Verse 3]\nThrough [G]many dangers, [G7]toils and [C]snares,\nI [G]have already [D]come;\n’Tis [G]grace hath brought me [G7]safe thus [C]far,\nAnd [G]grace will [D]lead me [G]home.\n\n[Verse 4]\nWhen [G]we’ve been there ten [G7]thousand [C]years,\nBright [G]shining as the [D]sun,\nWe’ve [G]no less days to [G7]sing God’s [C]praise\nThan [G]when we’d [D]first be[G]gun.' });
   const plan1 = db.get('plans', 'ev_1')!;
   db.put('plans', {
     ...plan1,

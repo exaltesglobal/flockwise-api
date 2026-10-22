@@ -2,7 +2,8 @@
 // announcements), keeps every screen on the same slide, and adds song usage stats for worship teams.
 import { ApiError } from '../errors.js';
 import type { Ctx, Router } from '../engine.js';
-import type { Collections, LowerThird, PlanItem, PresentationState, PresentationTheme, PresentationView, Slide, Song, SongStats } from '../types.js';
+import type { BandItem, Collections, LowerThird, ObsSettings, PlanItem, PresentationState, PresentationTheme, PresentationView, Slide, Song, SongStats } from '../types.js';
+import { OBS_MOMENTS } from '../types.js';
 import { church, DAY, find, pick, settings } from '../util.js';
 import { liveView } from './ministry.js';
 
@@ -10,6 +11,8 @@ export const DEFAULT_THEME: PresentationTheme = { background: '#0f1f1c', textCol
 const SECTION = /^(verse|chorus|refrain|bridge|pre-?chorus|intro|outro|tag|interlude|ending|instrumental|vamp|coda)\b/i;
 
 export const themeOf = (ctx: Ctx): PresentationTheme => ({ ...DEFAULT_THEME, ...(settings(ctx).presentation ?? {}) });
+export const DEFAULT_OBS: ObsSettings = { scenes: {}, autoSwitch: true, lyricsOnSongs: true };
+export const obsOf = (ctx: Ctx): ObsSettings => ({ ...DEFAULT_OBS, ...(settings(ctx).obs ?? {}), scenes: { ...(settings(ctx).obs?.scenes ?? {}) } });
 
 type Section = { label: string; lines: string[]; chords: string[] };
 
@@ -135,6 +138,19 @@ export function buildDeck(ctx: Ctx, items: PlanItem[], theme = themeOf(ctx)): Sl
   return slides;
 }
 
+/** The musicians' charts: each item with its song's chart and the key it is played in today. */
+function bandItems(ctx: Ctx, items: PlanItem[]): BandItem[] {
+  return items.map((it, i) => {
+    const song = it.songId ? ctx.db.get('songs', it.songId) : undefined;
+    const chart = song ? (song.chordChart?.trim() ? song.chordChart : song.lyrics) : (it.text ?? '');
+    return {
+      itemIndex: i, id: it.id, kind: it.kind, title: it.title, person: it.person, minutes: it.minutes, notes: it.notes,
+      key: it.key || song?.defaultKey || null, songKey: song?.defaultKey ?? null, bpm: song?.bpm ?? null, author: song?.author ?? '',
+      chart, hasChords: /\[[A-G][#b]?[^\]]*\]/.test(chart), arrangement: it.arrangement?.length ? it.arrangement : song?.arrangement ?? [],
+    };
+  });
+}
+
 const stateFor = (ctx: Ctx, eventId: string): PresentationState =>
   ctx.db.get('presentations', eventId) ?? { id: eventId, eventId, index: 0, mode: 'live', message: '', updatedAt: ctx.now.toISOString() };
 
@@ -186,6 +202,8 @@ function view(ctx: Ctx, ev: Collections['events'], staff = true): PresentationVi
     timer: { itemTitle: runningItem?.title ?? null, itemEndsAt: live.itemEndsAt, serviceEndsAt: live.serviceEndsAt },
     announcements: ctx.db.all('announcements').filter((a) => a.status === 'published').sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)).slice(0, 6).map((a) => ({ title: a.title, body: a.body.slice(0, 240) })),
     suggestedLowerThirds: suggestLowerThirds(live.plan.items),
+    charts: bandItems(ctx, live.plan.items),
+    obs: obsOf(ctx),
     ...(staff ? { screenKey: screenKey(ctx) } : {}),
   };
 }
@@ -285,6 +303,26 @@ export function registerPresent(r: Router) {
     for (const k of ['background', 'textColor'] as const) if (patch[k] !== undefined && !/^#[0-9a-f]{3,8}$/i.test(String(patch[k]))) delete patch[k];
     const next = { ...themeOf(ctx), ...patch };
     ctx.db.put('settings', { ...settings(ctx), presentation: next });
+    return next;
+  });
+
+  // OBS scene plan: which scene each moment of the service gets. The presenter's browser does the switching.
+  r.get('/admin/presentation-obs', { staff: true }, (ctx) => obsOf(ctx));
+  r.put('/admin/presentation-obs', { perm: ['services', 'settings'] }, (ctx) => {
+    const cur = obsOf(ctx);
+    const scenes: ObsSettings['scenes'] = {};
+    const given = ctx.body.scenes ?? cur.scenes;
+    for (const m of OBS_MOMENTS) {
+      const v = String(given[m.id] ?? '').trim().slice(0, 100);
+      if (v) scenes[m.id] = v;
+    }
+    const next: ObsSettings = {
+      scenes,
+      autoSwitch: ctx.body.autoSwitch === undefined ? cur.autoSwitch : !!ctx.body.autoSwitch,
+      lyricsOnSongs: ctx.body.lyricsOnSongs === undefined ? cur.lyricsOnSongs : !!ctx.body.lyricsOnSongs,
+    };
+    ctx.db.put('settings', { ...settings(ctx), obs: next });
+    ctx.audit('updated', 'settings', 'church', 'Updated the OBS scene plan');
     return next;
   });
 
