@@ -133,6 +133,12 @@ at a Chitthi test server (default `https://app.chitthi.live`).
 
 Each church gets 300 AI requests a month by default (church setting `aiMonthlyLimit`).
 
+### Licensed song lyrics (optional, for later)
+
+| Variable | Status | Value |
+|---|---|---|
+| `LYRICS_FEEDS` | not set (fine) | Only once Agape Labs signs a lyrics licence (SongSelect partner API, a publisher, an Indian label). JSON list: `[{"id":"songselect","name":"CCLI SongSelect","url":"https://…","key":"…","covers":"ccli"}]`. Contract in [SONG-CATALOG.md](SONG-CATALOG.md). Empty means the song database offers public-domain words only |
+
 ### Not used in production
 
 `DATA_FILE` (local JSON storage without MySQL). Leave unset on Hostinger.

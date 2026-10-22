@@ -75,6 +75,8 @@ export function createHub() {
       http: (req) => hooks.http(req),
       google: { accessToken: (k, scope) => hooks.google.accessToken(k, scope), signedUrl: (k, input) => hooks.google.signedUrl(k, input) },
       ...(config.canva ? { canvaApp: { ...config.canva, redirectUrl: `${config.apiPublicUrl}/v1/integrations/canva/callback`, pkce } } : {}),
+      lyricsFeeds: config.lyricsFeeds,
+      songCatalog: { stored: () => platform?.songs() ?? [] },
       verifyRazorpay: checkKeys,
       serverPaymentKeys: isDefault && !!config.razorpay.main,
       razorpayPartnerUrl: config.razorpayPartnerUrl,

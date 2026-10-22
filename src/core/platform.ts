@@ -9,6 +9,7 @@ import { ApiError } from './errors.js';
 import type { createChurchEngine } from './index.js';
 import { activePeople } from './modules/people.js';
 import { createNetworks } from './network.js';
+import { songTeamRoute, storedSongs } from './catalog/team.js';
 import { SETUP_FEE, teamReadDoc, teamSetupRow, teamUpdateSetup } from './modules/razorpay-setup.js';
 import { effectivePlan, getSubscription, monthlyValue, PLAN_ORDER, PLANS, saveSubscription, startTrial, type PlanId, type Subscription } from './plans.js';
 import type { Currency, Session } from './types.js';
@@ -449,6 +450,8 @@ export function createPlatform({ db, env, host, admins }: PlatformOpts) {
       teamLog(team.email, 'support_access', e.id, `Opened ${e.name} as ${owner.name}${body.reason ? ` (${String(body.reason).slice(0, 200)})` : ''}`);
       return { church: { id: e.id, slug: e.slug, name: e.name }, session };
     }
+    // The shared song database (public-domain songs every church can add).
+    if (rest[0] === 'songs') return songTeamRoute(db, env, method, rest, body, query, (action, summary) => teamLog(team.email, action, null, summary));
     return teamRoute(method, rest, body, query, team.email);
   }
 
@@ -462,7 +465,7 @@ export function createPlatform({ db, env, host, admins }: PlatformOpts) {
     }
   }
 
-  return { handle, resolve, lookup, ensureChurch, entries, entry, tickAll, slugProblem, suggestSlug, db, networks };
+  return { handle, resolve, lookup, ensureChurch, entries, entry, tickAll, slugProblem, suggestSlug, db, networks, songs: () => storedSongs(db) };
 }
 
 export type Platform = ReturnType<typeof createPlatform>;

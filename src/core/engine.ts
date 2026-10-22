@@ -5,7 +5,7 @@ import { ApiError } from './errors.js';
 import { withChurchMail } from './mail.js';
 import { PERMISSIONS } from './perms.js';
 import { atLeast, checkPlan, effectivePlan, getSubscription, type BillingInterval, type PlanId } from './plans.js';
-import type { Channel, ChannelStatus, ChurchNetworkHost, Collections, DonationRecord, Kind, Permission, StaffRole } from './types.js';
+import type { CatalogSong, Channel, ChannelStatus, ChurchNetworkHost, Collections, DonationRecord, Kind, Permission, StaffRole } from './types.js';
 
 export type BillingCheckout = { churchId: string; churchName: string; plan: PlanId; interval: BillingInterval; currency: 'INR' | 'USD'; amount: number; email: string; name: string };
 /** `html` is the branded version of `text`; providers send both when it is there. */
@@ -103,9 +103,20 @@ export type Env = {
     accessToken(key: GoogleKey, scope: string): Promise<string>;
     signedUrl(key: GoogleKey, input: { bucket: string; object: string; method: 'PUT' | 'GET'; contentType?: string; expiresSeconds: number }): Promise<string>;
   };
+  /**
+   * Licensed lyrics services (SongSelect, a publisher, an Indian label) Flockwise has an agreement
+   * with. Each answers the lyrics-feed contract in docs/SONG-CATALOG.md over `http`. Empty or absent
+   * means copyrighted songs are added with credits only.
+   */
+  lyricsFeeds?: LyricsFeed[];
+  /** Songs and public-domain words the Flockwise team added to the shared song database (/platform/songs). */
+  songCatalog?: { stored(): CatalogSong[] };
   /** Flockwise's Canva app, so churches can connect their Canva. Absent when CANVA_CLIENT_ID is not set. */
   canvaApp?: { clientId: string; clientSecret: string; redirectUrl: string; pkce(): { verifier: string; challenge: string } };
 };
+
+/** One licensed lyrics service. `key` is sent as a bearer token. */
+export type LyricsFeed = { id: string; name: string; url: string; key: string; covers: 'all' | 'ccli' };
 
 export type HttpRequest = { method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; url: string; headers?: Record<string, string>; body?: string | Uint8Array; timeoutMs?: number };
 export type HttpResponse = { status: number; headers: Record<string, string>; text: string };
