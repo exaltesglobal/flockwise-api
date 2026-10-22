@@ -102,6 +102,18 @@ and a phone number not already on the WhatsApp app.
   (WhatsApp Manager > Message templates). Needed to message people who haven't written in the last 24 hours.
 - `WHATSAPP_TEMPLATE_LANG`: the template's language code, e.g. `en`.
 
+Churches that use **Chitthi** don't need these: each church connects its own Chitthi workspace
+in Settings › Integrations, and WhatsApp goes through Chitthi. `CHITTHI_URL` is only for pointing
+at a Chitthi test server (default `https://app.chitthi.live`).
+
+### AI features (optional)
+
+- `ANTHROPIC_API_KEY`: from console.anthropic.com > API keys. While it is unset, the Assistant and
+  every "Write with AI" button stay hidden.
+- `ANTHROPIC_MODEL`: leave unset to use `claude-opus-5-5`.
+
+Each church gets 300 AI requests a month by default (church setting `aiMonthlyLimit`).
+
 ### Not used in production
 
 `DATA_FILE` (local JSON storage without MySQL). Leave unset on Hostinger.
