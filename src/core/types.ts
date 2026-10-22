@@ -964,6 +964,11 @@ export type Collections = {
   dataRequests: DataRequest;
   parentPages: ParentPage;
   bulletins: Bulletin;
+  ssClasses: SsClass;
+  ssLessons: SsLesson;
+  ssAttendance: SsAttendance;
+  ssExams: SsExam;
+  ssMarks: SsMark;
   apiKeys: ApiKeyRecord;
   automations: Automations & { id: string };
   greetings: Greeting;
@@ -1025,6 +1030,7 @@ export const KINDS = [
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
+  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks',
 ] as const satisfies readonly Kind[];
 
 // ----- assisted Razorpay setup: Flockwise's team opens the church's Razorpay account and does its KYC -----
@@ -1283,4 +1289,117 @@ export type BulletinView = Bulletin & {
   serving: { team: string; names: string[] }[];
   giving: { url: string; campaigns: PublicCampaign[] };
   shareUrl: string;
+};
+
+// ---------- Sunday school ----------
+
+export type SsClass = {
+  id: string;
+  name: string;
+  minAge: number;
+  maxAge: number;
+  /** The kids' check-in room the class meets in, so check-ins can fill the register. */
+  roomId: string | null;
+  teacherIds: string[];
+  studentIds: string[];
+  order: number;
+  createdAt: string;
+};
+export type SsLesson = {
+  id: string;
+  /** null means every class has this lesson. */
+  classId: string | null;
+  date: string;
+  title: string;
+  scripture: string;
+  memoryVerse: string;
+  notes: string;
+};
+/** One class on one Sunday. id is `${classId}:${date}`. */
+export type SsAttendance = {
+  id: string;
+  classId: string;
+  date: string;
+  present: string[];
+  /** Children who said the memory verse. */
+  verse: string[];
+  visitors: number;
+  /** Class offering, in paise. */
+  offering: number;
+  markedBy: string;
+  markedAt: string;
+};
+export type SsExam = {
+  id: string;
+  name: string;
+  date: string;
+  maxMarks: number;
+  classIds: string[];
+  /** Published results show to parents and can be sent on WhatsApp. */
+  status: 'open' | 'published';
+  createdAt: string;
+};
+/** id is `${examId}:${personId}`. marks null means absent. */
+export type SsMark = { id: string; examId: string; personId: string; classId: string; marks: number | null };
+
+export type SsPerson = { id: string; name: string; age: number | null };
+export type SsClassView = SsClass & {
+  teachers: SsPerson[];
+  students: number;
+  roomName: string | null;
+  /** Average share present over the last 8 marked Sundays. */
+  attendance: number | null;
+  lastMarked: string | null;
+};
+export type SsStudentRow = SsPerson & { present: number; of: number; percent: number | null; verses: number; streak: number };
+export type SsClassDetail = SsClassView & {
+  roster: SsStudentRow[];
+  sessions: { date: string; present: number; of: number; visitors: number; offering: number }[];
+  lessons: SsLesson[];
+};
+export type SsRegister = {
+  classId: string;
+  className: string;
+  date: string;
+  saved: boolean;
+  lesson: SsLesson | null;
+  students: (SsPerson & { present: boolean; verse: boolean; checkedIn: boolean })[];
+  visitors: number;
+  offering: number;
+};
+export type SsGrade = 'A+' | 'A' | 'B' | 'C' | 'D';
+export type SsExamView = SsExam & { classes: { id: string; name: string; entered: number; of: number }[] };
+export type SsResultRow = SsPerson & { marks: number | null; /** Marked absent, as opposed to not entered yet. */ absent: boolean; percent: number | null; grade: SsGrade | null; rank: number | null };
+export type SsExamResults = SsExamView & { results: { classId: string; name: string; average: number | null; rows: SsResultRow[] }[] };
+export type SsPrizes = {
+  from: string;
+  to: string;
+  classes: {
+    classId: string;
+    name: string;
+    toppers: { exam: string; rank: number; name: string; marks: number; maxMarks: number }[];
+    attendance: { name: string; present: number; of: number }[];
+    verses: { name: string; verses: number }[];
+  }[];
+};
+export type SsOverview = {
+  sunday: string;
+  classes: SsClassView[];
+  students: number;
+  teachers: number;
+  markedThisSunday: number;
+  unassigned: SsPerson[];
+  nextLesson: SsLesson | null;
+};
+export type MemberSundaySchool = {
+  children: {
+    id: string;
+    name: string;
+    className: string | null;
+    teachers: string[];
+    attendance: { present: number; of: number; percent: number | null };
+    verses: number;
+    lesson: SsLesson | null;
+    results: { exam: string; date: string; marks: number | null; maxMarks: number; grade: SsGrade | null; rank: number | null }[];
+  }[];
 };

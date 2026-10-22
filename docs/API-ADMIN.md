@@ -478,3 +478,27 @@ A weekly bulletin built from the next service's plan, recent notices, the coming
 Members: `GET /bulletins` (last 12 published, `{id, title, date}`), `GET /bulletins/latest` (or `null`), `GET /bulletins/:id`.
 
 Public: `GET /public/bulletins/:id?k=<shareKey>` for the WhatsApp link. Only published bulletins open. Birthdays and serving names are never on the public link, and celebrations only include adults who allow the directory.
+
+## Sunday school
+
+Classes by age, the weekly register, lessons, exams and the annual day prize list. Permission: `checkin`. Plan: Grow.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/admin/sunday-school` | `SsOverview`: classes with attendance, children, teachers, registers taken for the last Sunday, children not in a class, next lesson. |
+| POST | `/admin/sunday-school/setup` | Creates Beginners 3–5, Primary 6–8, Junior 9–11, Intermediate 12–14 and Senior 15–17, and places children by age. 409 when classes exist. |
+| POST | `/admin/sunday-school/enroll` | Places children who are not in a class into the class for their age. `{placed}` |
+| POST | `/admin/sunday-school/promote` | New year: every child moves to the class for their age; children older than the senior class finish. `{moved, graduated}` |
+| POST | `/admin/sunday-school/classes` | `{name, minAge, maxAge, roomId?, teacherIds?, studentIds?}`. A child is in one class at a time. |
+| GET/PATCH/DELETE | `/admin/sunday-school/classes/:id` | `SsClassDetail` with roster stats (attendance, verses, weeks in a row) over the last 13 registers. |
+| GET | `/admin/sunday-school/classes/:id/register?date=` | Defaults to the last Sunday. Before it is saved, children checked in that day are ticked. |
+| PUT | `/admin/sunday-school/classes/:id/register` | `{date, present[], verse[], visitors, offering}` (offering in paise). Future dates are refused. |
+| GET/POST | `/admin/sunday-school/lessons` | `{date, classId|null, title, scripture, memoryVerse, notes}`. null classId means every class. |
+| PATCH/DELETE | `/admin/sunday-school/lessons/:id` | |
+| GET/POST | `/admin/sunday-school/exams` | `{name, date, maxMarks, classIds?}` (default: every class). |
+| GET/PATCH/DELETE | `/admin/sunday-school/exams/:id` | Results with grade (A+ 90, A 75, B 60, C 45, D) and rank (ties share a rank). PATCH `status: 'published'` shows results to parents. |
+| PUT | `/admin/sunday-school/exams/:id/marks` | `{classId, marks: {personId: number | null | ''}}`. null is absent; '' clears. |
+| POST | `/admin/sunday-school/exams/:id/send` | Published exams only. Each marked child's result goes to the adults in their household on WhatsApp (SMS when only SMS is set up). `{channel, sent, failed, noParent}` |
+| GET | `/admin/sunday-school/prizes?from=&to=` | Per class: top 3 in each published exam, best attendance (at least 75% of Sundays) and most memory verses. Defaults to this calendar year. |
+
+Members: `GET /me/sunday-school` lists the children in the member's household who are in a class, with attendance, memory verses, this week's lesson and published results.

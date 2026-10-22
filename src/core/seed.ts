@@ -366,6 +366,36 @@ export function seedDemo(db: Db, env: Env) {
   db.put('blockouts', { id: 'bo_1', personId: pool[3].id, from: at(toSunday + 7, 0).slice(0, 10), to: at(toSunday + 14, 0).slice(0, 10), reason: 'Travelling to Kerala' });
   db.put('blockouts', { id: 'bo_2', personId: pool[8].id, from: at(toSunday, 0).slice(0, 10), to: at(toSunday, 0).slice(0, 10), reason: 'Family wedding' });
 
+  // ----- Sunday school: classes, 10 Sundays of registers, lessons and a published exam -----
+  {
+    const rs = rng(1977); // own stream so the rest of the demo data stays the same
+    const yrs = (p: Collections['people']) => (p.birthDate ? Math.floor((now - Date.parse(`${p.birthDate}T00:00:00Z`)) / (365.25 * DAY)) : null);
+    const teachers = (db.get('teams', 'tm_kids')?.members ?? []).map((m) => m.personId);
+    const defs: [string, number, number, string | null][] = [['Beginners', 3, 5, 'rm_tots'], ['Primary', 6, 8, 'rm_kids'], ['Junior', 9, 11, 'rm_kids'], ['Intermediate', 12, 14, null], ['Senior', 15, 17, null]];
+    const cls = defs.map(([name, minAge, maxAge, roomId], i) => ({
+      id: `ssc_${i + 1}`, name, minAge, maxAge, roomId, order: i, createdAt: at(-200, 10),
+      teacherIds: teachers.slice(i * 2, i * 2 + 2),
+      studentIds: people.filter((p) => p.status !== 'inactive' && (yrs(p) ?? -1) >= minAge && (yrs(p) ?? -1) <= maxAge).map((p) => p.id),
+    }));
+    for (const c of cls) db.put('ssClasses', c);
+    const sundays = Array.from({ length: 10 }, (_, i) => at(toSunday - 7 * (i + 1), 9).slice(0, 10));
+    for (const c of cls)
+      for (const date of sundays) {
+        const present = c.studentIds.filter(() => rs() < 0.82);
+        db.put('ssAttendance', { id: `${c.id}:${date}`, classId: c.id, date, present, verse: present.filter(() => rs() < 0.55), visitors: rs() < 0.3 ? 1 : 0, offering: present.length * [1000, 2000, 500][Math.floor(rs() * 3)], markedBy: 'Mercy Daniel', markedAt: `${date}T06:30:00.000Z` });
+      }
+    const lessons: [number, string, string, string][] = [
+      [-7, 'Joseph forgives his brothers', 'Genesis 45:1-15', 'Be kind and compassionate to one another, forgiving each other. Ephesians 4:32'],
+      [0, 'Ruth stays with Naomi', 'Ruth 1:1-18', 'Where you go I will go, and where you stay I will stay. Ruth 1:16'],
+      [7, 'David and Goliath', '1 Samuel 17:32-50', 'The Lord who rescued me from the paw of the lion will rescue me. 1 Samuel 17:37'],
+      [14, 'Daniel in the lions\' den', 'Daniel 6:10-23', 'My God sent his angel, and he shut the mouths of the lions. Daniel 6:22'],
+    ];
+    lessons.forEach(([d, title, scripture, memoryVerse], i) => db.put('ssLessons', { id: `ssl_${i + 1}`, classId: null, date: at(toSunday + d, 9).slice(0, 10), title, scripture, memoryVerse, notes: '' }));
+    db.put('ssExams', { id: 'sse_1', name: 'Half-yearly exam', date: at(-110, 0).slice(0, 10), maxMarks: 100, classIds: cls.map((c) => c.id), status: 'published', createdAt: at(-120, 10) });
+    for (const c of cls) for (const pid of c.studentIds) db.put('ssMarks', { id: `sse_1:${pid}`, examId: 'sse_1', personId: pid, classId: c.id, marks: rs() < 0.08 ? null : Math.round(48 + rs() * 50) });
+    db.put('ssExams', { id: 'sse_2', name: 'Annual exam', date: at(toSunday + 35, 0).slice(0, 10), maxMarks: 100, classIds: cls.map((c) => c.id), status: 'open', createdAt: at(-3, 10) });
+  }
+
   // ----- songs and plans -----
   const songs: [string, string, string, number][] = [
     ['Goodness of God', 'Bethel Music', 'A', 63],
