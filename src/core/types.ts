@@ -962,6 +962,7 @@ export type Collections = {
   auctionLots: AuctionLot;
   consentLog: ConsentEvent;
   dataRequests: DataRequest;
+  parentPages: ParentPage;
   apiKeys: ApiKeyRecord;
   automations: Automations & { id: string };
   greetings: Greeting;
@@ -1022,7 +1023,7 @@ export const KINDS = [
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys',
-  'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests',
+  'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages',
 ] as const satisfies readonly Kind[];
 
 // ----- assisted Razorpay setup: Flockwise's team opens the church's Razorpay account and does its KYC -----
@@ -1229,3 +1230,23 @@ export type PrivacyOverview = {
   minorsWithContact: number;
 };
 export type MemberPrivacy = { consent: Consent; log: ConsentEvent[]; requests: DataRequest[]; officer: { name: string; email: string; phone: string }; notice: string; church: string };
+
+// ---------- parent pager ----------
+
+export type PageReason = 'come' | 'pickup' | 'feeding' | 'custom';
+/** A message to a child's parents during a service, sent from check-in. */
+export type ParentPage = {
+  id: string;
+  eventId: string;
+  checkinId: string;
+  childName: string;
+  roomName: string | null;
+  securityCode: string | null;
+  reason: PageReason;
+  note: string;
+  text: string;
+  sentTo: { name: string; to: string; channel: Channel; ok: boolean; error?: string }[];
+  at: string;
+  by: string;
+  resolvedAt: string | null;
+};

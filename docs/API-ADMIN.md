@@ -454,3 +454,11 @@ India's Digital Personal Data Protection Act, 2023 gives people the right to kno
 - Members: `GET /me/privacy` returns their consent, history, requests, the church's notice and its grievance officer. `GET /me/privacy/export` returns everything held about them as JSON (confidential pastoral notes stay out). `POST /me/privacy/requests { kind: 'access' | 'correction' | 'erasure' | 'grievance', details }` opens a request due in 30 days.
 - Office: `GET /admin/privacy` returns the settings, requests, counts of people who said no to each channel, people inactive for longer than `reviewAfterMonths`, and children under 18 with their own phone or email. `PUT /admin/privacy/settings { officerName, officerEmail, officerPhone, notice, reviewAfterMonths }`. `POST /admin/privacy/requests` records a request made by phone or letter. `PATCH /admin/privacy/requests/:id { status, response }`; declining needs a reason. `GET /admin/people/:id/export` downloads a person's data.
 - `POST /admin/privacy/requests/:id/erase` (owner or admin) erases the person: profile, attendance, RSVPs, serving, groups, prayer requests, form answers, WhatsApp messages and consent history. Gift records stay with the donor's name and PAN only, as the Income Tax Act requires (section 8(7) of the DPDP Act allows this). Church registers stay as permanent records.
+
+## Parent pager (Grow plan, with check-in)
+
+The kids' team can ask a checked-in child's parents to come during the service. The message goes to the adults in the child's household who have a phone number, on WhatsApp (through Chitthi when connected) or SMS when WhatsApp is not set up. It says the child is fine, names the room and asks them to show the pickup code.
+
+- `GET /admin/checkin/checkins/:id/parents` lists who would get it.
+- `POST /admin/checkin/checkins/:id/page { reason: 'come' | 'pickup' | 'feeding' | 'custom', note? }` sends it and returns the page with who it reached (`sentTo[].ok`).
+- `GET /admin/checkin/:eventId/pages` lists the event's pages. `POST /admin/checkin/pages/:id/resolve` marks that the parent came.
