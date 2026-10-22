@@ -672,6 +672,7 @@ export type PublicChurch = {
   sermons: Sermon[];
   groups: PublicGroup[];
   forms: { id: string; title: string; description: string }[];
+  campaigns?: PublicCampaign[];
 };
 
 // ---------- celebrations ----------
@@ -954,6 +955,10 @@ export type Collections = {
   kycFiles: KycFile;
   recurring: RecurringGift;
   botMessages: BotMessage;
+  campaigns: Campaign;
+  envelopes: OfferingEnvelope;
+  inKind: InKindGift;
+  auctionLots: AuctionLot;
   apiKeys: ApiKeyRecord;
   automations: Automations & { id: string };
   greetings: Greeting;
@@ -1014,7 +1019,7 @@ export const KINDS = [
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys',
-  'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages',
+  'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots',
 ] as const satisfies readonly Kind[];
 
 // ----- assisted Razorpay setup: Flockwise's team opens the church's Razorpay account and does its KYC -----
@@ -1111,3 +1116,69 @@ export type WaBotStatus = {
   last30: { messages: number; people: number; prayers: number; newcomers: number; talk: number };
   recent: BotMessage[];
 };
+
+// ---------- special offerings: harvest festival, building fund and other campaigns ----------
+
+export type CampaignKind = 'harvest' | 'building' | 'thanksgiving' | 'mission' | 'special';
+export type Campaign = {
+  id: string;
+  name: string;
+  kind: CampaignKind;
+  description: string;
+  /** Gifts to this fund between the dates count towards the campaign. */
+  fundId: string;
+  goal: number | null;
+  startsOn: string;
+  endsOn: string | null;
+  /** Show the progress bar on the church's public page and in the member app. */
+  showPublic: boolean;
+  status: 'active' | 'closed';
+  createdAt: string;
+  createdBy: string;
+};
+/** A numbered offering envelope given to a family, and what came back in it. */
+export type OfferingEnvelope = {
+  id: string;
+  campaignId: string;
+  number: number;
+  personId: string | null;
+  familyName: string;
+  promised: number | null;
+  amount: number | null;
+  method: PaymentMethod | null;
+  receivedAt: string | null;
+  donationId: string | null;
+};
+/** Produce, gold, livestock or other things brought as an offering, often auctioned at harvest festival. */
+export type InKindGift = {
+  id: string;
+  campaignId: string;
+  donorId: string | null;
+  donorName: string;
+  item: string;
+  quantity: string;
+  /** Estimated value, in paise. Counted only when the item is not sold at the auction. */
+  value: number;
+  forAuction: boolean;
+  note: string;
+  receivedAt: string;
+};
+export type AuctionLot = {
+  id: string;
+  campaignId: string;
+  inKindId: string | null;
+  title: string;
+  bidderId: string | null;
+  bidderName: string;
+  amount: number;
+  paid: boolean;
+  method: PaymentMethod | null;
+  paidAt: string | null;
+  donationId: string | null;
+  createdAt: string;
+};
+export type CampaignProgress = { raised: number; gifts: number; envelopes: number; auction: number; inKind: number; givers: number; goal: number | null; percent: number | null; auctionUnpaid: number };
+export type CampaignView = Campaign & { fundName: string; progress: CampaignProgress; envelopesOut: number; envelopesBack: number };
+export type CampaignDetail = CampaignView & { envelopes: OfferingEnvelope[]; inKind: InKindGift[]; lots: AuctionLot[]; topGivers: { name: string; amount: number }[] };
+export type PublicCampaign = { id: string; name: string; kind: CampaignKind; description: string; fundId: string; goal: number | null; raised: number; percent: number | null; givers: number; endsOn: string | null };
+export type MemberCampaign = PublicCampaign & { envelope: { number: number; promised: number | null; amount: number | null } | null };

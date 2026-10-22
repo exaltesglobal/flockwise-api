@@ -127,6 +127,48 @@ function statement(ctx: Ctx, personId: string, fy?: string): GivingStatement {
   };
 }
 
+/** Records a gift given in person (cash, cheque, bank transfer or UPI to the church's account). */
+export function recordGift(ctx: Ctx, b: Record<string, any>) { // eslint-disable-line @typescript-eslint/no-explicit-any
+  requireFields(b, ['donorName', 'fundId', 'amount', 'method']);
+  const fund = find(ctx, 'funds', b.fundId, 'Fund');
+  const method = b.method as PaymentMethod;
+  if (!['cash', 'cheque', 'bank_transfer', 'upi', 'card', 'netbanking'].includes(method)) throw new ApiError(422, 'invalid', 'Choose how it was given.', { method: 'Required' });
+  if (!(Number(b.amount) > 0)) throw new ApiError(422, 'invalid', 'Enter the amount.', { amount: 'Required' });
+  if (b.pan && !PAN_RE.test(b.pan)) throw new ApiError(422, 'invalid', 'PAN should look like ABCDE1234F.', { pan: 'Invalid PAN' });
+  const donor = b.donorId ? ctx.db.get('people', b.donorId) : undefined;
+  const batch = b.batchId ? find(ctx, 'batches', String(b.batchId), 'Batch') : null;
+  if (batch && batch.status !== 'open') throw new ApiError(409, 'batch_committed', `The batch “${batch.name}” is committed. Reopen it to add gifts.`);
+  const at = b.receivedAt ? new Date(b.receivedAt).toISOString() : ctx.now.toISOString();
+  const d = ctx.db.put('donations', {
+    id: ctx.id('dn'),
+    donorId: donor?.id ?? null,
+    donorName: String(b.donorName),
+    donorEmail: donor?.email ?? null,
+    donorPhone: donor?.phone ?? null,
+    fundId: fund.id,
+    fundName: fund.name,
+    amount: Math.round(Number(b.amount)),
+    currency: settings(ctx).currency,
+    frequency: 'once',
+    status: 'succeeded',
+    method,
+    pan: b.pan || null,
+    donorCitizenship: b.donorCitizenship === 'OTHER' ? 'OTHER' : 'IN',
+    fcra: b.donorCitizenship === 'OTHER',
+    provider: 'offline',
+    providerRef: null,
+    providerPaymentId: null,
+    createdAt: at,
+    paidAt: at,
+    eventId: null,
+    receiptNumber: null,
+    batchId: batch?.id ?? null,
+  });
+  const saved = onDonationSucceeded(ctx, d);
+  ctx.audit('recorded', 'donation', d.id, `Recorded ${method} gift from ${d.donorName}`);
+  return saved;
+}
+
 export function registerGiving(r: Router) {
   // ----- member -----
   r.get('/giving/funds', {}, (ctx) =>
@@ -194,45 +236,7 @@ export function registerGiving(r: Router) {
     const res = page(list, ctx.query.cursor);
     return { ...res, data: res.data.map(adminDonation), totalAmount };
   });
-  r.post('/admin/giving/donations', { perm: 'giving.edit' }, (ctx) => {
-    requireFields(ctx.body, ['donorName', 'fundId', 'amount', 'method']);
-    const fund = find(ctx, 'funds', ctx.body.fundId, 'Fund');
-    const method = ctx.body.method as PaymentMethod;
-    if (!['cash', 'cheque', 'bank_transfer', 'upi', 'card', 'netbanking'].includes(method)) throw new ApiError(422, 'invalid', 'Choose how it was given.', { method: 'Required' });
-    if (ctx.body.pan && !PAN_RE.test(ctx.body.pan)) throw new ApiError(422, 'invalid', 'PAN should look like ABCDE1234F.', { pan: 'Invalid PAN' });
-    const donor = ctx.db.get('people', ctx.body.donorId);
-    const batch = ctx.body.batchId ? find(ctx, 'batches', String(ctx.body.batchId), 'Batch') : null;
-    if (batch && batch.status !== 'open') throw new ApiError(409, 'batch_committed', `The batch “${batch.name}” is committed. Reopen it to add gifts.`);
-    const at = ctx.body.receivedAt ? new Date(ctx.body.receivedAt).toISOString() : ctx.now.toISOString();
-    const d = ctx.db.put('donations', {
-      id: ctx.id('dn'),
-      donorId: donor?.id ?? null,
-      donorName: String(ctx.body.donorName),
-      donorEmail: donor?.email ?? null,
-      donorPhone: donor?.phone ?? null,
-      fundId: fund.id,
-      fundName: fund.name,
-      amount: Math.round(Number(ctx.body.amount)),
-      currency: settings(ctx).currency,
-      frequency: 'once',
-      status: 'succeeded',
-      method,
-      pan: ctx.body.pan || null,
-      donorCitizenship: ctx.body.donorCitizenship === 'OTHER' ? 'OTHER' : 'IN',
-      fcra: ctx.body.donorCitizenship === 'OTHER',
-      provider: 'offline',
-      providerRef: null,
-      providerPaymentId: null,
-      createdAt: at,
-      paidAt: at,
-      eventId: null,
-      receiptNumber: null,
-      batchId: batch?.id ?? null,
-    });
-    const saved = onDonationSucceeded(ctx, d);
-    ctx.audit('recorded', 'donation', d.id, `Recorded ${method} gift from ${d.donorName}`);
-    return adminDonation(saved);
-  });
+  r.post('/admin/giving/donations', { perm: 'giving.edit' }, (ctx) => adminDonation(recordGift(ctx, ctx.body)));
   r.post('/admin/giving/donations/:id/refund', { perm: 'giving.edit' }, (ctx) => {
     const d = find(ctx, 'donations', ctx.params[0], 'Gift');
     if (d.status !== 'succeeded') throw new ApiError(422, 'invalid', 'Only completed gifts can be marked refunded.');

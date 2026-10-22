@@ -59,6 +59,7 @@ export function seedDemo(db: Db, env: Env) {
   db.put('meta', { id: 'demoMember', value: DEMO_MEMBER });
   db.put('funds', { id: 'fd_building', name: 'Building Fund', description: 'New sanctuary construction.', taxDeductible: true, active: true, goal: 5_000_000_000 });
   db.put('funds', { id: 'fd_missions', name: 'Missions', description: 'Church planting in North India.', taxDeductible: false, active: true, goal: null });
+  db.put('funds', { id: 'fd_harvest', name: 'Harvest Festival 2026', description: 'Our annual harvest thanksgiving: envelopes, produce and the auction.', taxDeductible: true, active: true, goal: 50_000_000 });
   db.put('funds', { id: 'fd_relief', name: 'Flood Relief 2025', description: 'Closed appeal.', taxDeductible: true, active: false, goal: null });
 
   db.put('campuses', { id: 'cp_kondapur', name: 'Kondapur (main)', city: 'Hyderabad', address: 'Road No. 3, Kondapur', serviceTimes: 'Sun 9:00 am English, 11:30 am Telugu' });
@@ -295,6 +296,30 @@ export function seedDemo(db: Db, env: Env) {
   db.put('donations', gift({ donorId: DEMO_MEMBER, donorName: 'Priya Thomas', fundId: 'fd_building', amount: 1500000, createdAt: at(-60, 11), pan: 'ABCPT1234K' }));
   for (const [i, p] of adults.slice(10, 22).entries())
     db.put('pledges', { id: `pl_${i + 2}`, personId: p.id, personName: `${p.firstName} ${p.lastName}`, fundId: 'fd_building', fundName: 'Building Fund', amount: pick([2500000, 5000000, 10000000, 12000000]), startDate: at(-90, 0).slice(0, 10), endDate: at(275, 0).slice(0, 10), createdAt: at(-90 + i, 10) });
+  // ----- harvest festival -----
+  db.put('campaigns', { id: 'cp_harvest', name: 'Harvest Festival 2026', kind: 'harvest', description: 'Bring the first fruits of the year. Envelopes go to every family; produce brought on harvest Sunday is auctioned after the service.', fundId: 'fd_harvest', goal: 50_000_000, startsOn: at(-21, 0).slice(0, 10), endsOn: at(9, 0).slice(0, 10), showPublic: true, status: 'active', createdAt: at(-21, 10), createdBy: 'Samuel Raj' });
+  const families = new Map<string, Collections['people']>();
+  for (const p of adults) if (!families.has(p.householdName ?? p.id)) families.set(p.householdName ?? p.id, p);
+  [...families.values()].slice(0, 36).forEach((p, i) => {
+    const back = i % 3 !== 2;
+    const amount = back ? pick([100000, 200000, 250000, 500000, 1000000, 1500000]) : null;
+    const d = back ? gift({ donorId: p.id, donorName: p.householdName ?? `${p.firstName} ${p.lastName}`, fundId: 'fd_harvest', amount: amount!, createdAt: at(-14 + (i % 12), 11), method: i % 4 === 0 ? 'upi' : 'cash' }) : null;
+    if (d) db.put('donations', d);
+    db.put('envelopes', { id: `ev_${i + 1}`, campaignId: 'cp_harvest', number: i + 1, personId: p.id, familyName: p.householdName ?? `${p.firstName} ${p.lastName}`, promised: i % 5 === 0 ? 500000 : null, amount, method: d?.method ?? null, receivedAt: d?.paidAt ?? null, donationId: d?.id ?? null });
+  });
+  const produce: [string, string, number, boolean][] = [['Rice', '2 bags (50 kg)', 600000, true], ['Coconuts', '40', 120000, true], ['Bananas', '6 bunches', 90000, true], ['Country chicken', '2', 160000, true], ['Gold ring', '1 (4 g)', 2400000, false], ['Pumpkin', '1 large', 30000, true]];
+  produce.forEach(([item, quantity, value, forAuction], i) => {
+    const p = adults[30 + i];
+    db.put('inKind', { id: `ik_${i + 1}`, campaignId: 'cp_harvest', donorId: p.id, donorName: `${p.firstName} ${p.lastName}`, item, quantity, value, forAuction, note: '', receivedAt: at(-7, 10) });
+  });
+  ([[1, 1100000, true], [2, 450000, true], [4, 520000, true], [3, 300000, false]] as const).forEach(([n, amount, paid], i) => {
+    const p = adults[40 + i];
+    const item = produce[n - 1];
+    const d = paid ? gift({ donorId: p.id, donorName: `${p.firstName} ${p.lastName}`, fundId: 'fd_harvest', amount, createdAt: at(-7, 13), method: 'cash' }) : null;
+    if (d) db.put('donations', d);
+    db.put('auctionLots', { id: `al_${i + 1}`, campaignId: 'cp_harvest', inKindId: `ik_${n}`, title: `${item[1]} ${item[0].toLowerCase()}`, bidderId: p.id, bidderName: `${p.firstName} ${p.lastName}`, amount, paid, method: d?.method ?? null, paidAt: d?.paidAt ?? null, donationId: d?.id ?? null, createdAt: at(-7, 12, i) });
+  });
+  db.put('donations', gift({ donorId: DEMO_MEMBER, donorName: 'Priya Thomas', fundId: 'fd_harvest', amount: 500000, createdAt: at(-3, 20), method: 'upi' }));
   db.put('meta', { id: `receipt:${fy(now)}`, value: String(receipt) });
 
   // ----- announcements -----

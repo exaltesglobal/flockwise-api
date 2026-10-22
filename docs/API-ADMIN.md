@@ -434,3 +434,14 @@ People message the church's WhatsApp number (run on Chitthi) and get an answer a
 - `DELETE /admin/integrations/whatsapp-bot` turns it off and removes the Chitthi webhook.
 - `POST /admin/integrations/whatsapp-bot/try` with `{ text }` returns `{ intent, reply }` without sending anything or saving anything.
 - The webhook checks the `Chitthi-Signature` header (`t=<unix>,v1=<hex HMAC-SHA256 of "t.body">`, 5 minutes tolerance) with the secret Chitthi returned when the hook was made. It answers 410 when the church is unknown or the assistant is off, so Chitthi stops sending. Replies go out through Chitthi `POST /api/v1/messages` as free text. Customers who message first are inside WhatsApp's 24-hour window, so no template is needed.
+
+## Special offerings (Grow plan)
+
+A campaign (harvest festival, building fund, thanksgiving, mission appeal or other special offering) adds up everything given for it: gifts to its fund between its dates (online or recorded at the counter), numbered family envelopes, in-kind offerings and the auction. Envelope and auction money is recorded as an ordinary gift (`provider: 'offline'`) to the campaign's fund, so it gets an 80G receipt and appears in Giving and Accounts.
+
+- `GET /admin/offerings` lists campaigns with `progress` (`raised`, `gifts`, `envelopes`, `auction`, `inKind`, `givers`, `goal`, `percent`, `auctionUnpaid`). `POST` starts one with `{ name, kind, goal?, startsOn?, endsOn?, description?, showPublic?, fundId? }`. Without `fundId`, a new fund named after the campaign is made.
+- `GET|PATCH|DELETE /admin/offerings/:id`. `PATCH { status: 'closed' }` closes it, and nothing more can be recorded. A campaign with money recorded can only be closed, not deleted.
+- `POST /admin/offerings/:id/envelopes` numbers one envelope for every family (people grouped by household) that has none yet, or `{ blank: n }` adds blank ones. `POST .../envelopes/:envId/receive { amount, method }` records what came back.
+- `POST /admin/offerings/:id/in-kind { donorId? | donorName, item, quantity?, value?, forAuction? }` records produce, gold or livestock. Its value counts in the total until it is sold.
+- `POST /admin/offerings/:id/lots { inKindId? | title, bidderId? | bidderName, amount, paidNow?, method? }` records a winning bid. `POST .../lots/:lotId/pay { method }` records the payment.
+- Members: `GET /giving/campaigns` returns live public campaigns with progress and the family's envelope. `GET /public/church` includes `campaigns`.
