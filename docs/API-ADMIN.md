@@ -522,3 +522,14 @@ Missionaries the church supports, monthly commitments, money received and sent o
 Support status: `autopay` (an active AutoPay to the fund), `on_track` (gifts to the fund over the last three full months are at least 90% of the commitment), `behind`, `church`, `ended`.
 
 Members: `GET /missions` (active missionaries shown to members, with published news and `mine`), `PUT /missions/:id/support {amount}` to commit or change, `DELETE /missions/:id/support` to stop. Give to a missionary with `/app/give?fund=<fundId>&amount=<rupees>&monthly=1`.
+
+## Offline check-in
+
+A check-in desk keeps working when the church's internet drops. Perm: `checkin`.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/admin/checkin/:eventId/offline` | `OfflinePack`: the event, everyone active (name, household, age, child flag, room, allergies, QR code, last 4 mobile digits), who is already checked in, and who is serving. The web desk refreshes it every 5 minutes and keeps it in localStorage. |
+| POST | `/admin/checkin/:eventId/sync` | `{items: OfflineItem[]}` (max 500), each `{clientId, personIds, method, at, code}`. Returns `{results: OfflineSyncResult[]}`. Safe to repeat: an item already synced returns its check-ins unchanged. People checked in meanwhile by another desk come back in `skipped`. The desk's security code is kept so printed labels still match. `at` is used if it is not in the future and not more than a day before the event. Room capacity and "check-in turned off" are not enforced, because the people are already in the building. |
+
+The search, check-in and label logic the desk runs offline is shared with the server in `src/core/offline-checkin.ts` (`offlineSearch`, `offlineCheckIn`, `labelsFor`). Pickups, paging and reprints need the internet.

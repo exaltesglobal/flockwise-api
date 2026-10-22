@@ -264,6 +264,8 @@ export type Checkin = {
   checkedOutAt: string | null;
   /** Set when the person is scheduled to serve at this event. */
   volunteer?: { teamName: string; positionName: string } | null;
+  /** Set when the check-in was made on a desk without internet and synced later. */
+  clientId?: string | null;
 };
 export type CheckinSummary = {
   event: AdminEvent;
@@ -1514,4 +1516,38 @@ export type MemberMission = {
   committed: number;
   reports: { id: string; date: string; title: string; body: string; prayerPoints: string }[];
   mine: { amount: number; status: SupportStatus } | null;
+};
+
+// ---------- offline check-in: the desk keeps this pack and syncs what it did when back online ----------
+
+export type OfflinePerson = {
+  id: string;
+  name: string;
+  household: string | null;
+  age: number | null;
+  isChild: boolean;
+  roomId: string | null;
+  roomName: string | null;
+  allergies: string | null;
+  /** Personal QR code, so member QR scans work offline. */
+  code: string;
+  /** Last four digits of the mobile number, for search. The full number never leaves the server. */
+  phone4: string | null;
+};
+export type OfflinePack = {
+  event: { id: string; title: string; startsAt: string };
+  generatedAt: string;
+  people: OfflinePerson[];
+  /** Who was checked in when the pack was made. */
+  checkedIn: string[];
+  serving: { personId: string; teamName: string; positionName: string }[];
+};
+export type OfflineItem = { clientId: string; personIds: string[]; method: CheckinMethod; at: string; code: string | null };
+export type OfflineSyncResult = {
+  clientId: string;
+  ok: boolean;
+  checkins: Checkin[];
+  /** Already checked in on another desk, so nothing new was recorded for them. */
+  skipped: { personId: string; name: string; securityCode: string | null }[];
+  error?: string;
 };
