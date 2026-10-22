@@ -52,6 +52,8 @@ export const config = {
     template: env.WHATSAPP_TEMPLATE ?? '',
     templateLang: env.WHATSAPP_TEMPLATE_LANG ?? 'en',
   },
+  /** Claude for the AI features. Without a key the AI screens stay hidden. */
+  anthropic: { apiKey: env.ANTHROPIC_API_KEY ?? '', model: env.ANTHROPIC_MODEL ?? 'claude-opus-5-5' },
   /** Chitthi (Agape Labs' WhatsApp platform). Each church connects its own workspace key in Settings. */
   chitthiUrl: (env.CHITTHI_URL ?? 'https://app.chitthi.live').replace(/\/$/, ''),
 };

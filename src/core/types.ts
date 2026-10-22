@@ -450,6 +450,8 @@ export type ChurchSettings = Church & {
   presentation?: Partial<PresentationTheme>;
   /** Secret in the projector, stage and OBS overlay links so those screens need no sign-in. */
   screenKey?: string;
+  /** AI requests allowed each month (the plan's allowance). */
+  aiMonthlyLimit?: number;
 };
 
 export type Permission =
@@ -741,6 +743,15 @@ export type SongStats = {
   byLeader: { person: string; songs: number; distinct: number; favourite: string | null }[];
   keys: { key: string; uses: number }[];
 };
+
+// ---------- AI ----------
+
+export type AiStatus = { enabled: boolean; used: number; limit: number; month: string };
+export type AiPurpose = 'message' | 'announcement' | 'greeting' | 'social' | 'prayer';
+export type AiDraft = { subject: string; text: string };
+export type AiAnswer = { answer: string; toolsUsed: string[] };
+export type AiSetlist = { songs: { songId: string; title: string; reason: string }[]; note: string };
+export type AiSermonKind = 'outline' | 'discussion' | 'social' | 'kids' | 'summary';
 
 // ---------- integrations ----------
 

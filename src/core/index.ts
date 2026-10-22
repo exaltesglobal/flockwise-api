@@ -17,12 +17,14 @@ import { registerPresent } from './modules/present.js';
 import { registerWorkflows } from './modules/workflows.js';
 import { registerIntegrations } from './modules/integrations.js';
 import { createMcp } from './mcp.js';
+import { bindAiHandle, registerAi } from './modules/ai.js';
 
-export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry, registerCelebrations, registerPresent, registerIntegrations];
+export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry, registerCelebrations, registerPresent, registerIntegrations, registerAi];
 
 export function createChurchEngine(db: Db, env: Env) {
   const engine = createEngine(db, env, MODULES);
   const mcp = createMcp(engine.handle, engine.verifyKey);
+  bindAiHandle(engine.handle);
   return {
     ...engine,
     /** The MCP server: one JSON-RPC message in, the reply out (null for notifications). */
@@ -36,7 +38,7 @@ export function createChurchEngine(db: Db, env: Env) {
 
 export { Db, type Dump, type Env };
 export { ApiError } from './errors.js';
-export type { AuthClaims, DeliveryResult, Outgoing, Request } from './engine.js';
+export type { AiBlock, AiMessage, AiRequest, AiResponse, AuthClaims, DeliveryResult, Outgoing, Request } from './engine.js';
 export { onDonationSucceeded } from './modules/giving.js';
 export { DEMO_CODE } from './modules/auth.js';
 export { PERMISSIONS, ROLE_LABELS } from './perms.js';

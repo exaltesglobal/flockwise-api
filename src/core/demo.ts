@@ -1,6 +1,6 @@
 // Host hooks for demo mode: everything stays in memory, gifts succeed instantly and
 // messages are only logged. Used by the web demo and by tests.
-import type { Env } from './engine.js';
+import type { AiBlock, AiRequest, AiResponse, Env } from './engine.js';
 import type { Channel } from './types.js';
 
 export function createDemoEnv(opts: { now?: () => Date; webUrl?: string } = {}): Env & { outbox: { channel: Channel; to: string; subject: string; text: string }[] } {
@@ -40,6 +40,7 @@ export function createDemoEnv(opts: { now?: () => Date; webUrl?: string } = {}):
       }
       return { status: 404, data: { error: { message: 'Not found' } } };
     },
+    ai: demoAi,
     seal: (v) => `demo:${v}`,
     unseal: (v) => v.replace(/^demo:/, ''),
   };
@@ -53,4 +54,39 @@ export function readDemoToken(token: string | null | undefined) {
   } catch {
     return null;
   }
+}
+
+/**
+ * A scripted stand-in for Claude, so the demo and tests can show every AI screen without a key.
+ * It looks things up with the real tools, then sums up what came back.
+ */
+async function demoAi(req: AiRequest): Promise<AiResponse> {
+  const last = req.messages[req.messages.length - 1];
+  const text = (t: string): AiResponse => ({ content: [{ type: 'text', text: t }], stopReason: 'end_turn' });
+  const ask = typeof last.content === 'string' ? last.content : '';
+  if (req.tools?.length) {
+    if (typeof last.content === 'string') {
+      const briefing = /briefing/i.test(ask);
+      const calls: AiBlock[] = briefing
+        ? [{ type: 'tool_use', id: 'tu_1', name: 'church_overview', input: {} }, { type: 'tool_use', id: 'tu_2', name: 'upcoming_celebrations', input: { days: 7 } }]
+        : /birthday|anniversar/i.test(ask) ? [{ type: 'tool_use', id: 'tu_1', name: 'upcoming_celebrations', input: { days: 14 } }]
+          : /event|service|sunday/i.test(ask) ? [{ type: 'tool_use', id: 'tu_1', name: 'list_events', input: {} }]
+            : [{ type: 'tool_use', id: 'tu_1', name: 'search_people', input: { query: ask.split(/\s+/).filter((w) => /^[A-Z]/.test(w)).pop() ?? '' } }];
+      return { content: [{ type: 'text', text: 'Let me check.' }, ...calls], stopReason: 'tool_use' };
+    }
+    const results = last.content.filter((b): b is Extract<AiBlock, { type: 'tool_result' }> => b.type === 'tool_result');
+    const names = results.map((r) => { try { return [...r.content.matchAll(/"(?:name|title|firstName)":"([^"]+)"/g)].slice(0, 4).map((m) => m[1]); } catch { return []; } }).flat();
+    return text(`Here is what I found in your church data (demo answer):\n\n${names.length ? names.map((n) => `- ${n}`).join('\n') : '- Nothing matched.'}\n\nConnect an AI key on the server for full answers.`);
+  }
+  const props = (req.schema?.properties ?? {}) as Record<string, unknown>;
+  if ('songs' in props) {
+    const ids = [...ask.matchAll(/^(\S+) \| ([^|]+)\|/gm)].slice(0, Number(/Number of songs: (\d+)/.exec(ask)?.[1] ?? 4));
+    return text(JSON.stringify({ songs: ids.map((m, i) => ({ songId: m[1], reason: i === 0 ? 'A strong call to worship.' : 'Fits the theme and flows from the song before.' })), note: 'Starts upbeat and settles into reflective worship (demo suggestion).' }));
+  }
+  if ('subject' in props) {
+    const brief = ask.replace(/^Improve this draft\. Brief: /, '').split('\n')[0];
+    return text(JSON.stringify({ subject: brief.slice(0, 60), text: `Dear {{firstName}},\n\n${brief}\n\nWe look forward to seeing you.\n\nWith love,\nThe church office` }));
+  }
+  if (/^Translate/m.test(req.system)) return text(`[${/into (\w+)/.exec(req.system)?.[1] ?? 'translation'}] ${ask}`);
+  return text(`## Demo output\n\n${ask.split('\n').slice(0, 3).join('\n')}\n\n- Point one\n- Point two\n- Point three\n\nConnect an AI key on the server for real results.`);
 }

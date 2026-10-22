@@ -8,6 +8,25 @@ import type { Channel, ChannelStatus, Collections, DonationRecord, Kind, Permiss
 export type Outgoing = { to: string; name: string; subject: string; text: string };
 export type DeliveryResult = { ok: boolean; error?: string };
 
+/** A provider-neutral slice of the Claude Messages API, so the engine can run in the browser demo too. */
+export type AiBlock =
+  | { type: 'text'; text: string }
+  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
+  | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean }
+  /** A provider block the engine does not read (e.g. thinking) that must go back unchanged in the next turn. */
+  | { type: 'opaque'; value: unknown };
+export type AiMessage = { role: 'user' | 'assistant'; content: string | AiBlock[] };
+export type AiRequest = {
+  system: string;
+  messages: AiMessage[];
+  tools?: { name: string; description: string; input_schema: Record<string, unknown> }[];
+  /** JSON schema the reply must follow (structured output). */
+  schema?: Record<string, unknown>;
+  maxTokens?: number;
+  effort?: 'low' | 'medium' | 'high';
+};
+export type AiResponse = { content: AiBlock[]; stopReason: string };
+
 /** Everything the engine needs from its host. */
 export type Env = {
   /** Demo mode: fixed sign-in code, gifts succeed instantly, nothing leaves the browser. */
@@ -28,6 +47,8 @@ export type Env = {
   webUrl: string;
   /** Calls the Chitthi API (WhatsApp) with a church's key. */
   chitthi(apiKey: string, req: { method: 'GET' | 'POST'; path: string; body?: unknown }): Promise<{ status: number; data: any }>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  /** Claude, when the server has an API key. Absent means AI features are switched off. */
+  ai?: (req: AiRequest) => Promise<AiResponse>;
   /** Encrypts a stored credential (e.g. a partner API key) and reads it back. */
   seal(value: string): string;
   unseal(sealed: string): string;

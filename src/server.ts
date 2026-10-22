@@ -5,6 +5,7 @@ import { hashSecret, randomString, seal, signAccess, unseal } from './auth.js';
 import { config } from './config.js';
 import { bootstrapChurch, createChurchEngine, Db, type Env } from './core/index.js';
 import type { Currency } from './core/types.js';
+import { aiConfigured, claude } from './ai.js';
 import { razorpayCheckout } from './giving.js';
 import { channelStatus, deliver, sendOtpEmail } from './providers.js';
 import { coreStore } from './store/core-store.js';
@@ -35,6 +36,7 @@ export function buildServer(db = new Db()) {
     },
     seal,
     unseal,
+    ...(aiConfigured() ? { ai: claude } : {}),
   };
   const engine = createChurchEngine(db, env);
   store = coreStore(engine);

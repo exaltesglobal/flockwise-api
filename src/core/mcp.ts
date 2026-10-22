@@ -6,7 +6,7 @@ import { ApiError } from './errors.js';
 
 type Handle = (req: Request) => Promise<unknown>;
 type Json = Record<string, unknown>;
-type Tool = {
+export type Tool = {
   name: string;
   title: string;
   description: string;
@@ -21,7 +21,7 @@ const str = (description: string, extra: Json = {}): Json => ({ type: 'string', 
 const q = (a: Json, keys: string[]) => Object.fromEntries(keys.filter((k) => a[k] !== undefined && a[k] !== '').map((k) => [k, String(a[k])]));
 const id = (v: unknown) => encodeURIComponent(String(v ?? ''));
 
-const TOOLS: Tool[] = [
+export const TOOLS: Tool[] = [
   { name: 'church_overview', title: 'Church overview', description: 'This week at a glance: attendance, giving, new people, upcoming events and things that need attention.', call: () => ({ method: 'GET', path: '/admin/dashboard' }) },
   { name: 'church_insights', title: 'Growth and engagement insights', description: 'Trends in attendance, giving, group and volunteer engagement, and people drifting away.', call: () => ({ method: 'GET', path: '/admin/insights' }) },
   {
@@ -73,7 +73,7 @@ const TOOLS: Tool[] = [
 ];
 
 /** Keeps answers within what an assistant can read: long lists are cut to the first 50. */
-function trim(v: unknown): unknown {
+export function trim(v: unknown): unknown {
   if (Array.isArray(v)) return v.length > 50 ? [...v.slice(0, 50), { note: `${v.length - 50} more not shown` }] : v;
   if (v && typeof v === 'object' && Array.isArray((v as Json).data)) return { ...(v as Json), data: trim((v as Json).data) };
   return v;
