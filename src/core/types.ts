@@ -1653,3 +1653,56 @@ export type FamilyCheckinEvent = {
   members: { id: string; name: string; isChild: boolean; roomName: string | null; allergies: string | null; checkedIn: boolean; securityCode: string | null }[];
 };
 export type FamilyCheckinResult = { securityCode: string | null; checkedIn: string[]; event: FamilyCheckinEvent };
+
+// ----- church networks and dioceses: combined, anonymous stats across many churches -----
+export type NetworkKind = 'network' | 'diocese' | 'denomination' | 'association';
+export type Network = { id: string; name: string; kind: NetworkKind; code: string; admins: string[]; createdAt: string; createdBy: string };
+export type NetworkMembership = { networkId: string; churchId: string; joinedAt: string; joinedBy: string; shareGiving: boolean };
+/** A network as the church office sees it. */
+export type ChurchNetworkLink = { id: string; name: string; kind: NetworkKind; joinedAt: string; shareGiving: boolean; churches: number };
+/** What the host does for one church: list, preview a join code, join, change sharing, leave. */
+export type ChurchNetworkHost = {
+  list(): ChurchNetworkLink[];
+  preview(code: string): { id: string; name: string; kind: NetworkKind; churches: number } | null;
+  join(code: string, shareGiving: boolean, by: string): ChurchNetworkLink;
+  update(networkId: string, shareGiving: boolean): ChurchNetworkLink;
+  leave(networkId: string): void;
+};
+/** Totals only, never names of people: what one church shares with its network. */
+export type NetworkChurchStats = {
+  churchId: string;
+  name: string;
+  city: string;
+  slug: string;
+  joinedAt: string;
+  currency: Currency;
+  people: number;
+  members: number;
+  households: number;
+  newPeople90: number;
+  groups: number;
+  inGroups: number;
+  serving: number;
+  baptismsThisYear: number;
+  lastSunday: number;
+  /** Average of the last four Sundays, and its change against the four before (percent). */
+  avgAttendance: number;
+  attendanceChange: number | null;
+  attendance: { date: string; count: number }[];
+  shareGiving: boolean;
+  /** Last 12 months; null when the church does not share giving. */
+  giving12m: number | null;
+  givingByMonth: { month: string; amount: number }[] | null;
+  onlineLastStream: number | null;
+  lastActiveAt: string | null;
+};
+export type NetworkOverview = {
+  network: Network;
+  churches: NetworkChurchStats[];
+  totals: { churches: number; people: number; members: number; households: number; newPeople90: number; inGroups: number; serving: number; baptismsThisYear: number; lastSunday: number; avgAttendance: number };
+  /** Every church's Sunday attendance added up, by week (Monday dates). */
+  attendance: { weekStart: string; count: number }[];
+  /** Giving from the churches that share it, in the network's main currency. */
+  giving: { currency: Currency; churches: number; months: { month: string; amount: number }[]; total: number };
+};
+export type NetworkSummary = { id: string; name: string; kind: NetworkKind; churches: number };

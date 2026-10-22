@@ -54,11 +54,13 @@ export function createApp(hub: Hub) {
   const ipOf = (c: Context) => c.req.header('x-forwarded-for')?.split(',')[0].trim() ?? c.req.header('x-real-ip') ?? '';
 
   // Many churches: the church directory, self sign-up and the Flockwise team panel.
-  app.all('/v1/:area{platform|signup|churches}/*', async (c) => {
+  app.all('/v1/:area{platform|signup|churches|networks}/*', async (c, next) => {
     const path = c.req.path.slice(3);
+    // The pattern's alternation is not anchored, so /v1/admin/networks would land here too.
+    if (!/^\/(platform|signup|churches|networks)\//.test(path)) return next();
     const ip = ipOf(c);
-    if (c.req.method === 'POST' && /^\/(signup\/start|platform\/auth\/request|churches\/find)$/.test(path) && limited(`plat:${ip}`, 15, 3600_000)) throw new ApiError(429, 'too_many_codes', 'Too many attempts from this network. Please try again later.');
-    if (c.req.method === 'POST' && /^\/(signup\/complete|platform\/auth\/verify)$/.test(path) && limited(`platv:${ip}`, 40, 3600_000)) throw new ApiError(429, 'too_many_attempts', 'Too many attempts. Please try again later.');
+    if (c.req.method === 'POST' && /^\/(signup\/start|platform\/auth\/request|networks\/auth\/request|churches\/find)$/.test(path) && limited(`plat:${ip}`, 15, 3600_000)) throw new ApiError(429, 'too_many_codes', 'Too many attempts from this network. Please try again later.');
+    if (c.req.method === 'POST' && /^\/(signup\/complete|platform\/auth\/verify|networks\/auth\/verify)$/.test(path) && limited(`platv:${ip}`, 40, 3600_000)) throw new ApiError(429, 'too_many_attempts', 'Too many attempts. Please try again later.');
     const token = c.req.header('authorization')?.replace(/^Bearer\s+/i, '') ?? null;
     const result = await hub.platform.handle({ method: c.req.method, path, query: c.req.query(), body: await readBody(c), auth: null, token, ip });
     if (result === undefined) return c.body(null, 204);

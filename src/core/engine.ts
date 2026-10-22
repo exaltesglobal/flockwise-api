@@ -4,7 +4,7 @@ import type { Db } from './db.js';
 import { ApiError } from './errors.js';
 import { PERMISSIONS } from './perms.js';
 import { atLeast, checkPlan, effectivePlan, getSubscription, type BillingInterval, type PlanId } from './plans.js';
-import type { Channel, ChannelStatus, Collections, DonationRecord, Kind, Permission, StaffRole } from './types.js';
+import type { Channel, ChannelStatus, ChurchNetworkHost, Collections, DonationRecord, Kind, Permission, StaffRole } from './types.js';
 
 export type BillingCheckout = { churchId: string; churchName: string; plan: PlanId; interval: BillingInterval; currency: 'INR' | 'USD'; amount: number; email: string; name: string };
 export type Outgoing = { to: string; name: string; subject: string; text: string };
@@ -73,6 +73,8 @@ export type Env = {
   verifyRazorpay?: (keyId: string, keySecret: string) => Promise<boolean>;
   /** True when the host has its own Razorpay keys for this church (the server's original church). */
   serverPaymentKeys?: boolean;
+  /** Church networks and dioceses this church belongs to, kept by the host (many-church servers). */
+  network?: ChurchNetworkHost;
   /** Public base URL for incoming webhooks (…/v1/webhooks). Absent in the demo. */
   webhookBase?: string;
   /** Our Razorpay partner sign-up link for assisted setup. */

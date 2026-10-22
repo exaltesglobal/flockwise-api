@@ -566,3 +566,32 @@ One adult's login looks after the household (everyone with the same household na
 | GET | `/me/family/checkin` | Services with check-in on that start within a day, at the family's campus: who is in, their codes, and whether phone check-in is `open` (an hour before the start until the end). |
 | POST | `/me/family/checkin/:eventId` | `{personIds}` (household only). Checks in with method `app`; children share a new security code, or the code they already have is returned. `{securityCode, checkedIn, event}`. The desk prints labels with `POST /admin/checkin/:eventId/reprint {securityCode}`. |
 | GET/PUT | `/admin/checkin-settings` | `{phoneCheckin}` (perm `checkin`, default true). When off, families check in at the desk. |
+
+## Church networks and dioceses
+
+A diocese, denomination or network office signs in at `/network` and sees combined totals for its churches. Each church joins with the network's code and chooses whether to share giving totals. Only totals cross over: never names, contact details or individual gifts. Records live in the platform directory.
+
+Network office (`/v1/networks/*`, its own 14-day session token from `auth/verify`, sent as `Authorization: Bearer`):
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/networks/auth/request` | `{email}` sends a 6-digit code. Returns `{requestId}`. |
+| POST | `/networks/auth/verify` | `{requestId, code}` returns `{token, email, expiresAt}`. |
+| POST | `/networks/auth/sign-out` | Ends the session. 204. |
+| GET | `/networks/mine` | Networks you lead: `{id, name, kind, churches}[]`. |
+| POST | `/networks/new` | `{name, kind?}` (`network`, `diocese`, `denomination`, `association`). You become its first leader. |
+| GET | `/networks/:id` | Overview: `network` (with `code`, `admins`), `churches[]` (people, members, households, newPeople90, groups, inGroups, serving, baptismsThisYear, lastSunday, avgAttendance, attendanceChange, attendance, giving12m/givingByMonth or null when not shared, onlineLastStream), `totals`, weekly `attendance` (a latest week that fewer churches have recorded is left out) and `giving` in the most common currency. 404 unless you lead it. |
+| PATCH | `/networks/:id` | `{name?, kind?, admins?}`. The admins list must keep you. |
+| DELETE | `/networks/:id` | Deletes the network and all memberships. 204. |
+| POST | `/networks/:id/code` | New join code; the old one stops working. Returns the overview. |
+| DELETE | `/networks/:id/churches/:churchId` | Removes a church. Returns the overview. |
+
+Church office (perm `settings`, audited):
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/admin/networks` | `{available, networks: {id, name, kind, joinedAt, shareGiving, churches}[]}`. `available` is false on a server without the directory. |
+| GET | `/admin/networks/preview?code=` | `{id, name, kind, churches}` or 404 for a wrong code. Codes are not case-sensitive. |
+| POST | `/admin/networks/join` | `{code, shareGiving}`. Joining again keeps the first join date. |
+| PATCH | `/admin/networks/:id` | `{shareGiving}`. |
+| DELETE | `/admin/networks/:id` | Leaves the network. 204. |

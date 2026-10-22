@@ -8,6 +8,7 @@ import type { Env, Request } from './engine.js';
 import { ApiError } from './errors.js';
 import type { createChurchEngine } from './index.js';
 import { activePeople } from './modules/people.js';
+import { createNetworks } from './network.js';
 import { SETUP_FEE, teamReadDoc, teamSetupRow, teamUpdateSetup } from './modules/razorpay-setup.js';
 import { effectivePlan, getSubscription, monthlyValue, PLAN_ORDER, PLANS, saveSubscription, startTrial, type PlanId, type Subscription } from './plans.js';
 import type { Currency, Session } from './types.js';
@@ -146,6 +147,19 @@ export function createPlatform({ db, env, host, admins }: PlatformOpts) {
     engine.db.put('otps', { id, email, codeHash: env.hash(`${email}:${code}`), audience: 'admin', createdAt: t.toISOString(), expiresAt: new Date(t.getTime() + 60_000).toISOString(), attempts: 0, used: false });
     return (await engine.handle({ method: 'POST', path: '/auth/otp/verify', body: { requestId: id, code }, auth: null })) as Session;
   }
+
+  // ----- church networks and dioceses (network.ts) -----
+  const networks = createNetworks({
+    db,
+    env,
+    engine: (id) => host.get(id),
+    entry: (id) => entry(id),
+    sendCode: (email, label) => sendCode(email, 'member', label),
+    useCode: (requestId, code) => {
+      const { otp, done } = useCode(requestId, code, 'member');
+      return { email: otp.email, done };
+    },
+  });
 
   // ----- the Flockwise team -----
   function teamSession(token: string | null | undefined) {
@@ -396,6 +410,8 @@ export function createPlatform({ db, env, host, admins }: PlatformOpts) {
       }
     }
 
+    if (parts[0] === 'networks') return networks.handle(method, parts.slice(1), body, req.token);
+
     if (parts[0] !== 'platform') throw new ApiError(404, 'not_found', `No endpoint for ${method} ${path}.`);
     const rest = parts.slice(1);
 
@@ -446,7 +462,7 @@ export function createPlatform({ db, env, host, admins }: PlatformOpts) {
     }
   }
 
-  return { handle, resolve, lookup, ensureChurch, entries, entry, tickAll, slugProblem, suggestSlug, db };
+  return { handle, resolve, lookup, ensureChurch, entries, entry, tickAll, slugProblem, suggestSlug, db, networks };
 }
 
 export type Platform = ReturnType<typeof createPlatform>;

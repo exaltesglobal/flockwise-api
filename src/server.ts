@@ -65,6 +65,14 @@ export function createHub() {
       verifyRazorpay: checkKeys,
       serverPaymentKeys: isDefault && !!config.razorpay.main,
       razorpayPartnerUrl: config.razorpayPartnerUrl,
+      // Networks live in the platform database; each church sees only its own memberships.
+      network: {
+        list: () => platform.networks.hostFor(churchId).list(),
+        preview: (code) => platform.networks.hostFor(churchId).preview(code),
+        join: (code, share, by) => platform.networks.hostFor(churchId).join(code, share, by),
+        update: (id, share) => platform.networks.hostFor(churchId).update(id, share),
+        leave: (id) => platform.networks.hostFor(churchId).leave(id),
+      },
       webhookBase: `${config.apiPublicUrl}/v1/webhooks`,
       ...(config.billing ? { billing: billingHooks() } : {}),
       ...(aiConfigured() ? { ai: claude } : {}),
