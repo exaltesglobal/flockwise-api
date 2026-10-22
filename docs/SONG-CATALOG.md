@@ -11,6 +11,12 @@ change the key, add chords, a second language or an arrangement without touching
   `scripts/import-open-hymnal.py`, which keeps only files whose copyright line says "public
   domain" and skips modern words. Re-run it to refresh `src/core/catalog/open-hymnal.ts`; never
   edit that file by hand.
+  256 of them also carry a chord chart. The script works the chords out from the hymnal's
+  four-part harmony (soprano, alto, tenor, bass): on each melody note it weighs the pitches
+  sounding in all four voices, picks the best-fitting chord (major, minor, 7th, m7, sus4, dim, with
+  the bass note as a tie-breaker) and writes it over that syllable when it changes. A hymn gets a
+  chart only when every music line has exactly as many syllables as notes and the words come out
+  identical to the plain lyrics, so a chord never lands on the wrong word.
 - **Songs the Flockwise team adds** in the team panel (`/platform/songs`): hymns in Hindi, Telugu,
   Tamil, Malayalam, Kannada and other Indian languages from a checked hymnbook, and corrections to
   built-in hymns. Stored in the platform database (`meta` rows `song:<id>`), so no deploy is needed.
