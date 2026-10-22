@@ -9,6 +9,7 @@ import { registerComms, runDue } from './modules/comms.js';
 import { registerGiving } from './modules/giving.js';
 import { registerPeople } from './modules/people.js';
 import { registerServing } from './modules/serving.js';
+import { registerTeamAuth } from './modules/team-auth.js';
 import { registerCalendar } from './modules/calendar.js';
 import { registerForms } from './modules/forms.js';
 import { registerCelebrations } from './modules/celebrations.js';
@@ -37,7 +38,7 @@ import { registerNetworkLink } from './modules/network-link.js';
 import { ApiError } from './errors.js';
 import { atLeast, effectivePlan, getSubscription } from './plans.js';
 
-export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry, registerCelebrations, registerPresent, registerIntegrations, registerAi, registerBilling, registerPayments, registerRegisters, registerZones, registerAccounts, registerRazorpaySetup, registerRecurring, registerWhatsAppBot, registerOfferings, registerPrivacy, registerPager, registerBulletin, registerSundaySchool, registerMissions, registerLivestream, registerFamily, registerNetworkLink];
+export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry, registerCelebrations, registerPresent, registerIntegrations, registerAi, registerBilling, registerPayments, registerRegisters, registerZones, registerAccounts, registerRazorpaySetup, registerRecurring, registerWhatsAppBot, registerOfferings, registerPrivacy, registerPager, registerBulletin, registerSundaySchool, registerMissions, registerLivestream, registerFamily, registerNetworkLink, registerTeamAuth];
 
 export function createChurchEngine(db: Db, env: Env) {
   const engine = createEngine(db, env, MODULES);

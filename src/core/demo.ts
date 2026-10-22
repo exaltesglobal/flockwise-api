@@ -19,6 +19,8 @@ export function createDemoEnv(opts: { now?: () => Date; webUrl?: string } = {}):
     random: (length, alphabet) => Array.from({ length }, () => alphabet[Math.floor(rand() * alphabet.length)]).join(''),
     // Demo only: no secrets are stored, so a plain marker is enough.
     hash: (v) => `demo:${v}`,
+    hashPassword: (pw) => `demo-pw:${pw}`,
+    verifyPassword: (pw, stored) => stored === `demo-pw:${pw}`,
     signAccess: (claims) => ({ token: `demo.${btoa(JSON.stringify(claims))}`, expiresAt: new Date(Date.now() + 30 * 86_400_000).toISOString() }),
     sendOtpEmail: async () => undefined,
     deliver: async (channel, batch) => {

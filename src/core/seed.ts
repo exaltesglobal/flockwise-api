@@ -424,6 +424,8 @@ export function seedDemo(db: Db, env: Env) {
       }
     }
   }
+  // The demo member can open the team app with this password (no forced change in the demo).
+  db.put('teamLogins', { id: DEMO_MEMBER, personId: DEMO_MEMBER, email: 'priya@example.com', passwordHash: env.hashPassword('demo1234'), mustChangePassword: false, disabled: false, createdAt: iso(now - 30 * DAY), lastSignInAt: null, failedAt: [], resetCodeHash: null, resetExpiresAt: null, resetAttempts: 0 });
   db.put('assignments', { id: 'as_priya', eventId: 'ev_1', teamId: 'tm_worship', positionId: 'tm_worship_p2', personId: DEMO_MEMBER, status: 'pending', createdAt: iso(now - 2 * DAY), respondedAt: null, note: null });
   db.put('blockouts', { id: 'bo_1', personId: pool[3].id, from: at(toSunday + 7, 0).slice(0, 10), to: at(toSunday + 14, 0).slice(0, 10), reason: 'Travelling to Kerala' });
   db.put('blockouts', { id: 'bo_2', personId: pool[8].id, from: at(toSunday, 0).slice(0, 10), to: at(toSunday, 0).slice(0, 10), reason: 'Family wedding' });

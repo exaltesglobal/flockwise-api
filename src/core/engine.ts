@@ -38,6 +38,9 @@ export type Env = {
   /** Random string from `alphabet` (cryptographically random on the server). */
   random(length: number, alphabet: string): string;
   hash(value: string): string;
+  /** Slow, salted password hash (scrypt on the server) for team app logins. */
+  hashPassword(password: string): string;
+  verifyPassword(password: string, stored: string): boolean;
   /** Short-lived access token for the session. */
   signAccess(claims: AuthClaims): { token: string; expiresAt: string };
   sendOtpEmail(to: string, code: string, churchName: string): Promise<void>;

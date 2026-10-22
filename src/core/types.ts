@@ -493,6 +493,24 @@ export type RsvpRecord = { id: string; eventId: string; personId: string; at: st
 export type MemberRecord = { id: string; groupId: string; personId: string; since: string };
 export type AttendancePoint = { id: string; date: string; count: number };
 export type MetaRecord = { id: string; value: string };
+/** A team member's password login for the mobile app. Created by the office, never by the member. */
+export type TeamLogin = {
+  /** Same as the person's id: one login per person. */
+  id: string;
+  personId: string;
+  email: string;
+  passwordHash: string;
+  mustChangePassword: boolean;
+  disabled: boolean;
+  createdAt: string;
+  lastSignInAt: string | null;
+  /** Times of recent wrong passwords, for the 5-per-15-minutes lock. */
+  failedAt: string[];
+  resetCodeHash: string | null;
+  resetExpiresAt: string | null;
+  resetAttempts: number;
+};
+export type TeamLoginView = { personId: string; name: string; email: string; teams: { id: string; name: string }[]; mustChangePassword: boolean; disabled: boolean; createdAt: string; lastSignInAt: string | null };
 
 /** Every collection the engine stores. The key is the record kind. */
 
@@ -1011,6 +1029,7 @@ export type Collections = {
   audit: AuditEntry;
   otps: OtpRecord;
   refreshTokens: RefreshRecord;
+  teamLogins: TeamLogin;
   attendanceHistory: AttendancePoint;
   meta: MetaRecord;
   forms: Form;
@@ -1043,7 +1062,7 @@ export const KINDS = [
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
   'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
-  'streams', 'streamViews',
+  'streams', 'streamViews', 'teamLogins',
 ] as const satisfies readonly Kind[];
 
 // ----- assisted Razorpay setup: Flockwise's team opens the church's Razorpay account and does its KYC -----

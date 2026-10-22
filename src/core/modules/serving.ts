@@ -142,9 +142,11 @@ export function registerServing(r: Router) {
   // ----- member -----
   r.get('/me/serving', {}, (ctx): MyServing => {
     const me = ctx.me();
+    // The team app passes ?teamId= so a person sees one team's assignments at a time.
+    const teamId = ctx.query.teamId || null;
     const assignments = ctx.db
       .all('assignments')
-      .filter((a) => a.personId === me)
+      .filter((a) => a.personId === me && (!teamId || a.teamId === teamId))
       .map((a) => ({ a, ev: ctx.db.get('events', a.eventId), t: ctx.db.get('teams', a.teamId) }))
       .filter((x) => x.ev && x.t && upcoming(ctx, x.ev))
       .sort((x, y) => bySoonest(x.ev!, y.ev!))
@@ -157,7 +159,7 @@ export function registerServing(r: Router) {
       }));
     const teams = ctx.db
       .all('teams')
-      .filter((t) => t.members.some((m) => m.personId === me))
+      .filter((t) => t.members.some((m) => m.personId === me) && (!teamId || t.id === teamId))
       .map((t) => ({ id: t.id, name: t.name, positions: t.positions.filter((p) => t.members.find((m) => m.personId === me)!.positionIds.includes(p.id)).map((p) => p.name) }));
     const blockouts = ctx.db.all('blockouts').filter((b) => b.personId === me && b.to >= dateOnly(ctx.now)).sort((x, y) => x.from.localeCompare(y.from));
     return { assignments, teams, blockouts };

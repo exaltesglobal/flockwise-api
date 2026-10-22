@@ -595,3 +595,22 @@ Church office (perm `settings`, audited):
 | POST | `/admin/networks/join` | `{code, shareGiving}`. Joining again keeps the first join date. |
 | PATCH | `/admin/networks/:id` | `{shareGiving}`. |
 | DELETE | `/admin/networks/:id` | Leaves the network. 204. |
+
+## Team app logins (volunteers' mobile app)
+
+The mobile app is for team members only: no church members or guests sign in there. The church office creates each login; the person gets a 12-character temporary password by email and must choose their own at first sign-in. At sign-in they pick the team they are on, and the app shows only that person's own assignments for that team. Passwords are stored with scrypt (salted, slow). Tokens have the `member` scope, so the office stays closed to them.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/team/teams` | Public, honours `X-Church`. `[{id, name, color}]` for the team picker. |
+| POST | `/auth/team/sign-in` | `{email, password, teamId}` → `Session & {team: {id, name}, mustChangePassword}`. 401 `invalid_credentials` (same for unknown email and wrong password), 403 `not_on_team`, 403 `login_disabled`, 429 `too_many_attempts` after 5 wrong passwords in 15 minutes. |
+| POST | `/auth/team/password` | Signed in. `{currentPassword, newPassword}` (8+ characters) → 204. |
+| POST | `/auth/team/forgot` | `{email}` → `{sent: true}` always; emails a 6-digit code (15 minutes) when a login exists. Demo code 123456. |
+| POST | `/auth/team/reset` | `{email, code, newPassword, teamId}` → a Session as for sign-in. 422 `invalid_code`, 429 after 5 wrong codes. |
+| GET | `/me/serving?teamId=` | As before, filtered to that team when given. |
+| GET | `/admin/team-logins` | Perm `volunteers` or `staff`. `[{personId, name, email, teams, mustChangePassword, disabled, createdAt, lastSignInAt}]`. |
+| POST | `/admin/team-logins` | `{personId}`. The person needs an email and a team. Emails the temporary password. 409 when a login already exists. |
+| POST | `/admin/team-logins/:personId/reset` | Emails a new temporary password and re-enables the login. |
+| DELETE | `/admin/team-logins/:personId` | Switches the login off and revokes the person's app sessions. |
+
+Demo: the demo member (`priya@example.com`) has a login with password `demo1234` and no forced change.

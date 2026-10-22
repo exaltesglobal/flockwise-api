@@ -1,6 +1,6 @@
 // Access tokens are HS256 JWTs signed with JWT_SECRET and valid for an hour. Refresh
 // tokens are random, stored hashed by the engine, and rotated on every refresh.
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomInt, scryptSync, timingSafeEqual } from 'node:crypto';
 
 import { config } from './config.js';
 import type { AuthClaims } from './core/index.js';
@@ -37,6 +37,21 @@ export function verifyAccess(token: string | undefined): (AuthClaims & { church:
 
 /** Keyed hash for OTP codes and refresh tokens, so a database leak does not reveal them. */
 export const hashSecret = (value: string) => createHash('sha256').update(`${config.jwtSecret}:${value}`).digest('hex');
+
+/** Team app passwords: scrypt with a random salt, stored as scrypt$N$salt$hash. */
+const SCRYPT_N = 16384;
+export function hashPassword(password: string) {
+  const salt = randomBytes(16);
+  const key = scryptSync(password, salt, 32, { N: SCRYPT_N, r: 8, p: 1 });
+  return `scrypt$${SCRYPT_N}$${b64(salt)}$${b64(key)}`;
+}
+export function verifyPassword(password: string, stored: string) {
+  const [alg, n, salt, hash] = stored.split('$');
+  if (alg !== 'scrypt' || !salt || !hash) return false;
+  const want = Buffer.from(hash, 'base64url');
+  const got = scryptSync(password, Buffer.from(salt, 'base64url'), want.length, { N: Number(n), r: 8, p: 1 });
+  return timingSafeEqual(got, want);
+}
 
 export function randomString(length: number, alphabet: string) {
   let out = '';

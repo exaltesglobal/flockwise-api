@@ -3,7 +3,7 @@
 // Razorpay for gifts and for Flockwise plans.
 import { randomBytes } from 'node:crypto';
 
-import { hashSecret, randomString, seal, signAccess, unseal } from './auth.js';
+import { hashPassword, hashSecret, randomString, verifyPassword, seal, signAccess, unseal } from './auth.js';
 import { aiConfigured, claude } from './ai.js';
 import { config } from './config.js';
 import { bootstrapChurch, createChurchEngine, createPlatform, Db, type Env } from './core/index.js';
@@ -23,6 +23,7 @@ export function createHub() {
   /** Replaceable in tests. */
   const hooks = {
     sendOtpEmail,
+    deliver,
     /** Starts saving a new church's database (MySQL or file); set by index.ts. */
     persist: null as null | ((id: string, db: Db) => Promise<unknown>),
   };
@@ -35,11 +36,13 @@ export function createHub() {
       newId: (prefix) => `${prefix}_${randomBytes(9).toString('base64url')}`,
       random: randomString,
       hash: hashSecret,
+      hashPassword,
+      verifyPassword,
       signAccess: (claims) => signAccess(claims, churchId),
       sendOtpEmail: (to, code, name) => hooks.sendOtpEmail(to, code, name),
       // The server's SMS and WhatsApp accounts serve its original church only; other churches
       // send WhatsApp through their own Chitthi workspace. Email works for every church.
-      deliver: (channel, batch) => (isDefault || channel === 'email' ? deliver(channel, batch) : Promise.resolve(batch.map(() => ({ ok: false, error: 'Connect Chitthi in Settings › Integrations to send this.' })))),
+      deliver: (channel, batch) => (isDefault || channel === 'email' ? hooks.deliver(channel, batch) : Promise.resolve(batch.map(() => ({ ok: false, error: 'Connect Chitthi in Settings › Integrations to send this.' })))),
       channels: () => {
         const ch = channelStatus();
         return isDefault ? ch : { ...ch, sms: { configured: false, provider: 'not connected' }, whatsapp: { configured: false, provider: 'Connect Chitthi' } };

@@ -1,4 +1,5 @@
-// Passwordless sign-in with a one-time code sent by email (email only, by decision).
+// Passwordless sign-in with a one-time code sent by email (email only, by decision; the team
+// mobile app is the one exception and lives in team-auth.ts).
 // Staff sign in to the church office with the email their admin invited; members sign in
 // with the email on their church record, and newcomers are added as visitors.
 import { ApiError } from '../errors.js';
@@ -14,7 +15,7 @@ const ACCESS_REFRESH_DAYS = 60;
 export const DEMO_CODE = '123456';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function issueSession(ctx: Ctx, person: Collections['people'], staff: Collections['staff'] | null, scope: 'admin' | 'member'): Session {
+export function issueSession(ctx: Ctx, person: Collections['people'], staff: Collections['staff'] | null, scope: 'admin' | 'member'): Session {
   const raw = ctx.env.random(48, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789');
   const rec: Collections['refreshTokens'] = {
     id: ctx.id('rt'),
