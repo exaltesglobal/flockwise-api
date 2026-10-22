@@ -5,7 +5,7 @@ import type { Channel } from './types.js';
 
 export type DemoOutboxItem = { channel: Channel | 'push'; to: string; subject: string; text: string };
 
-export function createDemoEnv(opts: { now?: () => Date; webUrl?: string } = {}): Env & { outbox: DemoOutboxItem[] } {
+export function createDemoEnv(opts: { now?: () => Date; webUrl?: string; apiUrl?: string } = {}): Env & { outbox: DemoOutboxItem[] } {
   let seq = 0;
   const outbox: DemoOutboxItem[] = [];
   const rand = () => {
@@ -32,6 +32,7 @@ export function createDemoEnv(opts: { now?: () => Date; webUrl?: string } = {}):
     channels: () => ({ email: { configured: false, provider: 'demo' }, sms: { configured: false, provider: 'demo' }, whatsapp: { configured: false, provider: 'demo' } }),
     checkout: async () => ({ checkoutUrl: '', providerRef: null, provider: 'demo', status: 'succeeded' }),
     webUrl: opts.webUrl ?? '',
+    apiUrl: opts.apiUrl,
     // A stand-in Chitthi: any well-formed key works except ones containing "bad".
     chitthi: async (apiKey, req) => {
       if (apiKey.includes('bad')) return { status: 401, data: { error: { message: 'Missing or invalid API key.' } } };
