@@ -717,3 +717,26 @@ Permissions come from `permsOf(db, staff)` (built-in table or the custom role; a
 `GET /admin/billing` now also returns `addons`: `ai` (`credits` per pack, `price` in the church's currency, `extraThisMonth`, `packsThisMonth`, `online`) and `razorpaySetup` (`price`, `status`, `available` = INR churches). `FEATURES` in `core/plans.ts` is the full feature matrix (group → items with the lowest plan `from`); the web plans page renders it as a table with the current plan highlighted, and shows all four plans to every church, founding churches included (their buttons are replaced by "included in your founding plan"). Moving down is allowed from the same page; features above the new plan lock at once, nothing is deleted.
 
 **AI credit pack** (`POST /admin/billing/ai-pack`, perm settings): `AI_PACK` = 500 credits for ₹499 / $9, valid for the current month. Demo adds them at once; online it creates a one-time Razorpay payment link with `notes.kind = 'ai_pack'`, and `/webhooks/billing` `payment_link.paid` calls `markAiPackPaid` which adds the credits to meta `ai-extra:<month>`. `GET /admin/ai/status` and the meters count plan credits + extra.
+
+## Team hub: notices, threads and tasks
+
+The office and the serving teams share one hub. Every serving team has a channel (`hub_team_<teamId>`, made the first time anyone looks), the office has `hub_staff`, and anyone can start a smaller custom thread, optionally tagged to a team so it also shows in that team's app. People are addressed by a **hub key**: `p:<personId>` for anyone with a person record (volunteers, and office logins linked to a person) or `s:<staffId>` for office logins without one.
+
+Post kinds: `message` (chat; `@First` or `@First Last` mentions tell that person), `notice` (pinned on top, everyone in the channel is told), `task` (`task: { assigneeKey, dueAt }`; the assignee is told and sees it under their tasks). Volunteers can post notices only on threads they started or if they lead the team; otherwise a `notice` is saved as a `message`.
+
+Office (staff token):
+
+- `GET /admin/team-hub` → `HubView { me, channels: HubChannelView[], tasks: MyTask[], people: HubMember[] }`. `unread` counts posts since the person last opened the channel.
+- `POST /admin/team-hub/channels { name, memberKeys: HubKey[], teamId? }` → custom thread. `PATCH /admin/team-hub/channels/:id { name?, memberKeys?, archived? }` (custom threads only).
+- `GET /admin/team-hub/channels/:id?cursor=` → `HubChannelDetail { channel, pinned: HubPost[], posts: HubPost[] (newest first, 50 a page), nextCursor }`; opening marks it read.
+- `POST /admin/team-hub/channels/:id/posts { kind, text, pinned?, task? }` → `HubPost`.
+- `PATCH /admin/team-hub/posts/:id { text?, pinned?, done? }` (text by the writer or owner/admin/pastor; `done` by the assignee, the writer or the office). `DELETE /admin/team-hub/posts/:id`.
+
+Team app (member token; every route checks the person is on that team, else 403):
+
+- `GET /team/:teamId/notices` → `HubPost[]` (notices and pinned posts, newest first).
+- `GET /team/:teamId/threads` → `HubChannelView[]`: the team channel first, then custom threads on that team the person is in. `POST /team/:teamId/threads { name, memberKeys }` starts one with team mates.
+- `GET /team/:teamId/threads/:id/messages?cursor=` → `HubChannelDetail`. `POST /team/:teamId/threads/:id/messages { kind?, text, task? }` → `HubPost`.
+- `GET /me/tasks` → `MyTask[]` (open first, then by due date; each carries `channelName` and `teamId`). `PATCH /me/tasks/:id { done }` ticks the person's own task.
+
+Push kinds and the link they carry (`data.link`): `team.notice` and `team.message` → `/app/team/<teamId>/threads/<channelId>` (or `/app/team/threads/<channelId>` for a thread with no team); `task.assigned` → `/app/tasks/<postId>`. Email goes out for notices and tasks by default; rules are editable in Settings › Notifications. Office logins without a person record are emailed directly.

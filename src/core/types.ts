@@ -564,6 +564,45 @@ export type StaffView = StaffMember & { roleName: string; scopeKind: RoleScope; 
 /** A person's office access, as shown on their record. */
 export type PersonAccess = { staffId: string | null; role: StaffRole | null; roleId: string | null; roleName: string | null; scopeKind: RoleScope; scopeIds: string[]; status: 'active' | 'invited' | null; email: string | null };
 
+// ---------- team hub: notices, chat threads and tasks for staff and volunteers ----------
+/** Who someone is in the hub: a person (`p:<personId>`) or an office login with no person record (`s:<staffId>`). */
+export type HubKey = string;
+export type HubMember = { key: HubKey; personId: string | null; staffId: string | null; name: string };
+export type HubChannelKind = 'staff' | 'team' | 'custom';
+export type HubChannel = {
+  id: string;
+  name: string;
+  kind: HubChannelKind;
+  /** The serving team this channel belongs to (kind team, or a custom thread made inside a team). */
+  teamId: string | null;
+  /** Members of a custom thread. Staff and team channels work out their members. */
+  memberKeys: HubKey[];
+  createdBy: HubKey;
+  createdAt: string;
+  archived: boolean;
+};
+export type HubPostKind = 'message' | 'notice' | 'task';
+export type HubTask = { assigneeKey: HubKey; assigneeName: string; dueAt: string | null; done: boolean; doneAt: string | null; doneByName: string | null };
+export type HubPost = {
+  id: string;
+  channelId: string;
+  kind: HubPostKind;
+  text: string;
+  authorKey: HubKey;
+  authorName: string;
+  at: string;
+  /** Notices pin to the top until unpinned. */
+  pinned: boolean;
+  /** People named with @ in the text. */
+  mentions: HubKey[];
+  task: HubTask | null;
+};
+export type HubChannelView = HubChannel & { members: HubMember[]; teamName: string | null; unread: number; lastAt: string | null; lastText: string; openTasks: number };
+export type HubChannelDetail = { channel: HubChannelView; pinned: HubPost[]; posts: HubPost[]; nextCursor: string | null };
+/** A task as the team app shows it. */
+export type MyTask = HubPost & { channelName: string; teamId: string | null };
+export type HubView = { me: HubMember; channels: HubChannelView[]; tasks: MyTask[]; people: HubMember[] };
+
 export type AuditEntry = { id: string; at: string; actorId: string | null; actorName: string; action: string; entity: string; entityId: string | null; summary: string };
 
 // ---------- internal records ----------
@@ -996,7 +1035,7 @@ export type CanvaDesign = { id: string; title: string; editUrl: string; viewUrl:
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
 /** Things Flockwise can tell people about on its own. The office picks the channels for each. */
-export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned';
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned';
 export type NotificationRule = { email: boolean; push: boolean; whatsapp: boolean };
 export type NotificationCatalogEntry = { kind: NotificationKind; label: string; description: string; audience: string; rule: NotificationRule; sentCount: number };
 export type NotificationsView = { rules: NotificationCatalogEntry[]; devices: { member: number; team: number }; emailFrom: string | null };
@@ -1208,6 +1247,8 @@ export type Collections = {
   announcements: AdminAnnouncement;
   staff: StaffMember;
   roles: CustomRole;
+  hubChannels: HubChannel;
+  hubPosts: HubPost;
   rooms: Room;
   checkins: Checkin;
   teams: Team;
@@ -1251,7 +1292,7 @@ export const KINDS = [
   'funds', 'donations', 'pledges', 'plans', 'announcements', 'staff', 'rooms', 'checkins', 'teams', 'assignments', 'blockouts',
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
-  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles',
+  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
   'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
