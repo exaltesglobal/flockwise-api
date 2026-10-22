@@ -120,3 +120,15 @@ test('media team: screen links, lower-thirds, overlay and countdown', async () =
   assert.notEqual(screenKey, v.screenKey);
   await assert.rejects(engine.handle({ method: 'GET', path: '/screens/ev_1', query: { key: v.screenKey }, auth: null }));
 });
+
+test('song colours: only hex colours are kept and reach the musicians view', async () => {
+  const a = await signIn('admin', 'pastor@gracechurch.in');
+  const song = await call(a, 'POST', '/admin/songs', { title: 'Colour Hymn', chordChart: '[Verse 1]\n[G]Hello', colours: { chords: '#F2A93B', lyrics: 'red', background: '#101a18', bogus: '#ffffff' } });
+  assert.deepEqual(song.colours, { chords: '#f2a93b', background: '#101a18' });
+  const upd = await call(a, 'PATCH', `/admin/songs/${song.id}`, { colours: { headings: '#1f6b5c' } });
+  assert.deepEqual(upd.colours, { headings: '#1f6b5c' });
+  const ev = await call(a, 'POST', '/admin/events', { title: 'Colour service', kind: 'service', startsAt: new Date(Date.now() + 86_400_000).toISOString(), endsAt: new Date(Date.now() + 90_000_000).toISOString() });
+  await call(a, 'PUT', `/admin/services/${ev.id}`, { theme: '', notes: '', items: [{ kind: 'song', title: 'Colour Hymn', songId: song.id, key: 'G', minutes: 4, notes: '', person: '' }] });
+  const v = await call(a, 'GET', `/admin/services/${ev.id}/presentation`);
+  assert.deepEqual(v.charts[0].colours, { headings: '#1f6b5c' });
+});

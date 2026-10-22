@@ -367,6 +367,8 @@ export type PlanItem = {
   text?: string;
 };
 export type Plan = { id: string; eventId: string; theme: string; notes: string; items: PlanItem[]; updatedAt: string; rehearsalAt?: string | null; rehearsalNotes?: string };
+/** Chart colours a church picks for a song: page background, words, chords and section headings. Hex like #1f6b5c. */
+export type SongColours = { background?: string; lyrics?: string; chords?: string; headings?: string };
 export type Song = {
   id: string; title: string; author: string; defaultKey: string; bpm: number | null; ccli: string; tags: string[]; lyrics: string; chordChart?: string; attachments?: SongAttachment[];
   /** Lyrics in a second language with the same section headings, shown under the main lyrics. */
@@ -379,6 +381,8 @@ export type Song = {
   copyright?: string;
   /** The licensed lyrics service the words came from, when not public domain. */
   licensedFrom?: string;
+  /** Colours for the chord chart on screen, the musicians' view and PDFs. Empty = the app's defaults. */
+  colours?: SongColours;
 };
 export type SongView = Song & { timesUsed: number; lastUsedAt: string | null };
 export type ServiceSummary = { event: AdminEvent; items: number; minutes: number; songs: string[]; theme: string; volunteers: { filled: number; needed: number } };
@@ -849,6 +853,8 @@ export type BandItem = {
   hasChords: boolean;
   /** Section order for this service, when it differs from the chart. */
   arrangement: string[];
+  /** The song's chart colours, when the church set any. */
+  colours?: SongColours;
 };
 /** What the stream does as the presenter moves through the plan. Lives in church settings; the browser on the media desk talks to OBS. */
 export type ObsSettings = {

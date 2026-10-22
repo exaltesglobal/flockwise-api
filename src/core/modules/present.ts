@@ -147,6 +147,7 @@ function bandItems(ctx: Ctx, items: PlanItem[]): BandItem[] {
       itemIndex: i, id: it.id, kind: it.kind, title: it.title, person: it.person, minutes: it.minutes, notes: it.notes,
       key: it.key || song?.defaultKey || null, songKey: song?.defaultKey ?? null, bpm: song?.bpm ?? null, author: song?.author ?? '',
       chart, hasChords: /\[[A-G][#b]?[^\]]*\]/.test(chart), arrangement: it.arrangement?.length ? it.arrangement : song?.arrangement ?? [],
+      ...(song?.colours && Object.keys(song.colours).length ? { colours: song.colours } : {}),
     };
   });
 }
