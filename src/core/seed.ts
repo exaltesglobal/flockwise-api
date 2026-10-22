@@ -539,4 +539,34 @@ export function seedDemo(db: Db, env: Env) {
   [...fams.entries()].filter((_, i) => i % 3 === 2).slice(0, 4).forEach(([key, members], i) => {
     db.put('visits', { id: id('vs'), familyKey: key, familyName: key.startsWith('h:') ? key.slice(2) : `${members[0].firstName} ${members[0].lastName}`, personIds: members.map((p) => p.id), zoneId: members[0].zoneId ?? null, purpose: 'home', status: 'planned', plannedFor: iso(now + (i + 1) * 2 * DAY).slice(0, 10), visitedOn: null, visitorIds: ['st_1'], visitorNames: [], notes: null, prayerPoints: null, followUp: null, confidential: false, createdAt: iso(now), createdBy: 'Pastor Samuel Raj' });
   });
+
+  // ----- church accounts -----
+  const fyStart = (() => { const d = new Date(now); const y = d.getUTCMonth() >= 3 ? d.getUTCFullYear() : d.getUTCFullYear() - 1; return y; })();
+  const fyLabel = `${fyStart}-${String(fyStart + 1).slice(2)}`;
+  const headDefs: [string, string, number][] = [
+    ['ah_salary', 'Salaries and honorarium', 1_800_000], ['ah_power', 'Electricity and water', 240_000], ['ah_rent', 'Rent and lease', 0], ['ah_maint', 'Maintenance and repairs', 300_000],
+    ['ah_missions', 'Missions support', 600_000], ['ah_benev', 'Benevolence and charity', 250_000], ['ah_events', 'Events and programmes', 400_000], ['ah_media', 'Sound, media and equipment', 350_000],
+    ['ah_print', 'Printing and stationery', 60_000], ['ah_travel', 'Travel and conveyance', 120_000], ['ah_bank', 'Bank charges', 12_000], ['ah_building', 'Building fund expenses', 5_000_000],
+  ];
+  for (const [hid, name, rupees] of headDefs) db.put('accountHeads', { id: hid, name, tallyName: null, tallyGroup: 'Indirect Expenses', budgets: rupees ? { [fyLabel]: rupees * 100 } : {}, active: true });
+  let pv = 0;
+  const exp = (daysAgo: number, headId: string, rupees: number, payee: string, description: string, status: Collections['expenses']['status'], method: Collections['expenses']['method'] = 'bank_transfer', by = 'Leena George') => {
+    const date = iso(now - daysAgo * DAY).slice(0, 10);
+    const paid = status === 'paid';
+    db.put('expenses', { id: id('ex'), voucherNumber: paid ? `PV/${fyLabel}/${String(++pv).padStart(4, '0')}` : null, date, headId, amount: rupees * 100, payee, description, method: paid || status === 'approved' ? method : null, reference: paid && method !== 'cash' ? `UTR${100000 + pv * 7919}` : null, fcra: false, billUrl: null, status, submittedBy: by, submittedById: by === 'Leena George' ? 'st_2' : 'st_5', submittedAt: iso(now - (daysAgo + 1) * DAY), decidedBy: status === 'submitted' ? null : 'Vinod Mathew', decidedAt: status === 'submitted' ? null : iso(now - daysAgo * DAY), decisionNote: status === 'rejected' ? 'Please get a second quote first.' : null, paidAt: paid ? iso(now - daysAgo * DAY) : null });
+  };
+  for (let m = 0; m < 6; m++) {
+    exp(5 + m * 30, 'ah_salary', 145_000, 'Staff salaries', `Salaries for ${new Date(now - (5 + m * 30) * DAY).toLocaleDateString('en-IN', { month: 'long' })}`, 'paid');
+    exp(8 + m * 30, 'ah_power', 17_400 + m * 650, 'TSSPDCL', 'Electricity bill, church hall', 'paid', 'upi');
+    exp(12 + m * 30, 'ah_missions', 50_000, 'North India church planting', 'Monthly missions support', 'paid');
+  }
+  exp(20, 'ah_media', 38_500, 'Sri Sai Audio, Ameerpet', 'Two wireless handheld microphones', 'paid', 'upi', 'David Samuel');
+  exp(33, 'ah_events', 22_000, 'Hotel Annapurna Caterers', 'Youth retreat lunch for 110', 'paid', 'cheque');
+  exp(41, 'ah_benev', 15_000, 'Ramesh K.', 'School fees support (family in need)', 'paid', 'bank_transfer');
+  exp(3, 'ah_maint', 12_800, 'Venkat Electricals', 'Repair of hall fans and wiring', 'approved', 'cash');
+  exp(1, 'ah_media', 64_000, 'Musicland, Abids', 'New keyboard for the worship team', 'submitted', null, 'David Samuel');
+  exp(2, 'ah_print', 4_200, 'Om Printers', 'Christmas programme flyers, 1,000 copies', 'submitted', null, 'Leena George');
+  exp(15, 'ah_events', 90_000, 'Shamiana Tent House', 'Tent and chairs for the outdoor carol service', 'rejected', null, 'David Samuel');
+  db.put('settings', { ...db.get('settings', 'church')!, tally: { companyName: 'Grace Community Church Trust', bankLedger: 'HDFC Bank A/c 4821', cashLedger: 'Cash', fcraBankLedger: 'SBI FCRA A/c (New Delhi Main Branch)' } });
+  db.put('meta', { id: `voucher:pv:${fyLabel}`, value: String(pv) });
 }

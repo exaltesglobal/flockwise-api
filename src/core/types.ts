@@ -456,6 +456,7 @@ export type ChurchSettings = Church & {
   aiMonthlyLimit?: number;
   /** The church's own word for a zone: Zone, Prayer cell, Kudumba unit, Ward, Area. */
   zoneLabel?: string;
+  tally?: Partial<TallySettings>;
 };
 
 export type Permission =
@@ -891,6 +892,62 @@ export type Visit = {
 export type VisitView = Visit & { zoneName: string | null; visitors: string[] };
 export type ZoneReportRow = { zoneId: string | null; zoneName: string; families: number; visited: number; percent: number; visitsDone: number; planned: number };
 
+/** An expense head in the church accounts (Salaries, Electricity, Missions support...). */
+export type AccountHead = {
+  id: string;
+  name: string;
+  /** The ledger name in Tally, when it differs. */
+  tallyName: string | null;
+  /** Tally group for new ledgers, e.g. Indirect Expenses. */
+  tallyGroup: string;
+  /** Budget per financial year label (e.g. "2026-27"), in minor units. */
+  budgets: Record<string, number>;
+  active: boolean;
+};
+export type ExpenseStatus = 'submitted' | 'approved' | 'rejected' | 'paid';
+export type ExpenseMethod = 'bank_transfer' | 'upi' | 'cheque' | 'cash';
+export type Expense = {
+  id: string;
+  /** Voucher number, e.g. PV/2026-27/0012, given when paid. */
+  voucherNumber: string | null;
+  date: string;
+  headId: string;
+  amount: number;
+  payee: string;
+  description: string;
+  method: ExpenseMethod | null;
+  reference: string | null;
+  /** Paid from the FCRA account. */
+  fcra: boolean;
+  billUrl: string | null;
+  status: ExpenseStatus;
+  submittedBy: string;
+  submittedById: string | null;
+  submittedAt: string;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  decisionNote: string | null;
+  paidAt: string | null;
+};
+export type ExpenseView = Expense & { headName: string; /** True when the signed-in staff member asked for this. */ mine: boolean };
+/** How Flockwise names things when it writes Tally vouchers. */
+export type TallySettings = {
+  companyName: string;
+  bankLedger: string;
+  cashLedger: string;
+  fcraBankLedger: string;
+  /** Tally ledger name per fund id; the fund's own name otherwise. */
+  fundLedgers: Record<string, string>;
+  incomeGroup: string;
+};
+export type AccountsSummary = {
+  fy: string;
+  income: { fundId: string; name: string; amount: number; gifts: number }[];
+  expenses: { headId: string; name: string; budget: number; spent: number; committed: number }[];
+  months: { month: string; income: number; expense: number }[];
+  totals: { income: number; expense: number; budget: number; pendingApproval: number };
+};
+
 export type Collections = {
   settings: ChurchSettings & { id: string };
   integrations: ChitthiConfig | RazorpayConfig;
@@ -944,6 +1001,8 @@ export type Collections = {
   registers: RegisterEntry;
   zones: Zone;
   visits: Visit;
+  accountHeads: AccountHead;
+  expenses: Expense;
 };
 export type Kind = keyof Collections;
 export const KINDS = [
@@ -952,5 +1011,5 @@ export const KINDS = [
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys',
-  'registers', 'zones', 'visits',
+  'registers', 'zones', 'visits', 'accountHeads', 'expenses',
 ] as const satisfies readonly Kind[];

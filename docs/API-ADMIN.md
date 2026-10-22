@@ -382,3 +382,15 @@ Zones are areas, prayer cells or family units (the church picks its own word in 
 - `GET /admin/visits/due?since=&zoneId=` (people.view) → member and regular families with no visit since 1 January (or `since`).
 - `POST /admin/visits` (care) `{ personId | familyKey, date, status?: 'done', purpose, visitorIds?, visitorNames?, notes?, prayerPoints?, followUp?, confidential? }` plans or logs a visit for the person's household.
 - `PATCH /admin/visits/:id` (care) marks done or cancelled, moves the date, edits notes. `DELETE /admin/visits/:id` (care) removes a planned visit; visits that happened stay on record.
+
+## Church accounts and Tally (Grow plan)
+
+- `GET /admin/accounts/heads` (any staff) → `AccountHead[]`; a church gets twelve common heads the first time. `POST`, `PATCH /admin/accounts/heads/:id` (giving.edit) `{ name, tallyName?, tallyGroup?, budget?, fy?, active? }`; `budget` in rupees for the financial year `fy` (default the current one).
+- `GET /admin/accounts/summary?fy=2026` (giving.view) → `AccountsSummary`: income per fund, budget, spent (paid) and committed (approved) per head, month by month.
+- `GET /admin/expenses?status=&headId=&mine=1` (any staff; people without giving.view see only their own requests).
+- `POST /admin/expenses` (any staff) `{ headId, amount, payee, description, date?, method?, reference?, fcra?, billUrl?, paid? }`: a request. With `paid: true` and giving.edit it is recorded as paid straight away and gets a voucher number.
+- `POST /admin/expenses/:id/decide` (owner, admin or finance; never your own request) `{ approve, note? }`; a note is required to turn one down.
+- `POST /admin/expenses/:id/pay` (giving.edit) `{ method, date?, reference?, fcra? }` → numbers the payment voucher `PV/<financial year>/<nnnn>`.
+- `DELETE /admin/expenses/:id` withdraws an unpaid request (the person who asked or the treasurer).
+- `GET`, `PATCH /admin/accounts/tally` (giving.view / giving.edit): company name, bank, cash and FCRA bank ledger names, ledger name per fund, income group.
+- `GET /admin/accounts/tally-export?from=&to=&gifts=0|1&expenses=0|1&ledgers=0|1&daily=0|1` (giving.view) → `{ filename, xml, receipts, payments, incomeTotal, expenseTotal }`. Tally Prime import file: a Receipt voucher per gift (or per day, fund and account with `daily=1`; cash gifts to the cash ledger, FCRA gifts to the FCRA bank) and a Payment voucher per paid expense, with ledger masters for the funds and heads used.

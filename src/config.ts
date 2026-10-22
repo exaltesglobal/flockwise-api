@@ -5,6 +5,10 @@ function bool(v: string | undefined) {
   return v === 'true' || v === '1';
 }
 
+const billingAccount = env.BILLING_RAZORPAY_KEY_ID
+  ? account(env.BILLING_RAZORPAY_KEY_ID, env.BILLING_RAZORPAY_KEY_SECRET, env.BILLING_RAZORPAY_WEBHOOK_SECRET)
+  : account(env.RAZORPAY_KEY_ID, env.RAZORPAY_KEY_SECRET, env.RAZORPAY_WEBHOOK_SECRET);
+
 export const config = {
   port: Number(env.PORT) || 3000,
   apiPublicUrl: (env.API_PUBLIC_URL ?? 'http://localhost:3000').replace(/\/+$/, ''),
@@ -26,8 +30,13 @@ export const config = {
   },
   /** Flockwise team emails that can sign in to the team panel at /platform, comma separated. */
   platformAdmins: (env.PLATFORM_ADMINS ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
-  /** Flockwise's own Razorpay account, for churches paying for their plan (not for gifts). */
-  billing: account(env.BILLING_RAZORPAY_KEY_ID, env.BILLING_RAZORPAY_KEY_SECRET, env.BILLING_RAZORPAY_WEBHOOK_SECRET),
+  /**
+   * Flockwise's own Razorpay account: churches paying for their plan and for assisted Razorpay setup.
+   * BILLING_RAZORPAY_* if set, else RAZORPAY_*. Gifts never go here: every church connects its own account in Settings.
+   */
+  billing: billingAccount,
+  /** Our Razorpay partner sign-up link, used by assisted setup so we can do the church's KYC. */
+  razorpayPartnerUrl: env.RAZORPAY_PARTNER_URL ?? 'https://rzp.io/rzp/WOtsRAWp',
   /** The first church office login. Sign in at /admin with this email. */
   owner: { email: env.OWNER_EMAIL ?? '', name: env.OWNER_NAME ?? '' },
   db: env.DB_HOST
@@ -35,8 +44,9 @@ export const config = {
     : null,
   /** Without a database, keep data in this JSON file (local development). */
   dataFile: env.DATA_FILE ?? '',
+  /** Gift keys for the server's own church, only when RAZORPAY_* is not already Flockwise's billing account. */
   razorpay: {
-    main: account(env.RAZORPAY_KEY_ID, env.RAZORPAY_KEY_SECRET, env.RAZORPAY_WEBHOOK_SECRET),
+    main: env.BILLING_RAZORPAY_KEY_ID ? account(env.RAZORPAY_KEY_ID, env.RAZORPAY_KEY_SECRET, env.RAZORPAY_WEBHOOK_SECRET) : null,
     fcra: account(env.RAZORPAY_FCRA_KEY_ID, env.RAZORPAY_FCRA_KEY_SECRET, env.RAZORPAY_FCRA_WEBHOOK_SECRET),
   },
   email: {
@@ -81,7 +91,7 @@ export function assertConfig() {
   if (config.production && config.seedDemo) problems.push('SEED_DEMO must be false in production');
   if (config.production && !emailConfigured()) problems.push('Email must be configured (EMAIL_FROM plus SMTP_* or RESEND_API_KEY): sign-in codes are sent by email');
   if (config.razorpay.main && !config.razorpay.main.webhookSecret) problems.push('RAZORPAY_WEBHOOK_SECRET is needed to confirm payments');
-  if (config.billing && !config.billing.webhookSecret) problems.push('BILLING_RAZORPAY_WEBHOOK_SECRET is needed to confirm plan payments');
+  if (config.billing && !config.billing.webhookSecret) problems.push('The Razorpay webhook secret (BILLING_RAZORPAY_WEBHOOK_SECRET or RAZORPAY_WEBHOOK_SECRET) is needed to confirm plan payments');
   if (!config.jwtSecret) config.jwtSecret = 'dev-only-secret-change-me-dev-only-secret';
   if (problems.length) {
     console.error(`Configuration problems:\n - ${problems.join('\n - ')}`);

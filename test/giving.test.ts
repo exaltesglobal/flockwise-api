@@ -7,6 +7,10 @@ process.env.JWT_SECRET = 'test-secret-test-secret-test-secret-123';
 process.env.RAZORPAY_KEY_ID = 'rzp_test_x';
 process.env.RAZORPAY_KEY_SECRET = 'key-secret';
 process.env.RAZORPAY_WEBHOOK_SECRET = 'wh-secret';
+// A separate billing account, so the RAZORPAY_* keys stay this server's own church gift keys.
+process.env.BILLING_RAZORPAY_KEY_ID = 'rzp_test_billing';
+process.env.BILLING_RAZORPAY_KEY_SECRET = 'billing-secret';
+process.env.BILLING_RAZORPAY_WEBHOOK_SECRET = 'billing-wh';
 process.env.WEB_URL = 'https://app.example';
 process.env.API_PUBLIC_URL = 'https://api.example';
 process.env.CHURCH_ID = 'ch_1';
