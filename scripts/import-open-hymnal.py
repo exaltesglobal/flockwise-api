@@ -33,6 +33,32 @@ def syllables(line):
     text = text.replace('\x00 ', '-').replace('\x00', '-')
     return re.sub(r'\s+', ' ', text).strip()
 
+def lines(text):
+    """Breaks a verse into lines: at punctuation before a capital letter, keeping lines of 4+ words."""
+    if not text: return []
+    parts = re.split(r'(?<=[,;:.!?])\s+(?=[A-Z"\'\u2018\u201c(])', text)
+    out = []
+    for p in parts:
+        if out and len(out[-1].split()) < 4: out[-1] += ' ' + p
+        else: out.append(p)
+    if len(out) > 1 and len(out[-1].split()) < 4:
+        last = out.pop()
+        out[-1] += ' ' + last
+    return [half for line in out for half in split_long(line)]
+
+def split_long(line):
+    """Splits a line of more than 70 characters at the comma or semicolon nearest its middle."""
+    if len(line) <= 70: return [line]
+    cuts = [m.end() for m in re.finditer(r'[,;:!?]\s', line)]
+    cuts = [c for c in cuts if len(line[:c].split()) >= 3 and len(line[c:].split()) >= 3]
+    if not cuts:  # no punctuation: before a capitalised word, else the space nearest the middle
+        cuts = [m.start() for m in re.finditer(r'\s(?=[A-Z][a-z])', line) if len(line[:m.start()].split()) >= 3 and len(line[m.start():].split()) >= 3]
+    if not cuts and len(line) > 90:
+        cuts = [m.start() for m in re.finditer(r'\s', line)]
+    if not cuts: return [line]
+    c = min(cuts, key=lambda c: abs(c - len(line) / 2))
+    return split_long(line[:c].strip()) + split_long(line[c:].strip())
+
 def parse(path):
     b = open(path, 'rb').read()
     try: txt = b.decode('utf-8')
@@ -59,20 +85,20 @@ def parse(path):
             if cur and not l.startswith('+:'): blocks.append(cur); cur = []
     if cur: blocks.append(cur)
     nverses = max((len(b) for b in blocks), default=0)
-    verses = [[] for _ in range(nverses)]
+    # Raw w: text per verse across all blocks, so a word split over two music lines joins up.
+    raw_verses = [[] for _ in range(nverses)]
     refrain = []
     last_multi = max((i for i, b in enumerate(blocks) if len(b) > 1), default=-1)
     for bi, b in enumerate(blocks):
         if len(b) == 1 and nverses > 1:
-            s = syllables(b[0])
-            if not s: continue
-            if bi > last_multi: refrain.append(s)          # a chorus after the verses
+            if bi > last_multi: refrain.append(b[0])          # a chorus after the verses
             else:
-                for v in verses: v.append(s)                # a line every verse sings
+                for v in raw_verses: v.append(b[0])             # a line every verse sings
             continue
         for i, line in enumerate(b):
-            s = syllables(line)
-            if s: verses[i].append(s)
+            raw_verses[i].append(re.sub(r'^\s*\d+\.\s*~?', '', line) if raw_verses[i] else line)
+    verses = [lines(syllables(' '.join(v))) for v in raw_verses]
+    refrain = lines(syllables(' '.join(refrain))) if refrain else []
     # extra verses as plain text (W:)
     extra, cur = [], []
     for l in raw:
