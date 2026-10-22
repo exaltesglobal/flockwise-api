@@ -20,6 +20,7 @@ export const CATALOG: Record<NotificationKind, Entry> = {
   'door.scanned': { label: 'Family arrived', description: 'Someone in the family scanned the door QR.', audience: 'Other adults in the household', rule: { email: false, push: true, whatsapp: false } },
   'team.notice': { label: 'Team notice', description: 'A notice is posted on the team hub.', audience: 'Everyone in that channel', rule: { email: true, push: true, whatsapp: false } },
   'team.message': { label: 'Team hub mention or thread message', description: 'Someone is named with @ or gets a message in a small thread.', audience: 'The people named or in the thread', rule: { email: false, push: true, whatsapp: false } },
+  'carol.visit': { label: 'Carol singers tomorrow', description: 'The night before the carol team comes, the home is told roughly when.', audience: 'Everyone in that household', rule: { email: true, push: true, whatsapp: true } },
   'task.assigned': { label: 'Task given', description: 'A task on the team hub is given to someone.', audience: 'The person it is given to', rule: { email: true, push: true, whatsapp: false } },
 };
 export const KINDS = Object.keys(CATALOG) as NotificationKind[];

@@ -5,6 +5,7 @@ import { ApiError } from '../errors.js';
 import type { Ctx, Router } from '../engine.js';
 import type { Audience, AudiencePreview, Automations, Channel, Collections, Message, MessageInput } from '../types.js';
 import { checkinsFor, DAY, find, fullName, localDate, localHour, pick, requireFields, rsvpsFor, settings } from '../util.js';
+import { carolReminders } from './carols.js';
 import { sendStaffDigest } from './celebrations.js';
 import { channelStatus, deliverAll } from './integrations.js';
 import { notify } from './notify.js';
@@ -186,6 +187,7 @@ export async function runDue(ctx: Ctx) {
     if (ids.length) await sendDirect(ctx, a.anniversary.channel, ids, a.anniversary.subject, a.anniversary.body, 'automation');
   }
   if (a.staffDigest.enabled) await sendStaffDigest(ctx, a.staffDigest.daysAhead);
+  await carolReminders(ctx, today);
   if (a.welcome.enabled) {
     const welcomed = new Set((ctx.db.get('meta', 'automations:welcomed')?.value ?? '').split(',').filter(Boolean));
     const fresh = people.filter((p) => p.status === 'visitor' && !welcomed.has(p.id) && ctx.now.getTime() - new Date(p.joinedAt).getTime() < 7 * DAY);
