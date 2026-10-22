@@ -16,13 +16,13 @@ function smtp() {
 
 async function sendEmail(m: Outgoing): Promise<DeliveryResult> {
   if (config.email.smtp) {
-    await smtp().sendMail({ from: config.email.from, to: m.to, subject: m.subject, text: m.text });
+    await smtp().sendMail({ from: config.email.from, to: m.to, subject: m.subject, text: m.text, ...(m.html ? { html: m.html } : {}) });
     return { ok: true };
   }
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${config.email.resendKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: config.email.from, to: [m.to], subject: m.subject, text: m.text }),
+    body: JSON.stringify({ from: config.email.from, to: [m.to], subject: m.subject, text: m.text, ...(m.html ? { html: m.html } : {}) }),
     signal: AbortSignal.timeout(15_000),
   });
   return res.ok ? { ok: true } : { ok: false, error: `Resend ${res.status}` };
@@ -122,7 +122,7 @@ export async function sendViaMailbox(a: SmtpAccount, batch: Outgoing[]): Promise
   const out: DeliveryResult[] = [];
   for (const m of batch) {
     try {
-      await t.sendMail({ from, to: m.to, subject: m.subject, text: m.text });
+      await t.sendMail({ from, to: m.to, subject: m.subject, text: m.text, ...(m.html ? { html: m.html } : {}) });
       out.push({ ok: true });
     } catch (e) {
       out.push({ ok: false, error: (e as Error).message.slice(0, 200) });

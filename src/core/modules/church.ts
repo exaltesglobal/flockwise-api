@@ -3,7 +3,7 @@ import { ApiError } from '../errors.js';
 import type { Ctx, Router } from '../engine.js';
 import { PERMISSIONS, ROLE_LABELS } from '../perms.js';
 import { checkLimit } from '../plans.js';
-import type { Collections, EventAttendee, EventInput, GroupDetail, GroupInput, StaffRole } from '../types.js';
+import type { BrandFont, BrandKit, Collections, EventAttendee, EventInput, GroupDetail, GroupInput, StaffRole } from '../types.js';
 import {
   bySoonest,
   checkinsFor,
@@ -24,6 +24,33 @@ import {
   upcoming,
 } from '../util.js';
 import { notify } from './notify.js';
+
+/** A data-URL logo this long is about 300 KB; the web app shrinks uploads well below it. */
+const LOGO_MAX = 420_000;
+const BRAND_FONTS: BrandFont[] = ['modern', 'classic', 'rounded', 'elegant'];
+const HEX = /^#[0-9a-f]{6}$/i;
+
+/** Validates the brand kit from Settings › Church; unknown values keep what was saved. */
+function brandKit(body: Record<string, unknown> | null, prev: BrandKit | undefined): BrandKit | undefined {
+  if (body === null) return undefined;
+  const b = body ?? {};
+  const colour = (v: unknown, fallback: string, field: string) => {
+    if (v === undefined) return fallback;
+    if (typeof v !== 'string' || !HEX.test(v)) throw new ApiError(422, 'invalid', 'Colours must be like #1f6b5c.', { [field]: 'Use a hex colour' });
+    return v.toLowerCase();
+  };
+  const logoDarkUrl = b.logoDarkUrl === undefined ? prev?.logoDarkUrl ?? null : b.logoDarkUrl ? String(b.logoDarkUrl) : null;
+  if (logoDarkUrl && logoDarkUrl.length > LOGO_MAX) throw new ApiError(422, 'invalid', 'The dark logo is too big. Use a PNG or SVG under 300 KB.', { logoDarkUrl: 'Too big' });
+  const font = b.font === undefined ? prev?.font ?? 'modern' : (b.font as BrandFont);
+  if (!BRAND_FONTS.includes(font)) throw new ApiError(422, 'invalid', 'Choose a font.', { font: 'Choose a font' });
+  return {
+    primary: colour(b.primary, prev?.primary ?? '#1f6b5c', 'primary'),
+    accent: colour(b.accent, prev?.accent ?? '#f2a93b', 'accent'),
+    font,
+    logoDarkUrl,
+    tagline: b.tagline === undefined ? prev?.tagline ?? '' : String(b.tagline).slice(0, 120),
+  };
+}
 
 const EVENT_FIELDS: (keyof EventInput)[] = ['kind', 'title', 'description', 'startsAt', 'endsAt', 'location', 'imageUrl', 'capacity', 'published', 'campusId', 'checkinEnabled', 'price'];
 const GROUP_FIELDS: (keyof GroupInput)[] = ['name', 'description', 'meetingSchedule', 'location', 'leaderName', 'isOpen', 'type', 'zone', 'leaderId'];
@@ -321,9 +348,11 @@ export function registerChurch(r: Router) {
   r.patch('/admin/settings', { perm: 'settings' }, (ctx) => {
     const s = settings(ctx);
     const patch = pick<Collections['settings']>(ctx.body, ['name', 'city', 'address', 'phone', 'email', 'website', 'timezone', 'languages', 'logoUrl', 'childAgeLimit', 'zoneLabel']);
+    if (typeof patch.logoUrl === 'string' && patch.logoUrl.length > LOGO_MAX) throw new ApiError(422, 'invalid', 'The logo is too big. Use a PNG or SVG under 300 KB.', { logoUrl: 'Too big' });
     const next = {
       ...s,
       ...patch,
+      ...(ctx.body.brand !== undefined ? { brand: brandKit(ctx.body.brand, s.brand) } : {}),
       fcra: { ...s.fcra, ...pick(ctx.body.fcra ?? {}, ['registered', 'registrationNumber', 'accountLast4']) },
       receipts80g: { ...s.receipts80g, ...pick(ctx.body.receipts80g ?? {}, ['enabled', 'registrationNumber', 'pan']) },
     };

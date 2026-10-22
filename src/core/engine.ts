@@ -8,7 +8,8 @@ import { atLeast, checkPlan, effectivePlan, getSubscription, type BillingInterva
 import type { Channel, ChannelStatus, ChurchNetworkHost, Collections, DonationRecord, Kind, Permission, StaffRole } from './types.js';
 
 export type BillingCheckout = { churchId: string; churchName: string; plan: PlanId; interval: BillingInterval; currency: 'INR' | 'USD'; amount: number; email: string; name: string };
-export type Outgoing = { to: string; name: string; subject: string; text: string };
+/** `html` is the branded version of `text`; providers send both when it is there. */
+export type Outgoing = { to: string; name: string; subject: string; text: string; html?: string };
 export type DeliveryResult = { ok: boolean; error?: string };
 /** A church's own mailbox, unsealed, for the host to send through. */
 export type SmtpAccount = { host: string; port: number; user: string; pass: string; from: string; fromName: string };

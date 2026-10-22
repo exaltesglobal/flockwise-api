@@ -652,3 +652,11 @@ Settings › Notifications. For each kind the office picks email, push (the memb
 | DELETE | `/me/devices?token=` | On sign-out. Without `token`, all of the person's phones. |
 
 Push goes through Expo (`https://exp.host/--/api/v2/push/send`; `EXPO_ACCESS_TOKEN` env is optional). A `DeviceNotRegistered` answer removes the phone. Each message carries `data: {kind, link?}` for deep links.
+
+## Brand kit
+
+The church's logo always appears beside its name: in the church office sidebar, the member app header, the public page, bulletins, certificates, the projector's logo screen, invitations and on every email (a letterhead in the brand colour is wrapped around the plain text automatically; callers only write the text).
+
+- `Church.logoUrl` (in every session and `GET /public/church`) is the logo; `Church.brand` is the kit: `{ primary: '#rrggbb', accent: '#rrggbb', font: 'modern' | 'classic' | 'rounded' | 'elegant', logoDarkUrl: string | null, tagline: string }`. Apps use `primary` for buttons and headers, `accent` for highlights, `logoDarkUrl` on dark backgrounds.
+- `PATCH /admin/settings` (perm `settings`) takes `logoUrl` (a URL or a data URL under about 300 KB; the web app shrinks uploads to 512 px) and `brand` (partial; missing fields keep their saved values; `brand: null` removes the kit). Colours must be 6-digit hex.
+- `Outgoing.html`: the engine fills it for email from the church settings (`brandedHtml` in `core/mail.ts`); hosts send `text` and `html` together.

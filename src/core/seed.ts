@@ -557,7 +557,9 @@ export function seedDemo(db: Db, env: Env) {
   db.put('sermons', sermon('sm_3', 'Faith that works', 'Mercy Daniel', 21, 'James', 'James 2:14-26', 'What does living faith look like on a Monday morning?'));
   db.put('sermons', sermon('sm_4', 'The God who sees', 'Pastor Samuel Raj', 28, 'Stand-alone', 'Genesis 16', 'Hagar meets the God who sees her in the wilderness.'));
 
-  db.put('settings', { ...db.get('settings', 'church')!, publicPage: { enabled: true, tagline: 'A home for everyone in Hyderabad', about: 'Grace Community Church has been serving Hyderabad since 1998. We are a family of families from every part of India, meeting in English and Telugu.', serviceTimes: 'Sundays 9:00 am (English) and 11:30 am (Telugu), Kondapur\nSundays 10:00 am, Secunderabad Hall', heroImageUrl: '', showEvents: true, showGroups: true, showSermons: true, showGiving: true } });
+  // The demo church's brand kit: a simple mark so the logo shows beside the name everywhere.
+  const demoLogo = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#7a2e2e"/><path d="M32 10v44M18 24h28" stroke="#fff" stroke-width="7" stroke-linecap="round"/><path d="M12 50c8-10 32-10 40 0" fill="none" stroke="#e9b949" stroke-width="4" stroke-linecap="round"/></svg>');
+  db.put('settings', { ...db.get('settings', 'church')!, logoUrl: demoLogo, brand: { primary: '#7a2e2e', accent: '#e9b949', font: 'classic', logoDarkUrl: null, tagline: 'A home for everyone in Hyderabad' }, publicPage: { enabled: true, tagline: 'A home for everyone in Hyderabad', about: 'Grace Community Church has been serving Hyderabad since 1998. We are a family of families from every part of India, meeting in English and Telugu.', serviceTimes: 'Sundays 9:00 am (English) and 11:30 am (Telugu), Kondapur\nSundays 10:00 am, Secunderabad Hall', heroImageUrl: '', showEvents: true, showGroups: true, showSermons: true, showGiving: true } });
 
   const cash = db.all('donations').filter((d) => d.method === 'cash' || d.method === 'cheque').slice(0, 12);
   if (cash.length) {
