@@ -70,7 +70,8 @@ const DEFAULT_PAGE: PublicPage = { enabled: false, tagline: '', about: '', servi
 export const publicPageOf = (ctx: Ctx): PublicPage => ({ ...DEFAULT_PAGE, ...(settings(ctx).publicPage ?? {}) });
 
 function cleanSermon(body: Record<string, unknown>): Partial<Sermon> {
-  const input = pick<Sermon>(body, ['title', 'speaker', 'date', 'series', 'scripture', 'description', 'videoUrl', 'audioUrl', 'notesUrl', 'imageUrl', 'published', 'eventId']);
+  const input = pick<Sermon>(body, ['title', 'speaker', 'date', 'series', 'scripture', 'description', 'videoUrl', 'audioUrl', 'notesUrl', 'imageUrl', 'notes', 'published', 'eventId']);
+  if (input.notes !== undefined) input.notes = String(input.notes ?? '').slice(0, 40_000);
   for (const k of ['videoUrl', 'audioUrl', 'notesUrl', 'imageUrl'] as const) if (input[k] && !/^https?:\/\//.test(String(input[k]))) throw new ApiError(422, 'invalid', 'Links should start with https://', { [k]: 'Use a full link' });
   if (input.date && !/^\d{4}-\d{2}-\d{2}$/.test(String(input.date))) throw new ApiError(422, 'invalid', 'Use a date.', { date: 'YYYY-MM-DD' });
   return input;
@@ -267,6 +268,7 @@ export function registerMinistry(r: Router) {
       audioUrl: '',
       notesUrl: '',
       imageUrl: '',
+      notes: '',
       published: true,
       eventId: null,
       ...cleanSermon(ctx.body),

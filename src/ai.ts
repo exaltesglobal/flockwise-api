@@ -15,7 +15,7 @@ export async function claude(req: AiRequest): Promise<AiResponse> {
       model: config.anthropic.model,
       max_tokens: req.maxTokens ?? 4000,
       system: req.system,
-      messages: req.messages.map((m) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : m.content.map((b) => (b.type === 'opaque' ? b.value : b)) })) as Anthropic.MessageParam[],
+      messages: req.messages.map((m) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : m.content.map((b) => (b.type === 'opaque' ? b.value : b.type === 'image' ? { type: 'image', source: { type: 'base64', media_type: b.mediaType, data: b.data } } : b)) })) as Anthropic.MessageParam[],
       ...(req.tools?.length ? { tools: req.tools.map((t) => ({ ...t, input_schema: { type: 'object' as const, ...t.input_schema } })) } : {}),
       output_config: { effort: req.effort ?? 'medium', ...(req.schema ? { format: { type: 'json_schema' as const, schema: req.schema } } : {}) },
     });

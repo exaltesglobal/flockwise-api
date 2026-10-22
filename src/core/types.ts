@@ -803,6 +803,8 @@ export type Sermon = {
   audioUrl: string;
   notesUrl: string;
   imageUrl: string;
+  /** The preacher's own notes, typed or dictated, shown to members under the sermon. */
+  notes: string;
   published: boolean;
   eventId: string | null;
   createdAt: string;
@@ -957,7 +959,10 @@ export type AiPurpose = 'message' | 'announcement' | 'greeting' | 'social' | 'pr
 export type AiDraft = { subject: string; text: string };
 export type AiAnswer = { answer: string; toolsUsed: string[] };
 export type AiSetlist = { songs: { songId: string; title: string; reason: string }[]; note: string };
-export type AiSermonKind = 'outline' | 'discussion' | 'social' | 'kids' | 'summary';
+export type AiSermonKind = 'outline' | 'discussion' | 'social' | 'kids' | 'summary' | 'notes';
+/** A song read off a photo of a songbook page or a handwritten sheet. */
+export type AiScannedSong = { title: string; author: string; key: string; language: string; lyrics: string; chordChart: string; warnings: string[] };
+export type AiSongScan = { songs: AiScannedSong[]; pages: number };
 
 // ---------- integrations ----------
 

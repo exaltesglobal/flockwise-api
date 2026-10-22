@@ -130,6 +130,19 @@ async function demoAi(req: AiRequest): Promise<AiResponse> {
     return text(`Here is what I found in your church data (demo answer):\n\n${names.length ? names.map((n) => `- ${n}`).join('\n') : '- Nothing matched.'}\n\nConnect an AI key on the server for full answers.`);
   }
   const props = (req.schema?.properties ?? {}) as Record<string, unknown>;
+  const photos = typeof last.content === 'string' ? 0 : last.content.filter((b) => b.type === 'image').length;
+  if (photos) {
+    // A scanned songbook page: one Telugu chorus with chords and one English hymn, as a real scan would come back.
+    return text(JSON.stringify({ songs: [
+      { title: 'Yesu Nee Naamam', author: '', key: 'G', language: 'te', lyrics: 'Chorus\nయేసు నీ నామం మధురం\nయేసు నీ ప్రేమ అమరం\n\nVerse 1\nనా పాపములన్నీ క్షమించితివి\nనా బాధలన్నీ తొలగించితివి', chordChart: 'Chorus\n[G]యేసు నీ [C]నామం మధు[G]రం\n[G]యేసు నీ [D]ప్రేమ అమ[G]రం\n\nVerse 1\n[C]నా పాపము[G]లన్నీ క్షమించి[D]తివి\n[C]నా బాధ[G]లన్నీ తొలగించి[D]తివి', warnings: ['The last line of verse 2 is cut off at the fold of the page.'] },
+      { title: 'Rock of Ages', author: 'Augustus Toplady', key: '', language: 'en', lyrics: 'Verse 1\nRock of Ages, cleft for me,\nLet me hide myself in Thee;\nLet the water and the blood,\nFrom Thy wounded side which flowed,\nBe of sin the double cure;\nSave from wrath and make me pure.', chordChart: '', warnings: [] },
+    ].slice(0, photos === 1 ? 2 : 2) }));
+  }
+  if (/clean sermon notes/.test(ask)) {
+    const body = ask.slice(ask.indexOf('Notes:') + 6, ask.lastIndexOf('\n\nWrite ')).trim();
+    const sentences = body.replace(/\b(um+|uh+|you know|like)\b,?\s*/gi, '').split(/(?<=[.!?])\s+/).filter(Boolean);
+    return text(`## Main point\n${sentences.slice(0, 2).join(' ')}\n\n## Going deeper\n${sentences.slice(2).join(' ') || 'The preacher’s remaining notes, tidied (demo).'}\n\n_Tidied in demo mode. Connect an AI key on the server for the real thing._`);
+  }
   if ('songs' in props) {
     const ids = [...ask.matchAll(/^(\S+) \| ([^|]+)\|/gm)].slice(0, Number(/Number of songs: (\d+)/.exec(ask)?.[1] ?? 4));
     return text(JSON.stringify({ songs: ids.map((m, i) => ({ songId: m[1], reason: i === 0 ? 'A strong call to worship.' : 'Fits the theme and flows from the song before.' })), note: 'Starts upbeat and settles into reflective worship (demo suggestion).' }));

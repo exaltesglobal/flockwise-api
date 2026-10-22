@@ -18,10 +18,13 @@ export type PushMessage = { token: string; title: string; body: string; data?: R
 export type PushResult = { ok: boolean; error?: string; gone?: boolean };
 
 /** A provider-neutral slice of the Claude Messages API, so the engine can run in the browser demo too. */
+export type AiImageType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
 export type AiBlock =
   | { type: 'text'; text: string }
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean }
+  /** A photo for the model to read (base64, no data: prefix). */
+  | { type: 'image'; mediaType: AiImageType; data: string }
   /** A provider block the engine does not read (e.g. thinking) that must go back unchanged in the next turn. */
   | { type: 'opaque'; value: unknown };
 export type AiMessage = { role: 'user' | 'assistant'; content: string | AiBlock[] };

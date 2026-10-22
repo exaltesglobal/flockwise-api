@@ -2,12 +2,12 @@
 // translation into Indian languages, an assistant that answers questions from church data, a
 // weekly briefing, sermon helpers and a worship set suggester. Switched off unless the host has
 // an AI provider; each church has a monthly allowance.
-import type { AiBlock, AiMessage, AiRequest, Ctx, Request, Router } from '../engine.js';
+import type { AiBlock, AiImageType, AiMessage, AiRequest, Ctx, Request, Router } from '../engine.js';
 import type { Db } from '../db.js';
 import { ApiError } from '../errors.js';
 import { limitsFor, aiExtra } from '../plans.js';
 import { TOOLS, trim } from '../mcp.js';
-import type { AiAnswer, AiDraft, AiPurpose, AiSermonKind, AiSetlist, AiStatus } from '../types.js';
+import type { AiAnswer, AiDraft, AiPurpose, AiScannedSong, AiSermonKind, AiSetlist, AiSongScan, AiStatus } from '../types.js';
 import { settings } from '../util.js';
 
 const LANGS: Record<string, string> = { en: 'English', hi: 'Hindi', te: 'Telugu', ta: 'Tamil', ml: 'Malayalam', kn: 'Kannada', mr: 'Marathi', bn: 'Bengali', gu: 'Gujarati', pa: 'Punjabi', or: 'Odia', as: 'Assamese', ur: 'Urdu', kok: 'Konkani', mni: 'Manipuri', lus: 'Mizo', kha: 'Khasi', ne: 'Nepali' };
@@ -154,7 +154,7 @@ export function registerAi(r: Router) {
     askAssistant(ctx, 'Give me my weekly briefing.', [], 'For the weekly briefing: check the overview, upcoming celebrations, events this week, care cases and volunteer gaps you can see. Write at most 12 short bullets in sections: This week, People to reach, Needs attention. End with one encouraging line.'));
 
   r.post('/admin/ai/sermon', { perm: ['services', 'comms'] }, async (ctx) => {
-    const kind: AiSermonKind = (['outline', 'discussion', 'social', 'kids', 'summary'] as const).includes(ctx.body.kind) ? ctx.body.kind : 'discussion';
+    const kind: AiSermonKind = (['outline', 'discussion', 'social', 'kids', 'summary', 'notes'] as const).includes(ctx.body.kind) ? ctx.body.kind : 'discussion';
     const title = str(ctx.body.title, 200);
     const passage = str(ctx.body.passage, 200);
     const notes = str(ctx.body.notes, 12_000);
@@ -166,14 +166,63 @@ export function registerAi(r: Router) {
       social: 'three short social media posts and one WhatsApp status line inviting people to listen, each with a key quote.',
       kids: 'a children’s ministry version for ages 6 to 11: the main idea in one sentence, a simple story retelling, two activities and a memory verse.',
       summary: 'a 150-word summary for the church newsletter and website.',
+      notes: 'the notes above as clean sermon notes for the church app: keep the preacher’s own words and order, fix what speech-to-text got wrong, drop fillers and repeats, write scripture references in full (book chapter:verse), and put a short heading before each main point. Do not add points the preacher did not make.',
     };
+    if (kind === 'notes' && !notes) throw new ApiError(400, 'bad_request', 'Dictate or type some notes first.');
     const res = await run(ctx, {
       system: `${churchContext(ctx)}\n\nYou support pastors with sermon follow-up material, staying faithful to the passage and to mainstream Christian teaching. Never invent quotes from the sermon; use only what the notes say. Write in ${lang}. Use Markdown headings and lists.`,
       messages: [{ role: 'user', content: `Sermon title: ${title || '(none)'}\nPassage: ${passage || '(none)'}\nNotes:\n${notes || '(none)'}\n\nWrite ${asks[kind]}` }],
-      maxTokens: 4000,
+      maxTokens: kind === 'notes' ? 6000 : 4000,
       effort: kind === 'outline' ? 'medium' : 'low',
     });
     return { text: textOf(res.content) };
+  });
+
+  // Photos of a songbook page, a handwritten chord sheet or a projected slide become songs for the
+  // library. One request per call (up to four pages), checked by the office before anything is saved.
+  r.post('/admin/ai/song-scan', { perm: 'services' }, async (ctx): Promise<AiSongScan> => {
+    const raw = Array.isArray(ctx.body.images) ? (ctx.body.images as unknown[]) : [];
+    if (!raw.length) throw new ApiError(400, 'bad_request', 'Take a photo of the page first.');
+    if (raw.length > 4) throw new ApiError(422, 'invalid', 'Up to four pages at a time.');
+    const images = raw.map((x) => {
+      const o = (x ?? {}) as { mediaType?: unknown; data?: unknown };
+      const mediaType = String(o.mediaType ?? 'image/jpeg') as AiImageType;
+      if (!(['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as string[]).includes(mediaType)) throw new ApiError(422, 'invalid', 'Use a JPEG, PNG or WebP photo.');
+      const data = String(o.data ?? '').replace(/^data:[^,]+,/, '');
+      if (data.length < 100) throw new ApiError(422, 'invalid', 'That photo is empty.');
+      if (data.length > 5_600_000) throw new ApiError(422, 'invalid', 'That photo is too big. Photos are shrunk in the app before sending; try again.');
+      return { type: 'image' as const, mediaType, data };
+    });
+    const hint = str(ctx.body.hint, 300);
+    const res = await run(ctx, {
+      system: `${churchContext(ctx)}\n\nYou read photos of church songbook pages, handwritten chord sheets and projected lyric slides, and type out every song on them exactly as printed. Keep the original script (Telugu, Hindi, Tamil and so on stay in their own script); never translate or transliterate. Keep verse and chorus order with a heading line before each section (Verse 1, Chorus, Bridge). When chords are printed above or beside the words, write them inline in square brackets right before the syllable they fall on, ChordPro style, in chordChart, and put the plain words in lyrics; when there are no chords, leave chordChart empty. Guess the key from the chords (or leave it empty). Note in warnings anything you could not read. If a page has no song on it, return no songs.`,
+      messages: [{ role: 'user', content: [...images, { type: 'text', text: `Type out every song on ${images.length === 1 ? 'this page' : `these ${images.length} pages`}.${hint ? ` Hint from the office: ${hint}` : ''}` }] }],
+      schema: {
+        type: 'object',
+        properties: {
+          songs: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: { title: { type: 'string' }, author: { type: 'string' }, key: { type: 'string' }, language: { type: 'string', description: 'ISO code such as en, te, hi, ta' }, lyrics: { type: 'string' }, chordChart: { type: 'string' }, warnings: { type: 'array', items: { type: 'string' } } },
+              required: ['title', 'author', 'key', 'language', 'lyrics', 'chordChart', 'warnings'],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ['songs'],
+        additionalProperties: false,
+      },
+      maxTokens: 8000,
+      effort: 'medium',
+    });
+    const out = json<{ songs: Partial<AiScannedSong>[] }>(res.content);
+    const songs: AiScannedSong[] = (Array.isArray(out.songs) ? out.songs : []).map((s) => ({
+      title: str(s.title, 200) || 'Untitled song', author: str(s.author, 200), key: str(s.key, 10), language: str(s.language, 8) || 'en',
+      lyrics: str(s.lyrics, 20_000), chordChart: str(s.chordChart, 20_000), warnings: Array.isArray(s.warnings) ? s.warnings.map((w) => str(w, 300)).filter(Boolean).slice(0, 5) : [],
+    })).filter((s) => s.lyrics || s.chordChart);
+    ctx.audit('scanned', 'song', '-', `Read ${songs.length} song${songs.length === 1 ? '' : 's'} from ${images.length} photo${images.length === 1 ? '' : 's'}`);
+    return { songs, pages: images.length };
   });
 
   r.post('/admin/ai/setlist', { perm: 'services' }, async (ctx): Promise<AiSetlist> => {
