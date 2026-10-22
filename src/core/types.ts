@@ -786,6 +786,49 @@ export type ChitthiTemplate = { name: string; language: string; category: string
 export type ApiKeyRecord = { id: string; name: string; prefix: string; hash: string; staffId: string; access: 'read' | 'full'; createdAt: string; lastUsedAt: string | null; revokedAt: string | null };
 export type ApiKeyView = Omit<ApiKeyRecord, 'hash'> & { createdByName: string };
 
+/** Church registers: baptism, confirmation, marriage and burial entries, and membership transfer letters. */
+export type RegisterKind = 'baptism' | 'confirmation' | 'marriage' | 'burial' | 'transfer';
+export type RegisterField = { key: string; label: string; type: 'text' | 'date' | 'number' | 'select' | 'textarea'; options?: string[]; required?: boolean; group?: string };
+export type RegisterNote = { at: string; by: string; text: string };
+export type RegisterEntry = {
+  id: string;
+  kind: RegisterKind;
+  /** Entry number, e.g. BAP/2026/0007: per register and calendar year, never reused. */
+  number: string;
+  /** Date of the baptism, marriage, burial, or the letter. YYYY-MM-DD. */
+  date: string;
+  place: string;
+  officiant: string;
+  /** The person baptised, confirmed, buried or transferred; for a marriage, the groom. */
+  personId: string | null;
+  /** For a marriage, the bride. */
+  spouseId: string | null;
+  /** The name as written in the register. */
+  name: string;
+  details: Record<string, string>;
+  remarks: string | null;
+  status: 'recorded' | 'void';
+  voidReason: string | null;
+  /** Marginal notes: corrections (made automatically on edit) and later remarks. */
+  notes: RegisterNote[];
+  certificatesIssued: number;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+};
+export type RegisterEntryInput = Partial<Pick<RegisterEntry, 'date' | 'place' | 'officiant' | 'personId' | 'spouseId' | 'name' | 'details' | 'remarks'>> & { kind: RegisterKind };
+export type RegisterSummary = { kind: RegisterKind; total: number; thisYear: number; last: string | null };
+export type Certificate = {
+  entry: RegisterEntry;
+  title: string;
+  church: { name: string; address: string; city: string; phone: string; email: string; logoUrl: string | null };
+  rows: { label: string; value: string }[];
+  /** Body of a transfer letter; null for certificates. */
+  letter: string | null;
+  issuedAt: string;
+  copy: number;
+};
+
 export type Collections = {
   settings: ChurchSettings & { id: string };
   integrations: ChitthiConfig | RazorpayConfig;
@@ -836,6 +879,7 @@ export type Collections = {
   groupPosts: GroupPost;
   groupResources: GroupResource;
   sermons: Sermon;
+  registers: RegisterEntry;
 };
 export type Kind = keyof Collections;
 export const KINDS = [
@@ -844,4 +888,5 @@ export const KINDS = [
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys',
+  'registers',
 ] as const satisfies readonly Kind[];

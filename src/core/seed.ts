@@ -471,4 +471,23 @@ export function seedDemo(db: Db, env: Env) {
   if (celebrate[0]) db.put('people', { ...celebrate[0], birthDate: `${celebrate[0].birthDate?.slice(0, 4) ?? '1985'}-${md(0)}` });
   if (celebrate[1]) db.put('people', { ...celebrate[1], birthDate: `${celebrate[1].birthDate?.slice(0, 4) ?? '1990'}-${md(2)}` });
   if (celebrate[2]) db.put('people', { ...celebrate[2], anniversary: `2010-${md(4)}` });
+
+  // ----- church registers -----
+  const counters = new Map<string, number>();
+  const reg = (kind: Collections['registers']['kind'], date: string, name: string, details: Record<string, string>, extra: Partial<Collections['registers']> = {}) => {
+    const prefix = { baptism: 'BAP', confirmation: 'CNF', marriage: 'MAR', burial: 'BUR', transfer: 'TRF' }[kind];
+    const key = `register:${kind}:${date.slice(0, 4)}`;
+    const n = (counters.get(key) ?? 0) + 1;
+    counters.set(key, n);
+    db.put('meta', { id: key, value: String(n) });
+    db.put('registers', { id: id('rg'), kind, number: `${prefix}/${date.slice(0, 4)}/${String(n).padStart(4, '0')}`, date, place: 'Grace Community Church, Hyderabad', officiant: 'Rev. Samuel Raj', personId: null, spouseId: null, name, details, remarks: null, status: 'recorded', voidReason: null, notes: [], certificatesIssued: 0, createdAt: `${date}T10:00:00.000Z`, createdBy: 'Leena George', updatedAt: `${date}T10:00:00.000Z`, ...extra });
+  };
+  const thisYear = new Date(now).getUTCFullYear();
+  reg('marriage', '2013-11-16', 'Arun Thomas', { groomAge: '27', groomStatus: 'Bachelor', groomFather: 'Thomas Mathew', groomAddress: 'Kondapur, Hyderabad', brideName: 'Priya Varghese', brideAge: '22', brideStatus: 'Spinster', brideFather: 'George Varghese', brideAddress: 'Secunderabad', bannsDates: '27 Oct, 3 Nov and 10 Nov 2013', witness1: 'John Varghese', witness2: 'Mary Joseph' }, { personId: 'p_arun', spouseId: DEMO_MEMBER });
+  reg('baptism', `${thisYear}-01-14`, 'Ananya Reddy', { birthDate: `${thisYear - 1}-09-02`, birthPlace: 'Hyderabad', gender: 'Female', fatherName: 'Kiran Reddy', motherName: 'Sneha Reddy', address: 'Madhapur, Hyderabad', godparents: 'Rahul and Anita Varghese' });
+  reg('baptism', `${thisYear}-04-20`, 'Joel Daniel', { birthDate: `${thisYear - 1}-12-11`, birthPlace: 'Secunderabad', gender: 'Male', fatherName: 'Daniel Paul', motherName: 'Grace Daniel', address: 'SD Road, Secunderabad', godparents: 'Samuel and Ruth Kumar' });
+  reg('baptism', `${thisYear}-08-31`, 'Esther Joseph', { birthDate: `${thisYear}-03-18`, birthPlace: 'Hyderabad', gender: 'Female', fatherName: 'Joseph Mathew', motherName: 'Leah Joseph', address: 'Gachibowli, Hyderabad', godparents: 'Vinod and Susan Mathew' }, { certificatesIssued: 1 });
+  reg('confirmation', `${thisYear}-05-25`, 'Rohan Thomas', { birthDate: `${thisYear - 15}-02-09`, baptismDate: `${thisYear - 15}-04-15`, baptismPlace: 'Grace Community Church, Hyderabad', fatherName: 'Thomas Mathew', motherName: 'Mercy Thomas', sponsor: 'David Samuel' });
+  reg('burial', `${thisYear}-06-12`, 'Mathew Abraham', { deathDate: `${thisYear}-06-10`, age: '84', relation: 'Husband of Annamma Abraham', address: 'Kukatpally, Hyderabad', causeOfDeath: 'Old age', cemetery: 'Christian Cemetery, Narayanguda', graveNumber: 'C-114' });
+  reg('transfer', `${thisYear}-07-03`, 'Sam and Rebecca John', { toChurch: 'St. Mark’s CSI Church, Bengaluru', toAddress: 'MG Road, Bengaluru 560001', memberSince: '2016-03-06', family: 'Their children Aaron and Hannah John', reason: 'Moving for work' });
 }

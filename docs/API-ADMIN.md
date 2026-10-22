@@ -354,3 +354,16 @@ Media team actions on the presentation POST: `countdown { until? }` (mode `count
 - `GET /admin/celebrations?days=30&kind=birthday|anniversary|baptism` (people.view) → `Celebration[]`, soonest first, with `years`, `isChild`, `greeted` (office greeting sent this year) and `wishes` (member wishes).
 - `POST /admin/celebrations/greet` (comms) `{ personId, kind, channel, subject?, body }` → sends the greeting and records it.
 - Automation `staffDigest: { enabled, daysAhead }` in `/admin/messages/automations`: emails staff with the `care` permission each morning someone celebrates, and a full list on Mondays.
+
+## Registers (Grow plan)
+
+Baptism, confirmation, marriage and burial registers, plus membership transfer letters. Field definitions per register are `REGISTER_FIELDS` in `src/core/modules/registers.ts`.
+
+- `GET /admin/registers/summary` (people.view) → `{ kinds: RegisterSummary[], fields, labels }`.
+- `GET /admin/registers?kind=&q=&year=&status=void|all&cursor=` (people.view) → page of `RegisterEntry`, newest first. Void entries are hidden unless asked for.
+- `GET /admin/registers/:id`, `GET /admin/people/:id/registers` (people.view).
+- `POST /admin/registers` (people.edit) `{ kind, date, name?, personId?, spouseId?, place?, officiant?, details, remarks?, markInactive? }` → numbers the entry `BAP|CNF|MAR|BUR|TRF/<year>/<nnnn>` (per register and year, never reused). Linked people are updated where empty: baptism date, wedding anniversary for both spouses; a burial marks the person inactive and tags them Deceased; a transfer with `markInactive` tags them Transferred.
+- `PATCH /admin/registers/:id` (people.edit) `{ ...fields, reason? }` → each changed value is written as a dated marginal note with the staff name.
+- `POST /admin/registers/:id/notes` (people.edit) `{ text }`.
+- `POST /admin/registers/:id/void` (owner, admin or pastor) `{ reason }`: entries are never deleted.
+- `POST /admin/registers/:id/certificate` (people.view) → `Certificate` (rows to print, or the letter text for a transfer) and counts the copy.
