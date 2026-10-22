@@ -3,9 +3,9 @@ import { Hono } from 'hono';
 import { config } from '../config.js';
 import { accountFor } from '../giving.js';
 import { verifyLinkCallback } from '../razorpay.js';
-import type { Store } from '../store/types.js';
+import type { Hub } from '../server.js';
 
-export function givingRoutes(store: Store) {
+export function givingRoutes(hub: Hub) {
   const app = new Hono();
 
   // Razorpay sends the donor back here after paying a payment link. The webhook is what
@@ -13,10 +13,11 @@ export function givingRoutes(store: Store) {
   app.get('/giving/return', async (c) => {
     const q = c.req.query();
     const linkId = q.razorpay_payment_link_id ?? '';
-    const d = linkId ? await store.findByProviderRef(linkId) : null;
+    const t = hub.tenants.get(q.church ?? '') ?? hub.main;
+    const d = linkId && t ? await t.store.findByProviderRef(linkId) : null;
     let ok = false;
     try {
-      const acct = d ? accountFor(d.donorCitizenship).acct : null;
+      const acct = d && t ? accountFor(t, d.donorCitizenship).acct : null;
       ok =
         !!acct &&
         q.razorpay_payment_link_status === 'paid' &&
@@ -27,7 +28,7 @@ export function givingRoutes(store: Store) {
     } catch {
       ok = false;
     }
-    return c.redirect(`${config.webUrl}${returnPath(d)}payment=${ok ? 'success' : 'cancelled'}`);
+    return c.redirect(`${t?.env.webUrl ?? config.webUrl}${returnPath(d)}payment=${ok ? 'success' : 'cancelled'}`);
   });
 
   return app;

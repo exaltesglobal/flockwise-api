@@ -1,6 +1,8 @@
 // People, households, campuses, the member's own profile and the opt-in directory.
 import { ApiError } from '../errors.js';
+import type { Db } from '../db.js';
 import type { Ctx, Router } from '../engine.js';
+import { checkLimit } from '../plans.js';
 import type { Collections, Consent, DirectoryEntry, ImportResult, PersonInput, PersonTimeline } from '../types.js';
 import {
   age,
@@ -20,6 +22,16 @@ import {
   requireFields,
 } from '../util.js';
 import { cleanCustom, triggerWorkflows } from './workflows.js';
+
+/** People counted towards the plan: everyone except those marked inactive. */
+export const activePeople = (db: Db) => db.all('people').filter((p) => p.status !== 'inactive').length;
+
+/** How many import rows match someone already in the database (by email or phone). */
+function countExisting(ctx: Ctx, rows: Record<string, unknown>[]) {
+  const emails = new Set(ctx.db.all('people').map((p) => normEmail(p.email)).filter(Boolean));
+  const phones = new Set(ctx.db.all('people').map((p) => String(p.phone ?? '').replace(/\D/g, '').slice(-10)).filter((x) => x.length >= 8));
+  return rows.filter((r) => emails.has(normEmail(String(r.email ?? ''))) || phones.has(String(r.phone ?? '').replace(/\D/g, '').slice(-10))).length;
+}
 
 const EDITABLE: (keyof PersonInput)[] = [
   'firstName', 'lastName', 'phone', 'email', 'gender', 'birthDate', 'status', 'householdName', 'address', 'language', 'tags', 'notes',
@@ -205,12 +217,14 @@ export function registerPeople(r: Router) {
   });
   r.post('/admin/people', { perm: 'people.edit' }, (ctx) => {
     requireFields(ctx.body, ['firstName']);
+    checkLimit(ctx.db, ctx.now, 'people', activePeople(ctx.db));
     const p = ctx.db.put('people', newPerson(ctx, { lastName: '', ...cleanInput(ctx.body), ...withCustom(ctx, ctx.body), firstName: String(ctx.body.firstName) }));
     ctx.audit('created', 'person', p.id, `Added ${fullName(p)}`);
     if (p.status === 'visitor') triggerWorkflows(ctx, 'new_visitor', p.id);
     return personView(ctx, p);
   });
   r.post('/admin/people/import', { perm: 'people.edit' }, (ctx) => {
+    if (Array.isArray(ctx.body.rows)) checkLimit(ctx.db, ctx.now, 'people', activePeople(ctx.db), Math.max(0, ctx.body.rows.length - countExisting(ctx, ctx.body.rows)));
     const result = importPeople(ctx, Array.isArray(ctx.body.rows) ? ctx.body.rows : [], ctx.body.dedupeBy === 'email' ? 'email' : 'phone');
     ctx.audit('imported', 'person', null, `Imported people from ${ctx.body.source ?? 'a file'}: ${result.created} added, ${result.updated} updated`);
     return result;
@@ -275,6 +289,7 @@ export function registerPeople(r: Router) {
   );
   r.post('/admin/campuses', { perm: 'settings' }, (ctx) => {
     requireFields(ctx.body, ['name']);
+    checkLimit(ctx.db, ctx.now, 'campuses', ctx.db.count('campuses'));
     const c = ctx.db.put('campuses', { id: ctx.id('cp'), name: ctx.body.name, city: ctx.body.city ?? '', address: ctx.body.address ?? '', serviceTimes: ctx.body.serviceTimes ?? '' });
     ctx.audit('created', 'campus', c.id, `Added campus ${c.name}`);
     return c;

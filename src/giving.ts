@@ -2,38 +2,49 @@
 import { randomBytes } from 'node:crypto';
 
 import { config, type RazorpayAccount } from './config.js';
-import type { Env } from './core/index.js';
+import { razorpayConfig, type Db, type Env } from './core/index.js';
+import type { RazorpaySealed } from './core/types.js';
 import { ApiError } from './errors.js';
 import { createPaymentLink, createPlan, createSubscription } from './razorpay.js';
 import type { Donation, PaymentMethod, Store } from './store/types.js';
 
 export const newId = (prefix: string) => `${prefix}_${randomBytes(9).toString('base64url')}`;
 
+/** A church's Razorpay accounts: the ones it connected in Settings, else (for the server's own church) the env keys. */
+export function churchAccounts(t: { db: Db; env: Env; isDefault: boolean }): { main: RazorpayAccount | null; fcra: RazorpayAccount | null } {
+  const c = razorpayConfig(t);
+  const open = (a: RazorpaySealed | null | undefined): RazorpayAccount | null => (a ? { keyId: a.keyId, keySecret: t.env.unseal(a.keySecretSealed), webhookSecret: t.env.unseal(a.webhookSecretSealed) } : null);
+  if (c) return { main: open(c.main), fcra: open(c.fcra) };
+  return t.isDefault ? { main: config.razorpay.main, fcra: config.razorpay.fcra } : { main: null, fcra: null };
+}
+
 /** Gifts from foreign citizens / OCI holders to an Indian church must go to its FCRA account. */
-export function accountFor(donorCitizenship: 'IN' | 'OTHER'): { acct: RazorpayAccount | null; fcra: boolean } {
-  const fcra = config.church.country === 'IN' && donorCitizenship === 'OTHER';
-  if (!fcra) return { acct: config.razorpay.main, fcra };
-  if (!config.razorpay.fcra && config.razorpay.main)
+export function accountFor(t: { db: Db; env: Env; isDefault: boolean }, donorCitizenship: 'IN' | 'OTHER'): { acct: RazorpayAccount | null; fcra: boolean } {
+  const { main, fcra: fcraAcct } = churchAccounts(t);
+  const fcra = (t.db.get('settings', 'church')?.country ?? 'IN') === 'IN' && donorCitizenship === 'OTHER';
+  if (!fcra) return { acct: main, fcra };
+  if (!fcraAcct && main)
     throw new ApiError(422, 'fcra_not_registered', 'This church cannot accept gifts from foreign citizens or OCI holders online yet. Please contact the church office.');
-  return { acct: config.razorpay.fcra, fcra };
+  return { acct: fcraAcct, fcra };
 }
 
 /** env.checkout for the engine: creates the Razorpay page for a pending donation. */
-export function razorpayCheckout(store: Store): Env['checkout'] {
+export function razorpayCheckout(t: { id: string; db: Db; env: Env; isDefault: boolean; store: Store }): Env['checkout'] {
   return async (d, opts) => {
-    const { acct } = accountFor(d.donorCitizenship);
+    const store = t.store;
+    const { acct } = accountFor(t, d.donorCitizenship);
     if (!acct) {
       // No Razorpay keys yet: the built-in test checkout lets you try the whole flow.
-      return { checkoutUrl: `${config.apiPublicUrl}/v1/dev/checkout/${d.id}`, providerRef: null, provider: 'fake' };
+      return { checkoutUrl: `${config.apiPublicUrl}/v1/dev/checkout/${d.id}?church=${encodeURIComponent(t.id)}`, providerRef: null, provider: 'fake' };
     }
-    const notes = { donation_id: d.id, church_id: config.church.id, fund: d.fundName, member_id: d.donorId ?? '' };
+    const notes = { donation_id: d.id, church_id: t.id, fund: d.fundName, member_id: d.donorId ?? '' };
     if (d.frequency === 'once') {
       const link = await createPaymentLink(acct, {
         amount: d.amount,
         currency: d.currency,
         description: opts.description,
         referenceId: d.id,
-        callbackUrl: `${config.apiPublicUrl}/v1/giving/return${d.eventId ? '?kind=ticket' : ''}`,
+        callbackUrl: `${config.apiPublicUrl}/v1/giving/return?church=${encodeURIComponent(t.id)}${d.eventId ? '&kind=ticket' : ''}`,
         customer: { name: d.donorName, email: d.donorEmail, contact: d.donorPhone?.replace(/\s/g, '') },
         notes,
       });

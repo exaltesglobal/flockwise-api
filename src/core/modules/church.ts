@@ -2,6 +2,7 @@
 import { ApiError } from '../errors.js';
 import type { Ctx, Router } from '../engine.js';
 import { PERMISSIONS, ROLE_LABELS } from '../perms.js';
+import { checkLimit } from '../plans.js';
 import type { Collections, EventAttendee, EventInput, GroupDetail, GroupInput, StaffRole } from '../types.js';
 import {
   bySoonest,
@@ -324,6 +325,7 @@ export function registerChurch(r: Router) {
     const email = normEmail(ctx.body.email);
     if (!ROLES.includes(ctx.body.role) || ctx.body.role === 'owner') throw new ApiError(422, 'invalid', 'Choose a role.', { role: 'Choose a role' });
     if (ctx.db.all('staff').some((s) => normEmail(s.email) === email)) throw new ApiError(409, 'exists', 'This email is already on the team.');
+    checkLimit(ctx.db, ctx.now, 'staff', ctx.db.count('staff'));
     const person = ctx.db.all('people').find((p) => normEmail(p.email) === email);
     const s = ctx.db.put('staff', { id: ctx.id('st'), personId: person?.id ?? null, name: String(ctx.body.name), email, phone: ctx.body.phone ?? person?.phone ?? null, role: ctx.body.role, status: 'invited', lastActiveAt: null });
     ctx.audit('invited', 'staff', s.id, `Invited ${s.name} as ${ROLE_LABELS[s.role]}`);

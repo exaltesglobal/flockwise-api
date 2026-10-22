@@ -3,8 +3,10 @@
 import type { Db } from './db.js';
 import { ApiError } from './errors.js';
 import { PERMISSIONS } from './perms.js';
+import { atLeast, checkPlan, effectivePlan, getSubscription, type BillingInterval, type PlanId } from './plans.js';
 import type { Channel, ChannelStatus, Collections, DonationRecord, Kind, Permission, StaffRole } from './types.js';
 
+export type BillingCheckout = { churchId: string; churchName: string; plan: PlanId; interval: BillingInterval; currency: 'INR' | 'USD'; amount: number; email: string; name: string };
 export type Outgoing = { to: string; name: string; subject: string; text: string };
 export type DeliveryResult = { ok: boolean; error?: string };
 
@@ -49,6 +51,18 @@ export type Env = {
   chitthi(apiKey: string, req: { method: 'GET' | 'POST'; path: string; body?: unknown }): Promise<{ status: number; data: any }>; // eslint-disable-line @typescript-eslint/no-explicit-any
   /** Claude, when the server has an API key. Absent means AI features are switched off. */
   ai?: (req: AiRequest) => Promise<AiResponse>;
+  /**
+   * Flockwise's own subscription billing (the church pays Flockwise). Absent in the demo, where
+   * a plan change takes effect at once.
+   */
+  billing?: {
+    checkout(input: BillingCheckout): Promise<{ url: string; providerRef: string | null }>;
+    cancel(providerRef: string): Promise<void>;
+  };
+  /** Checks a church's Razorpay keys with Razorpay. Absent in the demo. */
+  verifyRazorpay?: (keyId: string, keySecret: string) => Promise<boolean>;
+  /** True when the host has its own Razorpay keys for this church (the server's original church). */
+  serverPaymentKeys?: boolean;
   /** Encrypts a stored credential (e.g. a partner API key) and reads it back. */
   seal(value: string): string;
   unseal(sealed: string): string;
@@ -167,6 +181,7 @@ export function createEngine(db: Db, env: Env, modules: ((r: Router) => void)[])
       req = { ...req, auth: keyAuth(req.apiKey) };
       // Keys reach church data only; they cannot make more keys, change connections or change staff roles.
       if (!path.startsWith('/admin/') || /^\/admin\/(api-keys|integrations)/.test(path) || (path.startsWith('/admin/staff') && method !== 'GET')) throw new ApiError(403, 'forbidden', 'API keys cannot use this endpoint.');
+      if (!atLeast(effectivePlan(getSubscription(db), env.now()), 'cathedral')) throw new ApiError(402, 'plan_required', 'API access is part of the Cathedral plan.', { plan: 'cathedral' });
       if (req.auth!.readOnly && method !== 'GET') throw new ApiError(403, 'read_only_key', 'This API key can only read. Make a full-access key to change data.');
     }
     for (const route of router.routes) {
@@ -180,6 +195,7 @@ export function createEngine(db: Db, env: Env, modules: ((r: Router) => void)[])
           if (!ctx.staff) throw new ApiError(403, 'forbidden', 'This is for church staff. Sign in to the church office.');
           const need = route.opts.perm ? ([] as Permission[]).concat(route.opts.perm) : [];
           if (need.length && !need.some((p) => ctx.can(p))) ctx.require(need[0]);
+          checkPlan(db, ctx.now, path, method, req.body);
           if (ctx.staff.lastActiveAt?.slice(0, 10) !== ctx.now.toISOString().slice(0, 10)) db.put('staff', { ...ctx.staff, lastActiveAt: ctx.now.toISOString() });
         }
       }

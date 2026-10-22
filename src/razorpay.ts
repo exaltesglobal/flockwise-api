@@ -48,15 +48,25 @@ export function createPaymentLink(
   });
 }
 
-export function createPlan(acct: RazorpayAccount, input: { amount: number; currency: string; name: string }) {
-  return call<{ id: string }>(acct, 'POST', '/plans', { period: 'monthly', interval: 1, item: { name: input.name, amount: input.amount, currency: input.currency } });
+export function createPlan(acct: RazorpayAccount, input: { amount: number; currency: string; name: string; period?: 'monthly' | 'yearly' }) {
+  return call<{ id: string }>(acct, 'POST', '/plans', { period: input.period ?? 'monthly', interval: 1, item: { name: input.name, amount: input.amount, currency: input.currency } });
+}
+
+export function cancelSubscription(acct: RazorpayAccount, id: string) {
+  return call<Subscription>(acct, 'POST', `/subscriptions/${encodeURIComponent(id)}/cancel`, { cancel_at_cycle_end: 1 });
+}
+
+/** True when Razorpay accepts the keys (a harmless read). */
+export async function checkKeys(keyId: string, keySecret: string) {
+  const res = await fetch(`${BASE}/payments?count=1`, { headers: { Authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString('base64')}` }, signal: AbortSignal.timeout(15_000) }).catch(() => null);
+  return !!res && res.status !== 401;
 }
 
 /** Monthly gift: a Razorpay subscription. In India the donor approves UPI AutoPay or an e-mandate once. */
-export function createSubscription(acct: RazorpayAccount, input: { planId: string; notes: Record<string, string> }) {
+export function createSubscription(acct: RazorpayAccount, input: { planId: string; notes: Record<string, string>; totalCount?: number }) {
   return call<Subscription>(acct, 'POST', '/subscriptions', {
     plan_id: input.planId,
-    total_count: 120, // ten years; the donor can cancel any time from their UPI app or bank
+    total_count: input.totalCount ?? 120, // ten years; the donor can cancel any time from their UPI app or bank
     quantity: 1,
     customer_notify: 1,
     notes: input.notes,

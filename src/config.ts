@@ -21,7 +21,13 @@ export const config = {
     country: env.CHURCH_COUNTRY ?? 'IN',
     currency: env.CHURCH_CURRENCY ?? 'INR',
     city: env.CHURCH_CITY ?? '',
+    /** The church's web address on Flockwise (app.flockwise.church/c/<slug>). */
+    slug: env.CHURCH_SLUG ?? '',
   },
+  /** Flockwise team emails that can sign in to the team panel at /platform, comma separated. */
+  platformAdmins: (env.PLATFORM_ADMINS ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
+  /** Flockwise's own Razorpay account, for churches paying for their plan (not for gifts). */
+  billing: account(env.BILLING_RAZORPAY_KEY_ID, env.BILLING_RAZORPAY_KEY_SECRET, env.BILLING_RAZORPAY_WEBHOOK_SECRET),
   /** The first church office login. Sign in at /admin with this email. */
   owner: { email: env.OWNER_EMAIL ?? '', name: env.OWNER_NAME ?? '' },
   db: env.DB_HOST
@@ -75,6 +81,7 @@ export function assertConfig() {
   if (config.production && config.seedDemo) problems.push('SEED_DEMO must be false in production');
   if (config.production && !emailConfigured()) problems.push('Email must be configured (EMAIL_FROM plus SMTP_* or RESEND_API_KEY): sign-in codes are sent by email');
   if (config.razorpay.main && !config.razorpay.main.webhookSecret) problems.push('RAZORPAY_WEBHOOK_SECRET is needed to confirm payments');
+  if (config.billing && !config.billing.webhookSecret) problems.push('BILLING_RAZORPAY_WEBHOOK_SECRET is needed to confirm plan payments');
   if (!config.jwtSecret) config.jwtSecret = 'dev-only-secret-change-me-dev-only-secret';
   if (problems.length) {
     console.error(`Configuration problems:\n - ${problems.join('\n - ')}`);

@@ -47,6 +47,25 @@ Sign-in codes are sent by email only, so email must work before anyone can log i
 | `CHURCH_NAME` / `CHURCH_CITY` | set | Check these are the real first church, not the sample "Grace Community Church" |
 | `CHURCH_COUNTRY` / `CHURCH_CURRENCY` | set | `IN` / `INR` |
 | `OWNER_EMAIL` / `OWNER_NAME` | set | The first office login. Sign in at app.flockwise.church/admin with this email |
+| `CHURCH_SLUG` | optional | The first church's address, e.g. `grace` gives app.flockwise.church/c/grace. Leave unset to make one from the name |
+
+### Many churches, plans and the Flockwise team panel
+
+One server hosts every church. New churches sign up themselves at app.flockwise.church/start and
+get a 30-day trial of every feature. The first church (above) is a founding church with every
+feature and no limits.
+
+| Variable | Status | Value |
+|---|---|---|
+| `PLATFORM_ADMINS` | needed for /platform | Comma-separated Flockwise team emails, e.g. `admin@flockwise.church`. They sign in at app.flockwise.church/platform with an email code |
+| `BILLING_RAZORPAY_KEY_ID` / `BILLING_RAZORPAY_KEY_SECRET` | needed to sell plans | Agape Labs' own Razorpay account (Exaltes Global), not a church's. Until set, churches cannot pay for a plan online and are asked to write to hello@flockwise.church |
+| `BILLING_RAZORPAY_WEBHOOK_SECRET` | with the keys | In that Razorpay account: Settings > Webhooks > add `https://api.flockwise.church/v1/webhooks/billing` with events `subscription.activated`, `subscription.charged`, `subscription.halted`, `subscription.cancelled`, `subscription.completed`, and the secret you choose |
+
+Each new church connects its own Razorpay account for gifts in Settings > Giving (keys are stored
+encrypted with `JWT_SECRET`, so never change it once churches have connected). Its webhook URL is
+shown there: `https://api.flockwise.church/v1/webhooks/razorpay/<church id>`. The `RAZORPAY_*`
+variables below are for the first church only. The server's SMS and WhatsApp accounts also serve the
+first church only; other churches send WhatsApp through their own Chitthi workspace.
 
 ### Email alternative: Resend (optional)
 

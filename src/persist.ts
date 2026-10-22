@@ -1,6 +1,6 @@
 // Keeps the engine's in-memory database in MySQL. Every record is one row in `records`,
 // written through as it changes; the whole church is loaded once at start-up.
-// This suits one Node process per church, which is how Hostinger runs the app.
+// One pool serves every church on the server; each church is loaded into memory at start-up.
 import { readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';
 
 import mysql from 'mysql2/promise';
@@ -20,9 +20,19 @@ const DDL = `CREATE TABLE IF NOT EXISTS records (
   KEY idx_records_kind (church_id, kind)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`;
 
-export async function mysqlPersistence(conn: Conn, churchId: string, db: Db) {
-  const pool = mysql.createPool({ ...conn, connectionLimit: 5, charset: 'utf8mb4', timezone: 'Z' });
+export async function openPool(conn: Conn) {
+  const pool = mysql.createPool({ ...conn, connectionLimit: 8, charset: 'utf8mb4', timezone: 'Z' });
   await pool.query(DDL);
+  return pool;
+}
+
+/** Every church id that has data in the database. */
+export async function churchIds(pool: mysql.Pool) {
+  const [rows] = await pool.query<mysql.RowDataPacket[]>('SELECT DISTINCT church_id FROM records');
+  return rows.map((r) => String(r.church_id));
+}
+
+export async function mysqlPersistence(pool: mysql.Pool, churchId: string, db: Db) {
   const [rows] = await pool.query<mysql.RowDataPacket[]>('SELECT kind, data FROM records WHERE church_id = ?', [churchId]);
   const dump: Dump = {};
   for (const r of rows) {
@@ -63,7 +73,6 @@ export async function mysqlPersistence(conn: Conn, churchId: string, db: Db) {
     async settle() {
       while (flushing) await flushing;
     },
-    close: () => pool.end(),
   };
 }
 
@@ -81,5 +90,5 @@ export function filePersistence(path: string, db: Db) {
       save();
     }, 300);
   });
-  return { settle: async () => save(), close: async () => undefined };
+  return { settle: async () => save() };
 }

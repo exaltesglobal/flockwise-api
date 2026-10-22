@@ -3,25 +3,27 @@
 // weekly briefing, sermon helpers and a worship set suggester. Switched off unless the host has
 // an AI provider; each church has a monthly allowance.
 import type { AiBlock, AiMessage, AiRequest, Ctx, Request, Router } from '../engine.js';
+import type { Db } from '../db.js';
 import { ApiError } from '../errors.js';
+import { limitsFor } from '../plans.js';
 import { TOOLS, trim } from '../mcp.js';
 import type { AiAnswer, AiDraft, AiPurpose, AiSermonKind, AiSetlist, AiStatus } from '../types.js';
 import { settings } from '../util.js';
 
-const DEFAULT_LIMIT = 300;
 const LANGS: Record<string, string> = { en: 'English', hi: 'Hindi', te: 'Telugu', ta: 'Tamil', ml: 'Malayalam', kn: 'Kannada', mr: 'Marathi', bn: 'Bengali', gu: 'Gujarati', pa: 'Punjabi', or: 'Odia', as: 'Assamese', ur: 'Urdu', kok: 'Konkani', mni: 'Manipuri', lus: 'Mizo', kha: 'Khasi', ne: 'Nepali' };
 
 // The assistant calls the same endpoints as the office, as the signed-in staff member. The engine
 // hands over its request handler once it is built.
-let handle: ((req: Request) => Promise<unknown>) | null = null;
-export const bindAiHandle = (h: (req: Request) => Promise<unknown>) => { handle = h; };
+// One server hosts many churches, so each church's handler is kept with its database.
+const handles = new WeakMap<Db, (req: Request) => Promise<unknown>>();
+export const bindAiHandle = (db: Db, h: (req: Request) => Promise<unknown>) => void handles.set(db, h);
 
 const month = (ctx: Ctx) => ctx.now.toISOString().slice(0, 7);
 
 function status(ctx: Ctx): AiStatus {
   const m = month(ctx);
   const used = Number(ctx.db.get('meta', `ai:${m}`)?.value ?? 0);
-  return { enabled: !!ctx.env.ai, used, limit: settings(ctx).aiMonthlyLimit ?? DEFAULT_LIMIT, month: m };
+  return { enabled: !!ctx.env.ai, used, limit: settings(ctx).aiMonthlyLimit ?? limitsFor(ctx.db, ctx.now).aiCredits, month: m };
 }
 
 function churchContext(ctx: Ctx) {
@@ -75,6 +77,7 @@ const CHANNEL_RULES: Record<string, string> = {
 const ASK_TOOLS = TOOLS.filter((t) => !t.write);
 
 export async function askAssistant(ctx: Ctx, question: string, history: AiMessage[], extraSystem = ''): Promise<AiAnswer> {
+  const handle = handles.get(ctx.db);
   if (!handle) throw new ApiError(503, 'ai_off', 'The assistant is not ready.');
   const tools = ASK_TOOLS.map((t) => ({ name: t.name, description: t.description, input_schema: { type: 'object', properties: t.props ?? {}, ...(t.required ? { required: t.required } : {}) } }));
   const system = `${churchContext(ctx)}\n\nYou are the Flockwise assistant inside the church office. Answer questions using the tools, which read the church's live data with the permissions of ${ctx.staff?.name ?? 'this staff member'}. Look things up rather than guessing; if a tool says access is not allowed, say so plainly. Be brief: lead with the answer, then a few bullet points at most. Use names, dates and numbers from the data. Keep anything marked confidential to what was asked. You cannot change data or send messages; point the user to the right page instead.${extraSystem ? `\n\n${extraSystem}` : ''}`;

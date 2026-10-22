@@ -15,16 +15,23 @@ import { registerCelebrations } from './modules/celebrations.js';
 import { registerMinistry } from './modules/ministry.js';
 import { registerPresent } from './modules/present.js';
 import { registerWorkflows } from './modules/workflows.js';
-import { registerIntegrations } from './modules/integrations.js';
+import { registerIntegrations, registerPayments } from './modules/integrations.js';
 import { createMcp } from './mcp.js';
 import { bindAiHandle, registerAi } from './modules/ai.js';
+import { registerBilling } from './modules/billing.js';
+import { ApiError } from './errors.js';
+import { atLeast, effectivePlan, getSubscription } from './plans.js';
 
-export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry, registerCelebrations, registerPresent, registerIntegrations, registerAi];
+export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry, registerCelebrations, registerPresent, registerIntegrations, registerAi, registerBilling, registerPayments];
 
 export function createChurchEngine(db: Db, env: Env) {
   const engine = createEngine(db, env, MODULES);
-  const mcp = createMcp(engine.handle, engine.verifyKey);
-  bindAiHandle(engine.handle);
+  const mcp = createMcp(engine.handle, (key) => {
+    const auth = engine.verifyKey(key);
+    if (!atLeast(effectivePlan(getSubscription(db), env.now()), 'cathedral')) throw new ApiError(402, 'plan_required', 'Connecting AI assistants is part of the Cathedral plan.');
+    return auth;
+  });
+  bindAiHandle(db, engine.handle);
   return {
     ...engine,
     /** The MCP server: one JSON-RPC message in, the reply out (null for notifications). */
@@ -37,9 +44,13 @@ export function createChurchEngine(db: Db, env: Env) {
 }
 
 export { Db, type Dump, type Env };
-export { ApiError } from './errors.js';
+export { ApiError };
+export * from './plans.js';
 export type { AiBlock, AiMessage, AiRequest, AiResponse, AuthClaims, DeliveryResult, Outgoing, Request } from './engine.js';
 export { onDonationSucceeded } from './modules/giving.js';
 export { DEMO_CODE } from './modules/auth.js';
 export { PERMISSIONS, ROLE_LABELS } from './perms.js';
 export { bootstrapChurch } from './bootstrap.js';
+export { applyBillingEvent, billingView } from './modules/billing.js';
+export { createPlatform, slugify, type ChurchEntry, type Platform, type TenantHost } from './platform.js';
+export { razorpayConfig } from './modules/integrations.js';

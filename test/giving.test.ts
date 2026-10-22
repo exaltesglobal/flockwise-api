@@ -32,8 +32,8 @@ globalThis.fetch = (async (url: string, init: RequestInit) => {
 const server = buildServer();
 bootstrap(server);
 const codes = new Map<string, string>();
-server.env.sendOtpEmail = async (to, code) => void codes.set(to, code);
-const app = createApp(server.engine, server.store);
+server.hooks.sendOtpEmail = async (to, code) => void codes.set(to, code);
+const app = createApp(server);
 
 const json = (method: string, body?: unknown, token?: string) => ({
   method,
@@ -174,7 +174,7 @@ test('http: API keys, MCP endpoint and sealed Chitthi key', async () => {
   // Chitthi: the test fetch answers 200 for anything, so the key is accepted; it must be stored sealed.
   const st = await (await app.request('/v1/admin/integrations/chitthi', json('POST', { apiKey: 'chk_live_realkey1234567890' }, owner))).json();
   assert.equal(st.connected, true);
-  const rec = server.db.get('integrations', 'chitthi')!;
+  const rec = server.db.get('integrations', 'chitthi') as import('../src/core/types.js').ChitthiConfig;
   assert.ok(!rec.apiKeySealed.includes('realkey'));
   assert.equal(server.env.unseal(rec.apiKeySealed), 'chk_live_realkey1234567890');
 });

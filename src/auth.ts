@@ -10,15 +10,16 @@ const ACCESS_TTL = 3600;
 
 type Jwt = AuthClaims & { church: string; exp: number };
 
-export function signAccess(claims: AuthClaims) {
+export function signAccess(claims: AuthClaims, church: string = config.church.id) {
   const exp = Math.floor(Date.now() / 1000) + ACCESS_TTL;
   const header = b64(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const body = b64(JSON.stringify({ ...claims, church: config.church.id, exp } satisfies Jwt));
+  const body = b64(JSON.stringify({ ...claims, church, exp } satisfies Jwt));
   const sig = b64(createHmac('sha256', config.jwtSecret).update(`${header}.${body}`).digest());
   return { token: `${header}.${body}.${sig}`, expiresAt: new Date(exp * 1000).toISOString() };
 }
 
-export function verifyAccess(token: string | undefined): AuthClaims | null {
+/** The claims of a valid access token, with the church it was issued for. */
+export function verifyAccess(token: string | undefined): (AuthClaims & { church: string }) | null {
   if (!token) return null;
   const [header, body, sig] = token.split('.');
   if (!header || !body || !sig) return null;
@@ -27,8 +28,8 @@ export function verifyAccess(token: string | undefined): AuthClaims | null {
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
   try {
     const c = JSON.parse(Buffer.from(body, 'base64url').toString()) as Jwt;
-    if (c.exp * 1000 <= Date.now() || c.church !== config.church.id) return null;
-    return { sub: c.sub, staffId: c.staffId ?? null, scope: c.scope === 'admin' ? 'admin' : 'member' };
+    if (c.exp * 1000 <= Date.now() || !c.church) return null;
+    return { sub: c.sub, staffId: c.staffId ?? null, scope: c.scope === 'admin' ? 'admin' : 'member', church: c.church };
   } catch {
     return null;
   }

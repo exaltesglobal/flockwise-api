@@ -756,6 +756,10 @@ export type AiSermonKind = 'outline' | 'discussion' | 'social' | 'kids' | 'summa
 // ---------- integrations ----------
 
 /** The church's Chitthi connection: WhatsApp messages go out through its Chitthi workspace. */
+/** A church's own Razorpay account for gifts, with the secrets sealed by the host. */
+export type RazorpaySealed = { keyId: string; keySecretSealed: string; webhookSecretSealed: string };
+export type RazorpayConfig = { id: 'razorpay'; main: RazorpaySealed; fcra: RazorpaySealed | null; connectedAt: string; connectedBy: string };
+export type PaymentsStatus = { connected: boolean; keyId: string | null; mode: 'live' | 'test' | null; fcraKeyId: string | null; webhookPath: string; serverKeys: boolean };
 export type ChitthiConfig = {
   id: 'chitthi';
   /** The Chitthi API key, sealed by the host; never sent to the browser. */
@@ -784,7 +788,7 @@ export type ApiKeyView = Omit<ApiKeyRecord, 'hash'> & { createdByName: string };
 
 export type Collections = {
   settings: ChurchSettings & { id: string };
-  integrations: ChitthiConfig;
+  integrations: ChitthiConfig | RazorpayConfig;
   apiKeys: ApiKeyRecord;
   automations: Automations & { id: string };
   greetings: Greeting;

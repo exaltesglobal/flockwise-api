@@ -1,12 +1,13 @@
 // Connections to other apps: Chitthi for WhatsApp, and API keys for the public API and MCP.
 import type { Ctx, DeliveryResult, Outgoing, Router } from '../engine.js';
 import { ApiError } from '../errors.js';
-import type { ApiKeyRecord, ApiKeyView, Channel, ChannelStatus, ChitthiConfig, ChitthiStatus, ChitthiTemplate } from '../types.js';
-import { settings } from '../util.js';
+import type { ApiKeyRecord, ApiKeyView, Channel, ChannelStatus, ChitthiConfig, ChitthiStatus, ChitthiTemplate, PaymentsStatus, RazorpayConfig } from '../types.js';
+import { churchId, settings } from '../util.js';
 
 export const CHITTHI_SIGNUP = 'https://app.chitthi.live/signup?ref=flockwise';
 
 const chitthi = (ctx: Ctx) => ctx.db.get('integrations', 'chitthi') as ChitthiConfig | undefined;
+export const razorpayConfig = (ctx: Pick<Ctx, 'db'>) => ctx.db.get('integrations', 'razorpay') as RazorpayConfig | undefined;
 
 function chitthiStatus(ctx: Ctx): ChitthiStatus {
   const c = chitthi(ctx);
@@ -74,10 +75,10 @@ export function registerIntegrations(r: Router) {
     if (res.status >= 300) throw new ApiError(502, 'chitthi_error', errMessage(res.data, res.status));
     const now = ctx.now.toISOString();
     const t = cleanTemplate(ctx.body);
-    const c = ctx.db.put('integrations', {
+    const c: ChitthiConfig = ctx.db.put('integrations', {
       id: 'chitthi', apiKeySealed: ctx.env.seal(apiKey), keyHint: `${apiKey.slice(0, 9)}…${apiKey.slice(-4)}`, workspace: String(res.data?.workspace ?? 'Chitthi'),
       ...t, connectedAt: now, connectedBy: ctx.staff!.name, lastError: null, lastSentAt: null,
-    });
+    } satisfies ChitthiConfig) as ChitthiConfig;
     ctx.audit('connected', 'integration', 'chitthi', `Connected Chitthi workspace ${c.workspace} for WhatsApp`);
     return chitthiStatus(ctx);
   });
@@ -123,7 +124,7 @@ export function registerIntegrations(r: Router) {
     const name = String(ctx.body.name ?? '').trim().slice(0, 60);
     if (!name) throw new ApiError(400, 'name_required', 'Give the key a name, e.g. "Zapier" or "Claude".');
     if (ctx.db.all('apiKeys').filter((k) => !k.revokedAt).length >= 20) throw new ApiError(400, 'too_many_keys', 'You have 20 keys. Revoke one you no longer use first.');
-    const secret = `fw_live_${ctx.env.random(32, 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789')}`;
+    const secret = `fw_live_${churchId(ctx)}.${ctx.env.random(32, 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789')}`;
     const k = ctx.db.put('apiKeys', {
       id: ctx.id('key'), name, prefix: secret.slice(0, 12), hash: ctx.env.hash(secret), staffId: ctx.staff!.id,
       access: ctx.body.access === 'full' ? 'full' : 'read', createdAt: ctx.now.toISOString(), lastUsedAt: null, revokedAt: null,
@@ -139,5 +140,45 @@ export function registerIntegrations(r: Router) {
     ctx.db.put('apiKeys', { ...k, revokedAt: ctx.now.toISOString() });
     ctx.audit('revoked', 'api key', k.id, `Revoked API key "${k.name}"`);
     return undefined;
+  });
+}
+
+// ----- the church's own Razorpay account for gifts -----
+const KEY_RE = /^rzp_(live|test)_[A-Za-z0-9]{6,}$/;
+
+export function paymentsStatus(ctx: Ctx): PaymentsStatus {
+  const c = razorpayConfig(ctx);
+  return { connected: !!c || !!ctx.env.serverPaymentKeys, keyId: c?.main.keyId ?? null, mode: c ? (c.main.keyId.startsWith('rzp_live_') ? 'live' : 'test') : null, fcraKeyId: c?.fcra?.keyId ?? null, webhookPath: `/v1/webhooks/razorpay/${churchId(ctx)}`, serverKeys: !!ctx.env.serverPaymentKeys && !c };
+}
+
+async function sealAccount(ctx: Ctx, raw: unknown, label: string) {
+  const a = (raw ?? {}) as Record<string, unknown>;
+  const keyId = String(a.keyId ?? '').trim();
+  const keySecret = String(a.keySecret ?? '').trim();
+  const webhookSecret = String(a.webhookSecret ?? '').trim();
+  if (!KEY_RE.test(keyId)) throw new ApiError(422, 'invalid', `The ${label} Key ID starts with rzp_live_ or rzp_test_.`, { keyId: 'Paste the Key ID from Razorpay' });
+  if (keySecret.length < 10) throw new ApiError(422, 'invalid', `Paste the ${label} Key Secret.`, { keySecret: 'Paste the Key Secret' });
+  if (webhookSecret.length < 6) throw new ApiError(422, 'invalid', `Paste the ${label} webhook secret you set in Razorpay.`, { webhookSecret: 'Paste the webhook secret' });
+  if (ctx.env.verifyRazorpay && !(await ctx.env.verifyRazorpay(keyId, keySecret))) throw new ApiError(422, 'razorpay_rejected', `Razorpay did not accept the ${label} keys. Check the Key ID and Secret, and that the account is activated.`);
+  return { keyId, keySecretSealed: ctx.env.seal(keySecret), webhookSecretSealed: ctx.env.seal(webhookSecret) };
+}
+
+export function registerPayments(r: Router) {
+  r.get('/admin/settings/payments', { perm: 'settings' }, (ctx) => paymentsStatus(ctx));
+  r.post('/admin/settings/payments/razorpay', { perm: 'settings' }, async (ctx) => {
+    const main = await sealAccount(ctx, ctx.body, 'Razorpay');
+    const fcra = ctx.body.fcra?.keyId ? await sealAccount(ctx, ctx.body.fcra, 'FCRA account') : null;
+    ctx.db.put('integrations', { id: 'razorpay', main, fcra, connectedAt: ctx.now.toISOString(), connectedBy: ctx.staff?.name ?? '' });
+    const s = settings(ctx);
+    ctx.db.put('settings', { ...s, paymentProvider: 'razorpay', payments: { provider: 'razorpay', connected: true, accountId: main.keyId } });
+    ctx.audit('connected', 'payments', null, `Connected Razorpay (${main.keyId})${fcra ? ' with an FCRA account' : ''}`);
+    return paymentsStatus(ctx);
+  });
+  r.del('/admin/settings/payments/razorpay', { perm: 'settings' }, (ctx) => {
+    ctx.db.del('integrations', 'razorpay');
+    const s = settings(ctx);
+    ctx.db.put('settings', { ...s, payments: { ...s.payments, connected: !!ctx.env.serverPaymentKeys, accountId: null } });
+    ctx.audit('disconnected', 'payments', null, 'Disconnected Razorpay');
+    return paymentsStatus(ctx);
   });
 }
