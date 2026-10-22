@@ -448,6 +448,8 @@ export type ChurchSettings = Church & {
   childAgeLimit: number;
   publicPage?: PublicPage;
   presentation?: Partial<PresentationTheme>;
+  /** Secret in the projector, stage and OBS overlay links so those screens need no sign-in. */
+  screenKey?: string;
 };
 
 export type Permission =
@@ -704,8 +706,20 @@ export type Slide = {
   chords: string[];
 };
 export type PresentationTheme = { background: string; textColor: string; imageUrl: string; fontScale: number; linesPerSlide: number; showAlt: boolean; titleSlides: boolean; uppercase: boolean };
-export type PresentationMode = 'live' | 'blank' | 'logo';
-export type PresentationState = { id: string; eventId: string; index: number; mode: PresentationMode; message: string; updatedAt: string };
+export type PresentationMode = 'live' | 'blank' | 'logo' | 'countdown';
+/** A name strap for the livestream: speaker, reader, Bible reference or announcement. */
+export type LowerThird = { id: string; title: string; subtitle: string };
+export type PresentationState = {
+  id: string; eventId: string; index: number; mode: PresentationMode; message: string; updatedAt: string;
+  /** The lower-third showing on the livestream overlay, if any. */
+  lowerThird?: LowerThird | null;
+  /** Lower-thirds the media team prepared for this service. */
+  lowerThirds?: LowerThird[];
+  /** Whether the livestream overlay shows the lyrics bar. */
+  overlayLyrics?: boolean;
+  /** When the countdown ends (defaults to the service start). */
+  countdownTo?: string | null;
+};
 export type PresentationView = {
   event: { id: string; title: string; startsAt: string; endsAt: string };
   churchName: string;
@@ -714,6 +728,12 @@ export type PresentationView = {
   state: PresentationState;
   theme: PresentationTheme;
   timer: { itemTitle: string | null; itemEndsAt: string | null; serviceEndsAt: string | null };
+  /** Published announcements, rotated on the countdown screen. */
+  announcements: { title: string; body: string }[];
+  /** Lower-thirds suggested from the plan (preacher, readers, references). */
+  suggestedLowerThirds: LowerThird[];
+  /** Key for the sign-in-free screen links (projector PC, OBS Browser Source). Office logins only. */
+  screenKey?: string;
 };
 export type SongStats = {
   top: { songId: string; title: string; uses: number; lastUsedAt: string | null }[];

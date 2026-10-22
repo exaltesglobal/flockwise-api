@@ -2,7 +2,7 @@
 // announcements), keeps every screen on the same slide, and adds song usage stats for worship teams.
 import { ApiError } from '../errors.js';
 import type { Ctx, Router } from '../engine.js';
-import type { Collections, PlanItem, PresentationMode, PresentationState, PresentationTheme, PresentationView, Slide, Song, SongStats } from '../types.js';
+import type { Collections, LowerThird, PlanItem, PresentationState, PresentationTheme, PresentationView, Slide, Song, SongStats } from '../types.js';
 import { church, DAY, find, pick, settings } from '../util.js';
 import { liveView } from './ministry.js';
 
@@ -138,7 +138,37 @@ export function buildDeck(ctx: Ctx, items: PlanItem[], theme = themeOf(ctx)): Sl
 const stateFor = (ctx: Ctx, eventId: string): PresentationState =>
   ctx.db.get('presentations', eventId) ?? { id: eventId, eventId, index: 0, mode: 'live', message: '', updatedAt: ctx.now.toISOString() };
 
-function view(ctx: Ctx, ev: Collections['events']): PresentationView {
+const KEY_ALPHABET = 'abcdefghijkmnpqrstuvwxyz23456789';
+
+/** The church's screen key, created the first time an office login asks for it. */
+function screenKey(ctx: Ctx, rotate = false) {
+  const s = settings(ctx);
+  if (s.screenKey && !rotate) return s.screenKey;
+  const key = ctx.env.random(24, KEY_ALPHABET);
+  ctx.db.put('settings', { ...s, screenKey: key });
+  return key;
+}
+
+/** Name straps the media team will probably want: the preacher, readers and Bible references. */
+function suggestLowerThirds(items: PlanItem[]): LowerThird[] {
+  const out: LowerThird[] = [];
+  items.forEach((it, i) => {
+    const person = it.person?.trim();
+    if (it.kind === 'sermon' && person) out.push({ id: `s${i}`, title: person, subtitle: it.title });
+    else if (it.kind === 'reading') out.push({ id: `r${i}`, title: it.title, subtitle: person ? `Read by ${person}` : 'Scripture reading' });
+    else if (person && it.kind !== 'song' && person !== 'Worship team') out.push({ id: `p${i}`, title: person, subtitle: it.title });
+  });
+  const seen = new Set<string>();
+  return out.filter((l) => { const k = `${l.title}|${l.subtitle}`; if (seen.has(k)) return false; seen.add(k); return true; });
+}
+
+const cleanLower = (v: unknown, id: string): LowerThird | null => {
+  const o = (v ?? {}) as Record<string, unknown>;
+  const title = String(o.title ?? '').trim().slice(0, 80);
+  return title ? { id: String(o.id ?? id).slice(0, 40), title, subtitle: String(o.subtitle ?? '').trim().slice(0, 120) } : null;
+};
+
+function view(ctx: Ctx, ev: Collections['events'], staff = true): PresentationView {
   const live = liveView(ctx, ev);
   const theme = themeOf(ctx);
   const slides = buildDeck(ctx, live.plan.items, theme);
@@ -153,6 +183,9 @@ function view(ctx: Ctx, ev: Collections['events']): PresentationView {
     state: { ...state, index: Math.min(state.index, Math.max(0, slides.length - 1)) },
     theme,
     timer: { itemTitle: runningItem?.title ?? null, itemEndsAt: live.itemEndsAt, serviceEndsAt: live.serviceEndsAt },
+    announcements: ctx.db.all('announcements').filter((a) => a.status === 'published').sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)).slice(0, 6).map((a) => ({ title: a.title, body: a.body.slice(0, 240) })),
+    suggestedLowerThirds: suggestLowerThirds(live.plan.items),
+    ...(staff ? { screenKey: screenKey(ctx) } : {}),
   };
 }
 
@@ -214,12 +247,33 @@ export function registerPresent(r: Router) {
         if (i >= 0) { s.index = i; s.mode = 'live'; }
         break;
       }
-      case 'blank': case 'logo': case 'live': s.mode = ctx.body.action as PresentationMode; break;
+      case 'blank': case 'logo': case 'live': s.mode = ctx.body.action; break;
+      case 'countdown': {
+        const until = ctx.body.until ? new Date(String(ctx.body.until)) : new Date(ev.startsAt);
+        s.countdownTo = Number.isNaN(until.getTime()) ? ev.startsAt : until.toISOString();
+        s.mode = 'countdown';
+        break;
+      }
+      case 'lower': s.lowerThird = cleanLower(ctx.body.lowerThird, ctx.id('lt')); break;
+      case 'lowerClear': s.lowerThird = null; break;
+      case 'queue': s.lowerThirds = (Array.isArray(ctx.body.lowerThirds) ? ctx.body.lowerThirds : []).slice(0, 40).map((l: unknown, i: number) => cleanLower(l, `q${i}`)).filter((l: LowerThird | null): l is LowerThird => !!l); break;
+      case 'overlay': s.overlayLyrics = !!ctx.body.on; break;
       case 'message': s.message = String(ctx.body.message ?? '').slice(0, 200); break;
       default: throw new ApiError(422, 'invalid', 'Unknown action.');
     }
     ctx.db.put('presentations', { ...s, updatedAt: ctx.now.toISOString() });
     return view(ctx, ev);
+  });
+
+  // Projector, stage display and OBS overlay without signing in: the link carries the church's screen key.
+  r.get('/screens/:eventId', { public: true }, (ctx) => {
+    const key = settings(ctx).screenKey;
+    if (!key || String(ctx.query.key ?? '') !== key) throw new ApiError(404, 'not_found', 'This screen link is not valid. Copy a fresh link from the Present page.');
+    return view(ctx, find(ctx, 'events', ctx.params[0], 'Event'), false);
+  });
+  r.post('/admin/presentation-key/reset', { perm: ['services', 'settings'] }, (ctx) => {
+    ctx.audit('updated', 'settings', 'church', 'Reset the screen link key');
+    return { screenKey: screenKey(ctx, true) };
   });
 
   r.get('/admin/presentation-theme', { staff: true }, (ctx) => themeOf(ctx));

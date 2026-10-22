@@ -92,3 +92,31 @@ test('seeded hymn shows on the projector, and song stats count past services', a
   assert.ok(stats.resting.some((r: any) => r.songId === 'sg_h2'));
   assert.ok(stats.byLeader.length > 0);
 });
+
+test('media team: screen links, lower-thirds, overlay and countdown', async () => {
+  const a = await signIn('admin', 'pastor@gracechurch.in');
+  let v = await call(a, 'GET', '/admin/services/ev_1/presentation');
+  assert.ok(v.screenKey && v.screenKey.length >= 20);
+  assert.ok(v.suggestedLowerThirds.some((l: any) => l.title === 'Pastor Samuel Raj'));
+
+  const pub = await engine.handle({ method: 'GET', path: '/screens/ev_1', query: { key: v.screenKey }, auth: null }) as any;
+  assert.equal(pub.screenKey, undefined);
+  assert.equal(pub.slides.length, v.slides.length);
+  await assert.rejects(engine.handle({ method: 'GET', path: '/screens/ev_1', query: { key: 'wrong' }, auth: null }));
+
+  v = await call(a, 'POST', '/admin/services/ev_1/presentation', { action: 'lower', lowerThird: { title: 'Pastor Samuel Raj', subtitle: 'Lead pastor' } });
+  assert.equal(v.state.lowerThird.title, 'Pastor Samuel Raj');
+  v = await call(a, 'POST', '/admin/services/ev_1/presentation', { action: 'queue', lowerThirds: [{ title: 'Psalm 23' }, { title: '' }] });
+  assert.equal(v.state.lowerThirds.length, 1);
+  v = await call(a, 'POST', '/admin/services/ev_1/presentation', { action: 'lowerClear' });
+  assert.equal(v.state.lowerThird, null);
+  v = await call(a, 'POST', '/admin/services/ev_1/presentation', { action: 'overlay', on: true });
+  assert.equal(v.state.overlayLyrics, true);
+  v = await call(a, 'POST', '/admin/services/ev_1/presentation', { action: 'countdown' });
+  assert.equal(v.state.mode, 'countdown');
+  assert.equal(v.state.countdownTo, v.event.startsAt);
+
+  const { screenKey } = await call(a, 'POST', '/admin/presentation-key/reset');
+  assert.notEqual(screenKey, v.screenKey);
+  await assert.rejects(engine.handle({ method: 'GET', path: '/screens/ev_1', query: { key: v.screenKey }, auth: null }));
+});

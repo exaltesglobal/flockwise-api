@@ -312,8 +312,12 @@ Songs also take `lyricsAlt` (the same song in a second language, with matching s
 | GET | `/admin/presentation-theme` | any office login |
 | PUT | `/admin/presentation-theme` `{ background, textColor, imageUrl, fontScale, linesPerSlide, showAlt, titleSlides, uppercase }` | `services` or `settings` |
 | GET | `/admin/songs/stats` | `services` |
+| GET | `/screens/:eventId?key=` | none (the church's screen key) |
+| POST | `/admin/presentation-key/reset` | `services` or `settings` |
 
 The presentation view returns `{ event, churchName, logoUrl, slides[], state { index, mode, message }, theme, timer }`. Lyrics are split into slides by section headings (`Verse 1`, `[Chorus]`, `Bridge:`, ChordPro `{soc}`) and `linesPerSlide`. Screens poll the GET about once a second to stay in step with the operator.
+
+Media team actions on the presentation POST: `countdown { until? }` (mode `countdown`, defaults to the service start), `lower { lowerThird: { title, subtitle } }`, `lowerClear`, `queue { lowerThirds: [...] }`, `overlay { on }` (lyrics bar on the OBS overlay). The view adds `announcements` (for the countdown loop), `suggestedLowerThirds` (from the plan) and, for office logins, `screenKey`. Projector, stage display and the OBS Browser Source overlay can open `/present/:eventId/{screen|stage|overlay}?key=<screenKey>` without signing in; resetting the key breaks old links.
 
 ### Check-in: headcounts and volunteers
 
