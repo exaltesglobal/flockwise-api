@@ -9,8 +9,12 @@ import { registerComms, runDue } from './modules/comms.js';
 import { registerGiving } from './modules/giving.js';
 import { registerPeople } from './modules/people.js';
 import { registerServing } from './modules/serving.js';
+import { registerCalendar } from './modules/calendar.js';
+import { registerForms } from './modules/forms.js';
+import { registerMinistry } from './modules/ministry.js';
+import { registerWorkflows } from './modules/workflows.js';
 
-export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerComms, registerCare];
+export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry];
 
 export function createChurchEngine(db: Db, env: Env) {
   const engine = createEngine(db, env, MODULES);

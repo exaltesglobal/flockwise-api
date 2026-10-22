@@ -112,6 +112,34 @@ Open `checkoutUrl` in the browser. After paying, Razorpay returns the donor to t
 |---|---|---|
 | GET | `/directory?q=` | `Paginated<DirectoryEntry>` grouped by household. Only people who opted in are listed. Returns `403 directory_opt_in` until the caller turns on `consent.directory`. |
 
+## Forms and registrations
+
+`ChurchEvent.registrationFormId` points to an open registration form for the event.
+
+- `GET /forms`: open forms, each with `myStatus`.
+- `GET /forms/:id`: `PublicForm` plus `myResponses`.
+- `POST /forms/:id/responses` `{ answers: { [fieldId]: value }, tickets?: [{ ticketTypeId, qty }], discountCode? }` returns `{ response, checkoutUrl, message }`. Open `checkoutUrl` when it is not null. `response.status` is `confirmed`, `waitlisted` or `pending_payment`.
+- `DELETE /forms/:id/responses/:rid`: cancel your own unpaid or free registration.
+
+## Group space
+
+- `GET /groups/:id`: group, members, posts (pinned first) and files. Posts and files are for members only.
+- `POST /groups/:id/posts` `{ text }`, `DELETE /groups/:id/posts/:postId` (own posts; leaders can delete any), `PATCH /groups/:id/posts/:postId` `{ pinned }` (leaders).
+- `POST /groups/:id/resources` `{ name, url }`, `DELETE /groups/:id/resources/:resId` (leaders).
+
+## Sermons
+
+- `GET /sermons`: published sermons, newest first.
+
+## Public (no sign-in)
+
+Only works when the church turns on its public page (forms only need `isPublic`). Public POSTs are limited to 30 an hour per network.
+
+- `GET /public/church`: church info, page text, upcoming events, sermons, open groups and public forms.
+- `GET /public/sermons`, `GET /public/groups`.
+- `POST /public/groups/:id/interest` `{ name, email, phone?, message? }`: creates a join request (and a visitor record if new).
+- `GET /public/forms/:id`, `POST /public/forms/:id/responses` (same as the member version plus `name`, `email`, `phone`).
+
 ## Error codes the apps should expect
 
 `invalid`, `email_required`, `not_staff`, `too_many_codes`, `too_many_attempts`, `invalid_code`, `code_expired`,

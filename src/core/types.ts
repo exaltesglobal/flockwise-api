@@ -62,6 +62,8 @@ export type ChurchEvent = {
   price?: number | null;
   campusName?: string | null;
   checkedIn?: boolean;
+  /** Open registration form for this event (GET /forms/:id), if any. */
+  registrationFormId?: string | null;
 };
 
 export type HomeFeed = { nextService: ChurchEvent | null; announcements: Announcement[]; upcomingEvents: ChurchEvent[] };
@@ -116,6 +118,8 @@ export type Person = {
   allergies: string | null;
   medicalNotes: string | null;
   consent: Consent;
+  /** Values for the church's custom fields, keyed by field id. */
+  custom?: Record<string, string | number | boolean | null>;
   /** Personal check-in code, encoded in the member's QR as FW1:<code>. */
   checkinCode: string;
 };
@@ -191,6 +195,10 @@ export type DonationRecord = {
   paidAt: string | null;
   eventId: string | null;
   receiptNumber: string | null;
+  /** Set when this payment is for a registration form response. */
+  formResponseId?: string | null;
+  /** Deposit batch for cash and cheque counted together. */
+  batchId?: string | null;
 };
 
 export type AdminDonation = Donation & {
@@ -252,6 +260,8 @@ export type Checkin = {
   securityCode: string | null;
   allergies: string | null;
   checkedOutAt: string | null;
+  /** Set when the person is scheduled to serve at this event. */
+  volunteer?: { teamName: string; positionName: string } | null;
 };
 export type CheckinSummary = {
   event: AdminEvent;
@@ -260,10 +270,13 @@ export type CheckinSummary = {
   stillIn: number;
   rooms: { room: Room; count: number }[];
   checkins: Checkin[];
+  headcounts: Headcount[];
+  headcountTotal: number;
+  volunteers: { scheduled: number; checkedIn: number; missing: { personId: string; name: string; teamName: string; positionName: string }[] };
 };
 export type CheckinCandidate = { id: string; name: string; age: number | null; isChild: boolean; allergies: string | null; roomId: string | null; roomName: string | null; checkedIn: boolean };
 export type CheckinFamily = { householdName: string | null; people: CheckinCandidate[] };
-export type CheckinLabel = { kind: 'child' | 'guardian'; name: string; room: string | null; securityCode: string; allergies: string | null; event: string; date: string };
+export type CheckinLabel = { kind: 'child' | 'guardian' | 'volunteer'; name: string; room: string | null; securityCode: string; allergies: string | null; event: string; date: string };
 export type CheckinResult = { checkins: Checkin[]; securityCode: string | null; labels: CheckinLabel[] };
 
 // ---------- volunteers ----------
@@ -294,7 +307,7 @@ export type MyServing = {
 export type PlanItemKind = 'song' | 'reading' | 'sermon' | 'prayer' | 'announcement' | 'offering' | 'video' | 'other';
 export type PlanItem = { id: string; kind: PlanItemKind; title: string; songId: string | null; key: string | null; minutes: number; notes: string; person: string };
 export type Plan = { id: string; eventId: string; theme: string; notes: string; items: PlanItem[]; updatedAt: string };
-export type Song = { id: string; title: string; author: string; defaultKey: string; bpm: number | null; ccli: string; tags: string[]; lyrics: string };
+export type Song = { id: string; title: string; author: string; defaultKey: string; bpm: number | null; ccli: string; tags: string[]; lyrics: string; chordChart?: string; attachments?: SongAttachment[] };
 export type SongView = Song & { timesUsed: number; lastUsedAt: string | null };
 export type ServiceSummary = { event: AdminEvent; items: number; minutes: number; songs: string[]; theme: string; volunteers: { filled: number; needed: number } };
 export type ServiceDetail = { event: AdminEvent; plan: Plan; team: { teamName: string; positionName: string; name: string; status: AssignmentStatus }[] };
@@ -302,7 +315,7 @@ export type ServiceDetail = { event: AdminEvent; plan: Plan; team: { teamName: s
 // ---------- messaging ----------
 
 export type Channel = 'email' | 'sms' | 'whatsapp';
-export type AudienceType = 'everyone' | 'status' | 'group' | 'team' | 'tag' | 'campus' | 'people' | 'event';
+export type AudienceType = 'everyone' | 'status' | 'group' | 'team' | 'tag' | 'campus' | 'people' | 'event' | 'list';
 export type Audience = { type: AudienceType; ids: string[] };
 export type MessageStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed';
 export type Message = {
@@ -419,6 +432,7 @@ export type ChurchSettings = Church & {
   receipts80g: { enabled: boolean; registrationNumber: string | null; pan: string | null };
   /** Children are people younger than this; they check in to rooms with security codes. */
   childAgeLimit: number;
+  publicPage?: PublicPage;
 };
 
 export type Permission =
@@ -451,6 +465,191 @@ export type AttendancePoint = { id: string; date: string; count: number };
 export type MetaRecord = { id: string; value: string };
 
 /** Every collection the engine stores. The key is the record kind. */
+
+// ---------- forms & registrations ----------
+
+export type FormFieldType = 'text' | 'textarea' | 'select' | 'multiselect' | 'checkbox' | 'date' | 'number' | 'email' | 'phone';
+export type FormField = { id: string; label: string; type: FormFieldType; required: boolean; options: string[]; helpText: string };
+/** A price option on a registration form. Price in minor units; 0 is free. */
+export type TicketType = { id: string; name: string; price: number; capacity: number | null };
+export type DiscountCode = { code: string; percentOff: number | null; amountOff: number | null; maxUses: number | null; used: number };
+export type FormStatus = 'draft' | 'open' | 'closed';
+export type Form = {
+  id: string;
+  title: string;
+  description: string;
+  eventId: string | null;
+  fields: FormField[];
+  ticketTypes: TicketType[];
+  /** Total places (sum of ticket quantities, or one per response when there are no tickets). */
+  capacity: number | null;
+  waitlist: boolean;
+  discountCodes: DiscountCode[];
+  opensAt: string | null;
+  closesAt: string | null;
+  status: FormStatus;
+  /** Anyone with the link can register, without signing in. */
+  isPublic: boolean;
+  addTag: string | null;
+  addToGroupId: string | null;
+  workflowId: string | null;
+  confirmationMessage: string;
+  createdAt: string;
+};
+export type FormInput = Omit<Form, 'id' | 'createdAt'>;
+export type FormAnswer = string | string[] | boolean | number | null;
+export type FormResponseStatus = 'confirmed' | 'waitlisted' | 'pending_payment' | 'cancelled';
+export type FormResponse = {
+  id: string;
+  formId: string;
+  personId: string | null;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  answers: Record<string, FormAnswer>;
+  tickets: { ticketTypeId: string; qty: number }[];
+  amount: number;
+  discountCode: string | null;
+  status: FormResponseStatus;
+  donationId: string | null;
+  createdAt: string;
+};
+export type FormView = Form & { places: number; confirmed: number; waitlisted: number; pending: number; revenue: number; eventTitle: string | null };
+export type PublicForm = {
+  id: string;
+  title: string;
+  description: string;
+  fields: FormField[];
+  ticketTypes: (TicketType & { remaining: number | null })[];
+  event: { id: string; title: string; startsAt: string; location: string } | null;
+  isOpen: boolean;
+  closedReason: string | null;
+  spotsLeft: number | null;
+  waitlist: boolean;
+  hasDiscounts: boolean;
+  currency: Currency;
+  churchName: string;
+  isPublic: boolean;
+};
+export type FormSubmission = {
+  name?: string;
+  email?: string;
+  phone?: string;
+  answers: Record<string, FormAnswer>;
+  tickets?: { ticketTypeId: string; qty: number }[];
+  discountCode?: string;
+};
+export type FormSubmitResult = { response: FormResponse; checkoutUrl: string | null; message: string };
+
+// ---------- calendar & resource booking ----------
+
+export type ResourceKind = 'room' | 'equipment' | 'vehicle' | 'other';
+export type Resource = { id: string; name: string; kind: ResourceKind; capacity: number | null; description: string; needsApproval: boolean; approverIds: string[] };
+export type BookingStatus = 'pending' | 'approved' | 'declined' | 'cancelled';
+export type Booking = {
+  id: string;
+  title: string;
+  resourceIds: string[];
+  startsAt: string;
+  endsAt: string;
+  eventId: string | null;
+  requestedBy: string;
+  requestedByName: string;
+  status: BookingStatus;
+  notes: string;
+  setupMinutes: number;
+  createdAt: string;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  decisionNote: string | null;
+};
+export type BookingConflict = { bookingId: string; title: string; resourceName: string; startsAt: string; endsAt: string; status: BookingStatus };
+export type BookingView = Booking & { resources: { id: string; name: string }[]; conflicts: BookingConflict[]; canDecide: boolean };
+export type CalendarItem = { id: string; type: 'event' | 'booking'; title: string; startsAt: string; endsAt: string; status: string; resources: string[]; color: string };
+
+// ---------- people: custom fields, smart lists, workflows ----------
+
+export type CustomFieldType = 'text' | 'number' | 'date' | 'select' | 'checkbox';
+export type CustomField = { id: string; label: string; type: CustomFieldType; options: string[]; order: number };
+export type ListRuleField =
+  | 'status' | 'tag' | 'campus' | 'gender' | 'age' | 'joinedDays' | 'lastAttendedDays' | 'group' | 'team' | 'gaveDays' | 'birthdayMonth'
+  | 'hasEmail' | 'hasPhone' | 'formResponse' | 'workflow' | 'custom';
+export type ListRuleOp = 'is' | 'is_not' | 'gt' | 'lt' | 'within' | 'not_within' | 'contains' | 'empty' | 'not_empty';
+export type ListRule = { field: ListRuleField; op: ListRuleOp; value: string; customFieldId?: string };
+export type SmartList = { id: string; name: string; description: string; match: 'all' | 'any'; rules: ListRule[]; createdAt: string; createdBy: string };
+export type SmartListView = SmartList & { count: number };
+export type WorkflowStep = { id: string; title: string; dueDays: number; assigneeId: string | null };
+export type WorkflowTrigger = 'manual' | 'new_visitor' | 'form' | 'list';
+export type Workflow = { id: string; name: string; description: string; steps: WorkflowStep[]; trigger: WorkflowTrigger; triggerId: string | null; defaultAssigneeId: string | null; active: boolean; createdAt: string };
+export type WorkflowCardStatus = 'active' | 'done' | 'removed';
+export type WorkflowCard = {
+  id: string;
+  workflowId: string;
+  personId: string;
+  stepIndex: number;
+  status: WorkflowCardStatus;
+  assignedTo: string | null;
+  dueAt: string;
+  createdAt: string;
+  completedAt: string | null;
+  history: { at: string; by: string; action: string; note: string }[];
+};
+export type WorkflowCardView = WorkflowCard & { personName: string; personPhone: string | null; stepTitle: string; workflowName: string; assigneeName: string | null; overdue: boolean };
+export type WorkflowView = Workflow & { active_cards: number; done_cards: number; overdue: number; stepCounts: number[] };
+
+// ---------- services: live, CCLI ----------
+
+export type SongAttachment = { id: string; name: string; url: string; kind: 'chart' | 'lyrics' | 'audio' | 'video' | 'other' };
+export type LiveState = { id: string; eventId: string; itemIndex: number; startedAt: string | null; itemStartedAt: string | null; endedAt: string | null };
+export type LiveView = { event: AdminEvent; plan: Plan; live: LiveState; itemEndsAt: string | null; serviceEndsAt: string | null };
+export type CcliRow = { songId: string; title: string; author: string; ccli: string; uses: number; dates: string[] };
+
+// ---------- check-in: headcounts ----------
+
+export type Headcount = { id: string; eventId: string; area: string; count: number; recordedBy: string; at: string };
+
+// ---------- giving: batches ----------
+
+export type BatchStatus = 'open' | 'committed';
+export type Batch = { id: string; name: string; date: string; status: BatchStatus; expectedTotal: number | null; notes: string; createdBy: string; createdAt: string; committedAt: string | null; committedBy: string | null };
+export type BatchView = Batch & { count: number; total: number; byMethod: { method: string; count: number; total: number }[]; difference: number | null };
+
+// ---------- groups: posts, resources, finder ----------
+
+export type GroupPost = { id: string; groupId: string; authorId: string; authorName: string; text: string; at: string; pinned: boolean };
+export type GroupResource = { id: string; groupId: string; name: string; url: string; addedBy: string; addedByName: string; at: string };
+export type GroupDetailMember = { group: Group; isLeader: boolean; members: { id: string; name: string }[]; posts: GroupPost[]; resources: GroupResource[]; nextMeeting: string | null };
+export type PublicGroup = { id: string; name: string; description: string; meetingSchedule: string; location: string; type: GroupType; zone: string; leaderName: string; memberCount: number };
+
+// ---------- publishing ----------
+
+export type Sermon = {
+  id: string;
+  title: string;
+  speaker: string;
+  date: string;
+  series: string;
+  scripture: string;
+  description: string;
+  videoUrl: string;
+  audioUrl: string;
+  notesUrl: string;
+  imageUrl: string;
+  published: boolean;
+  eventId: string | null;
+  createdAt: string;
+};
+export type PublicPage = { enabled: boolean; tagline: string; about: string; serviceTimes: string; heroImageUrl: string; showEvents: boolean; showGroups: boolean; showSermons: boolean; showGiving: boolean };
+export type PublicChurch = {
+  church: Church;
+  page: PublicPage;
+  contact: { address: string; phone: string; email: string; website: string };
+  events: { id: string; title: string; startsAt: string; endsAt: string; location: string; description: string; formId: string | null }[];
+  sermons: Sermon[];
+  groups: PublicGroup[];
+  forms: { id: string; title: string; description: string }[];
+};
+
 export type Collections = {
   settings: ChurchSettings & { id: string };
   automations: Automations & { id: string };
@@ -483,10 +682,26 @@ export type Collections = {
   refreshTokens: RefreshRecord;
   attendanceHistory: AttendancePoint;
   meta: MetaRecord;
+  forms: Form;
+  formResponses: FormResponse;
+  resources: Resource;
+  bookings: Booking;
+  customFields: CustomField;
+  smartLists: SmartList;
+  workflows: Workflow;
+  workflowCards: WorkflowCard;
+  live: LiveState;
+  headcounts: Headcount;
+  batches: Batch;
+  groupPosts: GroupPost;
+  groupResources: GroupResource;
+  sermons: Sermon;
 };
 export type Kind = keyof Collections;
 export const KINDS = [
   'settings', 'automations', 'people', 'campuses', 'events', 'rsvps', 'groups', 'groupMembers', 'joinRequests', 'groupMeetings',
   'funds', 'donations', 'pledges', 'plans', 'announcements', 'staff', 'rooms', 'checkins', 'teams', 'assignments', 'blockouts',
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
+  'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
+  'batches', 'groupPosts', 'groupResources', 'sermons',
 ] as const satisfies readonly Kind[];

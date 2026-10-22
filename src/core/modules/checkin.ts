@@ -45,10 +45,34 @@ function families(ctx: Ctx, eventId: string, people: Collections['people'][]): C
   }));
 }
 
+/** Who is scheduled to serve at an event (accepted or still pending). */
+function servingAt(ctx: Ctx, eventId: string) {
+  const teams = new Map(ctx.db.all('teams').map((t) => [t.id, t]));
+  return ctx.db
+    .all('assignments')
+    .filter((a) => a.eventId === eventId && a.status !== 'declined')
+    .map((a) => {
+      const t = teams.get(a.teamId);
+      return { personId: a.personId, teamName: t?.name ?? 'Team', positionName: t?.positions.find((p) => p.id === a.positionId)?.name ?? '' };
+    });
+}
+
+export const headcountsFor = (ctx: Ctx, eventId: string) => ctx.db.all('headcounts').filter((h) => h.eventId === eventId).sort((x, y) => x.at.localeCompare(y.at));
+
 function summary(ctx: Ctx, ev: Collections['events']): CheckinSummary {
   const list = checkinsFor(ctx, ev.id).sort((x, y) => y.at.localeCompare(x.at));
   const rooms = ctx.db.all('rooms').sort((x, y) => x.minAge - y.minAge);
+  const serving = servingAt(ctx, ev.id);
+  const inIds = new Set(list.map((c) => c.personId));
+  const heads = headcountsFor(ctx, ev.id);
   return {
+    headcounts: heads,
+    headcountTotal: heads.reduce((s, h) => s + h.count, 0),
+    volunteers: {
+      scheduled: new Set(serving.map((s) => s.personId)).size,
+      checkedIn: new Set(serving.filter((s) => inIds.has(s.personId)).map((s) => s.personId)).size,
+      missing: serving.filter((s) => !inIds.has(s.personId)).map((s) => ({ ...s, name: ctx.db.get('people', s.personId) ? fullName(ctx.db.get('people', s.personId)!) : 'Unknown' })),
+    },
     event: eventView(ctx, ev),
     total: list.length,
     children: list.filter((c) => c.isChild).length,
@@ -71,6 +95,7 @@ export function checkIn(ctx: Ctx, ev: Collections['events'], personIds: string[]
       throw new ApiError(409, 'room_full', `${room.name} is full. Please speak to the kids' team.`);
   }
   const code = kids.length ? ctx.env.random(4, CODE_ALPHABET) : null;
+  const serving = servingAt(ctx, ev.id);
   const out: Checkin[] = [];
   for (const p of people) {
     if (existing.has(p.id)) continue;
@@ -90,6 +115,10 @@ export function checkIn(ctx: Ctx, ev: Collections['events'], personIds: string[]
       securityCode: child ? code : null,
       allergies: child ? p.allergies : null,
       checkedOutAt: null,
+      volunteer: (() => {
+        const mine = serving.filter((x) => x.personId === p.id);
+        return mine.length ? { teamName: [...new Set(mine.map((x) => x.teamName))].join(', '), positionName: mine.map((x) => x.positionName).filter(Boolean).join(', ') } : null;
+      })(),
     });
     touchAttendance(ctx, p.id);
     out.push(c);
@@ -102,6 +131,8 @@ export function checkIn(ctx: Ctx, ev: Collections['events'], personIds: string[]
     const guardian = people.find((p) => !isChild(ctx, p));
     labels.push({ kind: 'guardian', name: guardian ? fullName(guardian) : `${labels.length} ${labels.length === 1 ? 'child' : 'children'}`, room: null, securityCode: code!, allergies: null, event: ev.title, date });
   }
+  // Volunteers get a name badge with their team, so the welcome desk knows who's serving.
+  for (const c of out) if (c.volunteer && !c.isChild) labels.push({ kind: 'volunteer', name: c.personName, room: `${c.volunteer.teamName}${c.volunteer.positionName ? ` · ${c.volunteer.positionName}` : ''}`, securityCode: '', allergies: null, event: ev.title, date });
   return { checkins: out, securityCode: out.some((c) => c.isChild) ? code : null, labels };
 }
 
@@ -152,6 +183,29 @@ export function registerCheckin(r: Router) {
     return undefined;
   });
   r.get('/admin/checkin/:eventId', { perm: 'checkin' }, (ctx) => summary(ctx, find(ctx, 'events', ctx.params[0], 'Event')));
+  r.post('/admin/checkin/:eventId/headcounts', { perm: 'checkin' }, (ctx) => {
+    const ev = find(ctx, 'events', ctx.params[0], 'Event');
+    requireFields(ctx.body, ['area', 'count']);
+    const count = Math.round(Number(ctx.body.count));
+    if (!Number.isFinite(count) || count < 0) throw new ApiError(422, 'invalid', 'Enter how many people.', { count: 'Enter a number' });
+    const area = String(ctx.body.area).trim().slice(0, 60);
+    // One count per area: a recount replaces the earlier one.
+    const prev = headcountsFor(ctx, ev.id).find((h) => h.area.toLowerCase() === area.toLowerCase());
+    ctx.db.put('headcounts', { id: prev?.id ?? ctx.id('hc'), eventId: ev.id, area, count, recordedBy: ctx.staff?.name ?? '', at: ctx.now.toISOString() });
+    const total = headcountsFor(ctx, ev.id).reduce((s, h) => s + h.count, 0);
+    ctx.db.put('events', { ...ev, attendance: total });
+    return summary(ctx, ctx.db.get('events', ev.id)!);
+  });
+  r.del('/admin/checkin/headcounts/:id', { perm: 'checkin' }, (ctx) => {
+    const h = find(ctx, 'headcounts', ctx.params[0], 'Headcount');
+    ctx.db.del('headcounts', h.id);
+    const ev = ctx.db.get('events', h.eventId);
+    if (ev) {
+      const rest = headcountsFor(ctx, ev.id);
+      ctx.db.put('events', { ...ev, attendance: rest.length ? rest.reduce((s, x) => s + x.count, 0) : ev.attendance });
+    }
+    return undefined;
+  });
   r.get('/admin/checkin/:eventId/search', { perm: 'checkin' }, (ctx) => {
     const ev = find(ctx, 'events', ctx.params[0], 'Event');
     const q = String(ctx.query.q ?? '').trim();

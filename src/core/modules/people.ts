@@ -19,6 +19,7 @@ import {
   pick,
   requireFields,
 } from '../util.js';
+import { cleanCustom, triggerWorkflows } from './workflows.js';
 
 const EDITABLE: (keyof PersonInput)[] = [
   'firstName', 'lastName', 'phone', 'email', 'gender', 'birthDate', 'status', 'householdName', 'address', 'language', 'tags', 'notes',
@@ -32,6 +33,11 @@ function cleanInput(body: Record<string, unknown>) {
   if (input.email) input.email = normEmail(input.email);
   if (input.birthDate && !/^\d{4}-\d{2}-\d{2}$/.test(input.birthDate)) throw new ApiError(422, 'invalid', 'Birth date should be a date.', { birthDate: 'Use YYYY-MM-DD' });
   return input;
+}
+
+/** Custom field values merge into what the person already has. */
+function withCustom(ctx: Ctx, body: Record<string, unknown>, existing?: Collections['people']) {
+  return body?.custom === undefined ? {} : { custom: { ...(existing?.custom ?? {}), ...cleanCustom(ctx, body.custom) } };
 }
 
 function matches(p: Collections['people'], q: string) {
@@ -199,8 +205,9 @@ export function registerPeople(r: Router) {
   });
   r.post('/admin/people', { perm: 'people.edit' }, (ctx) => {
     requireFields(ctx.body, ['firstName']);
-    const p = ctx.db.put('people', newPerson(ctx, { lastName: '', ...cleanInput(ctx.body), firstName: String(ctx.body.firstName) }));
+    const p = ctx.db.put('people', newPerson(ctx, { lastName: '', ...cleanInput(ctx.body), ...withCustom(ctx, ctx.body), firstName: String(ctx.body.firstName) }));
     ctx.audit('created', 'person', p.id, `Added ${fullName(p)}`);
+    if (p.status === 'visitor') triggerWorkflows(ctx, 'new_visitor', p.id);
     return personView(ctx, p);
   });
   r.post('/admin/people/import', { perm: 'people.edit' }, (ctx) => {
@@ -212,7 +219,7 @@ export function registerPeople(r: Router) {
   r.get('/admin/people/:id/timeline', { perm: 'people.view' }, (ctx) => timeline(ctx, find(ctx, 'people', ctx.params[0], 'Person')));
   r.patch('/admin/people/:id', { perm: 'people.edit' }, (ctx) => {
     const p = find(ctx, 'people', ctx.params[0], 'Person');
-    const next = ctx.db.put('people', { ...p, ...cleanInput(ctx.body) });
+    const next = ctx.db.put('people', { ...p, ...cleanInput(ctx.body), ...withCustom(ctx, ctx.body, p) });
     ctx.audit('updated', 'person', p.id, `Updated ${fullName(next)}`);
     return personView(ctx, next);
   });

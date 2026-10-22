@@ -20,6 +20,7 @@ import {
   settings,
 } from '../util.js';
 import { onTicketPaid } from './church.js';
+import { onFormPaid } from './forms.js';
 
 const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 
@@ -37,8 +38,9 @@ const publicDonation = (d: Collections['donations']): Donation => ({
 /** Called once when a gift is confirmed (webhook, demo checkout, or office entry). */
 export function onDonationSucceeded(ctx: Ctx, d: Collections['donations']) {
   let next = d;
-  if (!d.receiptNumber && !d.eventId) next = ctx.db.put('donations', { ...d, receiptNumber: nextReceiptNumber(ctx) });
-  onTicketPaid(ctx, next);
+  if (!d.receiptNumber && !d.eventId && !d.formResponseId) next = ctx.db.put('donations', { ...d, receiptNumber: nextReceiptNumber(ctx) });
+  if (next.formResponseId) onFormPaid(ctx, next);
+  else onTicketPaid(ctx, next);
   return next;
 }
 
@@ -179,6 +181,8 @@ export function registerGiving(r: Router) {
     if (!['cash', 'cheque', 'bank_transfer', 'upi', 'card', 'netbanking'].includes(method)) throw new ApiError(422, 'invalid', 'Choose how it was given.', { method: 'Required' });
     if (ctx.body.pan && !PAN_RE.test(ctx.body.pan)) throw new ApiError(422, 'invalid', 'PAN should look like ABCDE1234F.', { pan: 'Invalid PAN' });
     const donor = ctx.db.get('people', ctx.body.donorId);
+    const batch = ctx.body.batchId ? find(ctx, 'batches', String(ctx.body.batchId), 'Batch') : null;
+    if (batch && batch.status !== 'open') throw new ApiError(409, 'batch_committed', `The batch “${batch.name}” is committed. Reopen it to add gifts.`);
     const at = ctx.body.receivedAt ? new Date(ctx.body.receivedAt).toISOString() : ctx.now.toISOString();
     const d = ctx.db.put('donations', {
       id: ctx.id('dn'),
@@ -203,6 +207,7 @@ export function registerGiving(r: Router) {
       paidAt: at,
       eventId: null,
       receiptNumber: null,
+      batchId: batch?.id ?? null,
     });
     const saved = onDonationSucceeded(ctx, d);
     ctx.audit('recorded', 'donation', d.id, `Recorded ${method} gift from ${d.donorName}`);
@@ -211,6 +216,7 @@ export function registerGiving(r: Router) {
   r.post('/admin/giving/donations/:id/refund', { perm: 'giving.edit' }, (ctx) => {
     const d = find(ctx, 'donations', ctx.params[0], 'Gift');
     if (d.status !== 'succeeded') throw new ApiError(422, 'invalid', 'Only completed gifts can be marked refunded.');
+    if (d.batchId && ctx.db.get('batches', d.batchId)?.status === 'committed') throw new ApiError(409, 'batch_committed', 'This gift is in a committed batch. Reopen the batch first.');
     ctx.audit('refunded', 'donation', d.id, `Marked gift from ${d.donorName} as refunded`);
     return adminDonation(ctx.db.put('donations', { ...d, status: 'refunded' }));
   });

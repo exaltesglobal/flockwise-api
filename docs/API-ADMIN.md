@@ -241,3 +241,93 @@ Every change is written to the activity log (`GET /admin/audit?q=&cursor=`).
 | POST | `/admin/songs` | `services` |
 | PATCH | `/admin/songs/:id` | `services` |
 | DELETE | `/admin/songs/:id` | `services` |
+
+### Forms and registrations
+
+Forms can sell ticket types (prices in minor units), apply discount codes, cap places and keep a waitlist. A paid registration is a pending payment to the hidden "Event registrations" fund with `formResponseId` set; the payment webhook confirms it. Free forms promote the waitlist automatically when someone cancels.
+
+| Method | Path | Needs |
+|---|---|---|
+| GET | `/admin/forms` | `events` or `people.edit` |
+| POST | `/admin/forms` | `events` |
+| GET | `/admin/forms/:id` | `events` or `people.edit` |
+| PATCH | `/admin/forms/:id` | `events` |
+| POST | `/admin/forms/:id/duplicate` | `events` |
+| DELETE | `/admin/forms/:id` | `events` (refused when there are paid registrations) |
+| GET | `/admin/forms/:id/responses?status=` | `events` or `people.edit` |
+| PATCH | `/admin/forms/:id/responses/:rid` `{ status: 'cancelled' \| 'confirmed' }` or `{ answers }` | `events` |
+| POST | `/admin/forms/:id/responses/:rid/promote` | `events` (paid forms email a payment link) |
+
+### Calendar and bookings
+
+| Method | Path | Needs |
+|---|---|---|
+| GET | `/admin/calendar?from=&to=` | any staff (events and bookings together) |
+| GET | `/admin/resources` | any staff |
+| POST, PATCH, DELETE | `/admin/resources[/:id]` | `settings` |
+| GET | `/admin/bookings?status=&when=past` | any staff |
+| POST | `/admin/bookings/check` `{ resourceIds, startsAt, endsAt, setupMinutes }` | any staff, returns clashes |
+| POST | `/admin/bookings` `{ title, resourceIds, startsAt, endsAt, setupMinutes?, repeatWeeks?, eventId?, force? }` | any staff; 409 `conflict` on a clash with an approved booking |
+| PATCH | `/admin/bookings/:id` | requester or approver |
+| POST | `/admin/bookings/:id/approve \| decline \| cancel` | approvers (owners, admins, or the resource's approvers); requester may cancel |
+
+### Custom fields, smart lists, workflows
+
+People accept `custom: { [fieldId]: value }` on create and update. Smart lists can be message audiences (`{ type: 'list', ids: [listId] }`). Rule fields: `status, tag, campus, gender, age, joinedDays, lastAttendedDays, group, team, gaveDays, birthdayMonth, hasEmail, hasPhone, formResponse, workflow, custom`; ops: `is, is_not, gt, lt, within, not_within, contains, empty, not_empty`.
+
+| Method | Path | Needs |
+|---|---|---|
+| GET | `/admin/people-fields` | `people.view` |
+| POST, PATCH, DELETE | `/admin/people-fields[/:id]` | `settings` |
+| GET, POST | `/admin/lists` | `people.view` |
+| POST | `/admin/lists/preview` `{ rules, match }` | `people.view` |
+| PATCH, DELETE | `/admin/lists/:id` | `people.view` |
+| GET | `/admin/lists/:id/people` | `people.view` |
+| GET | `/admin/workflows` | `people.view` or `care` |
+| POST, PATCH, DELETE | `/admin/workflows[/:id]` | `people.edit` |
+| GET | `/admin/workflows/:id?status=active\|done\|removed\|all` | `people.view` or `care` |
+| POST | `/admin/workflows/:id/cards` `{ personIds?, listId?, note? }` | `people.edit` or `care` |
+| GET | `/admin/workflow-cards?mine=true` or `?personId=` | `people.view` or `care` |
+| PATCH | `/admin/workflow-cards/:id` `{ action: advance\|back\|done\|remove\|snooze\|assign\|note, note?, days?, assignedTo? }` | `people.edit` or `care` |
+
+Workflow triggers: `manual`, `new_visitor` (a visitor is added), `form` (a registration for `triggerId` is confirmed), `list` (anyone newly matching smart list `triggerId`, checked by the scheduler).
+
+### Services: live and CCLI
+
+| Method | Path | Needs |
+|---|---|---|
+| GET | `/admin/services/:eventId/live` | `services`, `volunteers` or `checkin` |
+| POST | `/admin/services/:eventId/live` `{ action: start\|next\|prev\|goto\|stop\|reset, index? }` | `services` |
+| GET | `/admin/songs/ccli-report?from=&to=` | `services` or `volunteers` |
+
+Songs also take `chordChart` (ChordPro text) and `attachments: [{ name, url, kind }]`.
+
+### Check-in: headcounts and volunteers
+
+`GET /admin/checkin/:eventId` now includes `headcounts`, `headcountTotal` and `volunteers { scheduled, checkedIn, missing[] }`. Scheduled volunteers who check in get a `volunteer` label.
+
+| Method | Path | Needs |
+|---|---|---|
+| POST | `/admin/checkin/:eventId/headcounts` `{ area, count }` (a recount of the same area replaces it; event attendance becomes the total) | `checkin` |
+| DELETE | `/admin/checkin/headcounts/:id` | `checkin` |
+
+### Giving: deposit batches
+
+`POST /admin/giving/donations` accepts `batchId`. Committed batches can't take new gifts or refunds until reopened.
+
+| Method | Path | Needs |
+|---|---|---|
+| GET, POST | `/admin/giving/batches` | `giving.view` / `giving.edit` |
+| GET, PATCH, DELETE | `/admin/giving/batches/:id` | `giving.view` / `giving.edit` |
+| POST | `/admin/giving/batches/:id/commit` `{ force? }` | `giving.edit` (409 `mismatch` when the total differs from `expectedTotal`) |
+| POST | `/admin/giving/batches/:id/reopen` | `giving.edit` |
+
+### Groups, sermons and the public page
+
+| Method | Path | Needs |
+|---|---|---|
+| GET | `/admin/groups/:id/posts` | `groups` |
+| DELETE | `/admin/groups/posts/:postId` | `groups` |
+| GET, POST | `/admin/sermons` | `comms` or `services` |
+| PATCH, DELETE | `/admin/sermons/:id` | `comms` or `services` |
+| GET, PUT | `/admin/public-page` | `settings` |

@@ -5,6 +5,7 @@ import { ApiError } from '../errors.js';
 import type { Ctx, Router } from '../engine.js';
 import type { Audience, AudiencePreview, Automations, Channel, Collections, Message, MessageInput } from '../types.js';
 import { checkinsFor, DAY, find, fullName, localDate, localHour, pick, requireFields, rsvpsFor, settings } from '../util.js';
+import { listMembers, runListWorkflows } from './workflows.js';
 
 const CHANNELS: Channel[] = ['email', 'sms', 'whatsapp'];
 
@@ -28,6 +29,10 @@ export function resolveAudience(ctx: Ctx, a: Audience): Collections['people'][] 
     }
     case 'team': {
       const members = new Set(ctx.db.all('teams').filter((t) => ids.has(t.id)).flatMap((t) => t.members.map((m) => m.personId)));
+      return people.filter((p) => members.has(p.id));
+    }
+    case 'list': {
+      const members = new Set(a.ids.flatMap((id) => { const l = ctx.db.get('smartLists', id); return l ? listMembers(ctx, l).map((p) => p.id) : []; }));
       return people.filter((p) => members.has(p.id));
     }
     case 'event': {
@@ -54,6 +59,8 @@ export function audienceLabel(ctx: Ctx, a: Audience) {
       return names('teams');
     case 'event':
       return `Going to ${names('events')}`;
+    case 'list':
+      return a.ids.map((id) => ctx.db.get('smartLists', id)?.name ?? '').filter(Boolean).join(', ');
     case 'people':
       return `${a.ids.length} ${a.ids.length === 1 ? 'person' : 'people'}`;
   }
@@ -147,6 +154,7 @@ export const automations = (ctx: Ctx) => ctx.db.get('automations', 'church') ?? 
  * each daily job records the day it last ran, so it is safe to call as often as you like.
  */
 export async function runDue(ctx: Ctx) {
+  runListWorkflows(ctx);
   for (const m of ctx.db.all('messages')) {
     if (m.status === 'scheduled' && m.scheduledAt && m.scheduledAt <= ctx.now.toISOString()) {
       ctx.db.put('messages', { ...m, status: 'sending' });

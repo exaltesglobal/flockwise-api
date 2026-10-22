@@ -1,7 +1,7 @@
 // Volunteer teams and rosters, and service planning (order of service + song library).
 import { ApiError } from '../errors.js';
 import type { Ctx, Router } from '../engine.js';
-import type { Assignment, AvailablePerson, Collections, MyServing, Plan, PlanItem, Schedule, ScheduleOverview, ServiceDetail, ServiceSummary, SongView, Team, TeamView } from '../types.js';
+import type { Assignment, AvailablePerson, Collections, MyServing, Plan, PlanItem, Schedule, ScheduleOverview, ServiceDetail, ServiceSummary, SongAttachment, SongView, Team, TeamView } from '../types.js';
 import { bySoonest, dateOnly, DAY, eventView, find, fullName, memberEvent, pick, requireFields, settings, upcoming } from '../util.js';
 import { sendDirect } from './comms.js';
 
@@ -334,16 +334,30 @@ export function registerServing(r: Router) {
   });
   r.post('/admin/songs', { perm: 'services' }, (ctx) => {
     requireFields(ctx.body, ['title']);
-    const s = ctx.db.put('songs', { id: ctx.id('sg'), title: String(ctx.body.title), author: String(ctx.body.author ?? ''), defaultKey: String(ctx.body.defaultKey ?? ''), bpm: ctx.body.bpm ? Number(ctx.body.bpm) : null, ccli: String(ctx.body.ccli ?? ''), tags: Array.isArray(ctx.body.tags) ? ctx.body.tags.map(String) : [], lyrics: String(ctx.body.lyrics ?? '') });
+    const s = ctx.db.put('songs', { id: ctx.id('sg'), title: String(ctx.body.title), author: String(ctx.body.author ?? ''), defaultKey: String(ctx.body.defaultKey ?? ''), bpm: ctx.body.bpm ? Number(ctx.body.bpm) : null, ccli: String(ctx.body.ccli ?? ''), tags: Array.isArray(ctx.body.tags) ? ctx.body.tags.map(String) : [], lyrics: String(ctx.body.lyrics ?? ''), chordChart: String(ctx.body.chordChart ?? ''), attachments: cleanAttachments(ctx, ctx.body.attachments) });
     ctx.audit('created', 'song', s.id, `Added song ${s.title}`);
     return s;
   });
   r.patch('/admin/songs/:id', { perm: 'services' }, (ctx) => {
     const s = find(ctx, 'songs', ctx.params[0], 'Song');
-    return ctx.db.put('songs', { ...s, ...pick(ctx.body, ['title', 'author', 'defaultKey', 'bpm', 'ccli', 'tags', 'lyrics']) });
+    return ctx.db.put('songs', { ...s, ...pick(ctx.body, ['title', 'author', 'defaultKey', 'bpm', 'ccli', 'tags', 'lyrics', 'chordChart']), ...(ctx.body.attachments !== undefined ? { attachments: cleanAttachments(ctx, ctx.body.attachments) } : {}) });
   });
   r.del('/admin/songs/:id', { perm: 'services' }, (ctx) => {
     ctx.db.del('songs', ctx.params[0]);
     return undefined;
   });
+}
+
+/** Links to charts, lyrics sheets and recordings (Google Drive, Dropbox, YouTube...). */
+function cleanAttachments(ctx: Ctx, raw: unknown): SongAttachment[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .slice(0, 20)
+    .map((a: Record<string, unknown>) => ({
+      id: String(a.id || ctx.id('sa')),
+      name: String(a.name ?? '').trim().slice(0, 120) || 'Attachment',
+      url: String(a.url ?? '').trim(),
+      kind: (['chart', 'lyrics', 'audio', 'video', 'other'].includes(String(a.kind)) ? a.kind : 'other') as SongAttachment['kind'],
+    }))
+    .filter((a) => /^https?:\/\//.test(a.url));
 }

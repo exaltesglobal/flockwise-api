@@ -45,6 +45,7 @@ export function createApp(engine: Engine, store: Store) {
     const path = c.req.path.slice(3);
     const ip = c.req.header('x-forwarded-for')?.split(',')[0].trim() ?? c.req.header('x-real-ip') ?? '';
     if (path === '/auth/otp/request' && limited(`otp:${ip}`, 20, 3600_000)) throw new ApiError(429, 'too_many_codes', 'Too many sign-in attempts from this network. Please try again later.');
+    if (path.startsWith('/public/') && c.req.method !== 'GET' && limited(`public:${ip}`, 30, 3600_000)) throw new ApiError(429, 'too_many_requests', 'Too many submissions from this network. Please try again later.');
     if (path === '/auth/otp/verify' && limited(`verify:${ip}`, 40, 3600_000)) throw new ApiError(429, 'too_many_attempts', 'Too many attempts. Please try again later.');
     const auth = verifyAccess(c.req.header('authorization')?.replace(/^Bearer\s+/i, ''));
     let body: unknown = undefined;

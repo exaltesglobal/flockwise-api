@@ -27,9 +27,14 @@ export function givingRoutes(store: Store) {
     } catch {
       ok = false;
     }
-    const target = d?.eventId ? `/app/events/${d.eventId}` : '/app/give';
-    return c.redirect(`${config.webUrl}${target}?payment=${ok ? 'success' : 'cancelled'}`);
+    return c.redirect(`${config.webUrl}${returnPath(d)}payment=${ok ? 'success' : 'cancelled'}`);
   });
 
   return app;
+}
+
+/** Where the payer lands after checkout: the registration, the event, or giving. */
+export function returnPath(d: { eventId: string | null; formResponseId?: string | null } | null | undefined) {
+  if (d?.formResponseId) return `/forms/return?response=${d.formResponseId}&`;
+  return `${d?.eventId ? `/app/events/${d.eventId}` : '/app/give'}?`;
 }

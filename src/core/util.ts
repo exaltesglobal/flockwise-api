@@ -113,6 +113,7 @@ export function memberEvent(ctx: Ctx, ev: Collections['events'], personId: strin
     campusName: v.campusName,
     myRsvp: ctx.db.all('rsvps').some((r) => r.eventId === ev.id && r.personId === personId) ? 'going' : null,
     checkedIn: ctx.db.all('checkins').some((c) => c.eventId === ev.id && c.personId === personId),
+    registrationFormId: ctx.db.all('forms').find((f) => f.eventId === ev.id && f.status === 'open')?.id ?? null,
   };
 }
 
@@ -183,7 +184,7 @@ export function fundView(ctx: Ctx, f: Collections['funds']): AdminFund {
 /** 80G: not for FCRA gifts, non-80G funds, or cash above Rs 2,000 (Income Tax Act s.80G(5D)). */
 export function eligible80g(ctx: Ctx, d: DonationRecord) {
   const fund = ctx.db.get('funds', d.fundId);
-  return d.status === 'succeeded' && !!fund?.taxDeductible && !d.fcra && !(d.method === 'cash' && d.amount > 200000) && !d.eventId;
+  return d.status === 'succeeded' && !!fund?.taxDeductible && !d.fcra && !(d.method === 'cash' && d.amount > 200000) && !d.eventId && !d.formResponseId;
 }
 
 export function nextReceiptNumber(ctx: Ctx) {
@@ -243,3 +244,28 @@ export function localHour(ctx: Ctx, d: Date) {
     return d.getUTCHours();
   }
 }
+
+/** Finds a person by email (then phone), or adds them as a visitor. Used by public forms and the group finder. */
+export function matchOrCreatePerson(ctx: Ctx, input: { name: string; email?: string | null; phone?: string | null }): Collections['people'] {
+  const email = normEmail(input.email);
+  const phone = normPhone(input.phone);
+  const people = ctx.db.all('people');
+  const found = (email && people.find((p) => normEmail(p.email) === email)) || (phone.length === 10 && people.find((p) => normPhone(p.phone) === phone));
+  if (found) {
+    if (!found.email && email) return ctx.db.put('people', { ...found, email });
+    return found;
+  }
+  const [firstName, ...rest] = input.name.trim().split(/\s+/);
+  const p = ctx.db.put('people', newPerson(ctx, { firstName: firstName || 'Guest', lastName: rest.join(' '), email: email || null, phone: input.phone?.trim() || null, status: 'visitor' }));
+  ctx.audit('created', 'person', p.id, `Added ${fullName(p)} from a public form`);
+  return p;
+}
+
+export const money = (ctx: Ctx, minor: number) => {
+  const c = settings(ctx).currency;
+  try {
+    return new Intl.NumberFormat(c === 'INR' ? 'en-IN' : 'en', { style: 'currency', currency: c, maximumFractionDigits: minor % 100 ? 2 : 0 }).format(minor / 100);
+  } catch {
+    return `${c} ${(minor / 100).toFixed(2)}`;
+  }
+};

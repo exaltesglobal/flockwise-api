@@ -63,7 +63,7 @@ test('kids check-in gives matching security codes and checkout needs the code', 
   assert.equal(res.checkins.length, 4);
   assert.ok(res.securityCode);
   assert.equal(res.labels.filter((l: any) => l.kind === 'child').length, 2);
-  assert.ok(res.labels.every((l: any) => l.securityCode === res.securityCode));
+  assert.ok(res.labels.filter((l: any) => l.kind !== 'volunteer').every((l: any) => l.securityCode === res.securityCode));
   const joel = res.checkins.find((c: any) => c.personName === 'Joel Thomas');
   assert.equal(joel.allergies, 'Peanuts');
   await assert.rejects(call(a, 'POST', `/admin/checkin/checkins/${joel.id}/checkout`, { securityCode: 'ZZZZ' }), /security code/);
