@@ -660,3 +660,20 @@ The church's logo always appears beside its name: in the church office sidebar, 
 - `Church.logoUrl` (in every session and `GET /public/church`) is the logo; `Church.brand` is the kit: `{ primary: '#rrggbb', accent: '#rrggbb', font: 'modern' | 'classic' | 'rounded' | 'elegant', logoDarkUrl: string | null, tagline: string }`. Apps use `primary` for buttons and headers, `accent` for highlights, `logoDarkUrl` on dark backgrounds.
 - `PATCH /admin/settings` (perm `settings`) takes `logoUrl` (a URL or a data URL under about 300 KB; the web app shrinks uploads to 512 px) and `brand` (partial; missing fields keep their saved values; `brand: null` removes the kit). Colours must be 6-digit hex.
 - `Outgoing.html`: the engine fills it for email from the church settings (`brandedHtml` in `core/mail.ts`); hosts send `text` and `html` together.
+
+## Connections: Zoom, Google Cloud Storage, Canva
+
+`GET /admin/integrations` now also returns `zoom`, `gcs` and `canva` statuses (`ConnectionsStatus`). Credentials are sealed; the demo has stand-ins (anything containing "bad" fails).
+
+**Zoom** (a Server-to-Server OAuth app in the church's Zoom account, scopes `user:read:user:admin` and `meeting:write:meeting:admin`):
+- `POST /admin/integrations/zoom` `{accountId, clientId, clientSecret}` (perm `settings`): fetches a token and the account user to prove the details; `DELETE` disconnects.
+- `POST /admin/events/:id/zoom` (perm `events`): creates a scheduled meeting (join before host, no waiting room) and sets `event.meetingUrl` plus `event.zoom {meetingId, joinUrl, startUrl, passcode}` (office only). `DELETE /admin/events/:id/zoom` deletes the meeting and clears the link. Any link (Google Meet, YouTube) can also be typed into `meetingUrl` through `PATCH /admin/events/:id`; members see `meetingUrl` on `ChurchEvent`.
+
+**Google Cloud Storage** (the church's own bucket; a service account with Storage Object Admin on it):
+- `POST /admin/integrations/gcs` `{bucket, serviceAccount}` (the JSON key file as a string): checks the key and the bucket, records whether `allUsers` can read (`publicRead`); otherwise links are V4-signed for a week. `DELETE` disconnects (files stay).
+- Media library (perm `comms`): `GET /admin/media?folder=` → `{data: MediaItem[], gcs}`; `POST /admin/media/uploads` `{name, contentType, size, folder}` → `{item, uploadUrl, headers}`: the browser `PUT`s the file to `uploadUrl` with those headers (15-minute signed URL), then `POST /admin/media/:id/complete`. `DELETE /admin/media/:id` removes the object too. Folders: general, sermons, events, kids, brand. Objects are stored as `<churchId>/<folder>/<yyyy-mm>/<id>-<name>`.
+- Server side: `src/google.ts` (RS256 JWT for tokens, V4 signed URLs). Env hooks `http`, `google`.
+
+**Canva** (needs `CANVA_CLIENT_ID` and `CANVA_CLIENT_SECRET` from a Canva Connect app whose redirect URL is `<API_PUBLIC_URL>/v1/integrations/canva/callback`, scopes asset:read/write, design:content:read/write, design:meta:read, profile:read):
+- `GET /admin/integrations/canva/connect` → `{url, state}`: send the browser there (PKCE). Canva returns to the host route, which calls the church's public `POST /integrations/canva/callback` and redirects to `/admin/settings?canva=connected#integrations` (or `canva=error&reason=`). Tokens are refreshed automatically. `DELETE /admin/integrations/canva` disconnects.
+- `POST /admin/canva/designs` `{kind: invitation|social|story|poster|bulletin|slide, title, imageDataUrl?}` (perm `comms`): uploads the picture as a Canva asset (when given) and creates a design of that size starting from it; returns `CanvaDesign {id, title, editUrl, viewUrl, thumbnailUrl, kind, createdAt}`. `GET /admin/canva/designs` lists the ones opened from Flockwise.

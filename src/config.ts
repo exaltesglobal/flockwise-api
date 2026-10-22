@@ -70,6 +70,8 @@ export const config = {
   },
   /** Claude for the AI features. Without a key the AI screens stay hidden. */
   anthropic: { apiKey: env.ANTHROPIC_API_KEY ?? '', model: env.ANTHROPIC_MODEL ?? 'claude-opus-5-5' },
+  /** Flockwise's Canva app (canva.com/developers): churches connect their own Canva through it. */
+  canva: env.CANVA_CLIENT_ID && env.CANVA_CLIENT_SECRET ? { clientId: env.CANVA_CLIENT_ID, clientSecret: env.CANVA_CLIENT_SECRET } : null,
   /** Chitthi (Agape Labs' WhatsApp platform). Each church connects its own workspace key in Settings. */
   chitthiUrl: (env.CHITTHI_URL ?? 'https://app.chitthi.live').replace(/\/$/, ''),
 };

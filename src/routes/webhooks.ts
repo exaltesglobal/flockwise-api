@@ -49,6 +49,22 @@ export function webhookRoutes(hub: Hub) {
     return (await giving(raw, t)) ? c.json({ ok: true }) : c.json({ ok: false }, 500);
   });
 
+  // Canva sends the staff member's browser back here after they allow Flockwise; the state names the church.
+  app.get('/integrations/canva/callback', async (c) => {
+    const q = c.req.query();
+    const state = q.state ?? '';
+    const t = hub.tenants.get(state.split('.')[0] ?? '');
+    const back = `${t?.env.webUrl ?? config.webUrl}/admin/settings`;
+    if (!t) return c.redirect(`${back}?canva=error&reason=${encodeURIComponent('Unknown church')}#integrations`);
+    if (q.error) return c.redirect(`${back}?canva=error&reason=${encodeURIComponent(q.error_description ?? q.error)}#integrations`);
+    try {
+      await t.engine.handle({ method: 'POST', path: '/integrations/canva/callback', query: {}, body: { code: q.code ?? '', state }, auth: null });
+      return c.redirect(`${back}?canva=connected#integrations`);
+    } catch (e) {
+      return c.redirect(`${back}?canva=error&reason=${encodeURIComponent((e as Error).message)}#integrations`);
+    }
+  });
+
   // The WhatsApp assistant: Chitthi forwards message.received for a church's WhatsApp number.
   app.post('/webhooks/chitthi/:church', async (c) => {
     const t = hub.tenants.get(c.req.param('church'));

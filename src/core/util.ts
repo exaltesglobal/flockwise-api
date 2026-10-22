@@ -107,6 +107,7 @@ export function memberEvent(ctx: Ctx, ev: Collections['events'], personId: strin
     endsAt: v.endsAt,
     location: v.location,
     imageUrl: v.imageUrl ?? null,
+    meetingUrl: v.meetingUrl ?? null,
     goingCount: v.goingCount,
     capacity: v.capacity ?? null,
     price: v.price ?? null,

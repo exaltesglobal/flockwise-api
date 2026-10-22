@@ -2,8 +2,9 @@
 import type { Ctx, DeliveryResult, Outgoing, Router } from '../engine.js';
 import { ApiError } from '../errors.js';
 import { emailAccount, unsealAccount } from '../mail.js';
-import type { ApiKeyRecord, ApiKeyView, Channel, ChannelStatus, ChitthiConfig, ChitthiStatus, ChitthiTemplate, EmailAccountConfig, EmailAccountStatus, PaymentsStatus, RazorpayConfig } from '../types.js';
+import type { ApiKeyRecord, ApiKeyView, Channel, ChannelStatus, ChitthiConfig, ChitthiStatus, ChitthiTemplate, ConnectionsStatus, EmailAccountConfig, EmailAccountStatus, PaymentsStatus, RazorpayConfig } from '../types.js';
 import { churchId, requireFields, settings } from '../util.js';
+import { connectionsStatus } from './connections.js';
 
 export const CHITTHI_SIGNUP = 'https://app.chitthi.live/signup?ref=flockwise';
 
@@ -72,7 +73,7 @@ const cleanTemplate = (body: Record<string, unknown>) => ({
 });
 
 export function registerIntegrations(r: Router) {
-  r.get('/admin/integrations', { perm: 'settings' }, (ctx) => ({ chitthi: chitthiStatus(ctx), email: emailStatus(ctx) }));
+  r.get('/admin/integrations', { perm: 'settings' }, (ctx): ConnectionsStatus => ({ chitthi: chitthiStatus(ctx), email: emailStatus(ctx), ...connectionsStatus(ctx) }));
 
   // ----- the church's own mailbox -----
   r.post('/admin/integrations/email', { perm: 'settings' }, async (ctx) => {

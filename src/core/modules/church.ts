@@ -52,7 +52,7 @@ function brandKit(body: Record<string, unknown> | null, prev: BrandKit | undefin
   };
 }
 
-const EVENT_FIELDS: (keyof EventInput)[] = ['kind', 'title', 'description', 'startsAt', 'endsAt', 'location', 'imageUrl', 'capacity', 'published', 'campusId', 'checkinEnabled', 'price'];
+const EVENT_FIELDS: (keyof EventInput)[] = ['kind', 'title', 'description', 'startsAt', 'endsAt', 'location', 'imageUrl', 'meetingUrl', 'capacity', 'published', 'campusId', 'checkinEnabled', 'price'];
 const GROUP_FIELDS: (keyof GroupInput)[] = ['name', 'description', 'meetingSchedule', 'location', 'leaderName', 'isOpen', 'type', 'zone', 'leaderId'];
 const ROLES = Object.keys(PERMISSIONS) as StaffRole[];
 

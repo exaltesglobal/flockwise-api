@@ -1,12 +1,13 @@
 // The server's churches. Each church has its own in-memory database and engine; the platform
 // (directory, sign-up, Flockwise team panel) sits above them. Hooks: JWT, email, SMS, WhatsApp,
 // Razorpay for gifts and for Flockwise plans.
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 import { hashPassword, hashSecret, randomString, verifyPassword, seal, signAccess, unseal } from './auth.js';
 import { aiConfigured, claude } from './ai.js';
 import { config } from './config.js';
-import { bootstrapChurch, createChurchEngine, createPlatform, Db, type Env } from './core/index.js';
+import { bootstrapChurch, createChurchEngine, createPlatform, Db, type Env, type HttpRequest, type HttpResponse } from './core/index.js';
+import { googleHooks } from './google.js';
 import type { Currency } from './core/types.js';
 import { razorpayCheckout, razorpaySubscriptions } from './giving.js';
 import { channelStatus, deliver, expoPush, sendOtpEmail, sendViaMailbox } from './providers.js';
@@ -26,6 +27,8 @@ export function createHub() {
     deliver,
     smtp: sendViaMailbox,
     push: expoPush,
+    http: httpRequest,
+    google: googleHooks,
     /** Starts saving a new church's database (MySQL or file); set by index.ts. */
     persist: null as null | ((id: string, db: Db) => Promise<unknown>),
   };
@@ -69,6 +72,9 @@ export function createHub() {
       unseal,
       smtp: (account, batch) => hooks.smtp(account, batch),
       push: (batch) => hooks.push(batch),
+      http: (req) => hooks.http(req),
+      google: { accessToken: (k, scope) => hooks.google.accessToken(k, scope), signedUrl: (k, input) => hooks.google.signedUrl(k, input) },
+      ...(config.canva ? { canvaApp: { ...config.canva, redirectUrl: `${config.apiPublicUrl}/v1/integrations/canva/callback`, pkce } } : {}),
       verifyRazorpay: checkKeys,
       serverPaymentKeys: isDefault && !!config.razorpay.main,
       razorpayPartnerUrl: config.razorpayPartnerUrl,
@@ -168,6 +174,20 @@ export function createHub() {
 }
 
 export type Hub = ReturnType<typeof createHub>;
+
+/** Plain HTTPS for the church's connections; the body comes back as text. */
+async function httpRequest(req: HttpRequest): Promise<HttpResponse> {
+  const res = await fetch(req.url, { method: req.method, headers: req.headers, body: req.body as BodyInit | undefined, signal: AbortSignal.timeout(req.timeoutMs ?? 20_000) });
+  const headers: Record<string, string> = {};
+  res.headers.forEach((v, k) => (headers[k] = v));
+  return { status: res.status, headers, text: await res.text() };
+}
+
+/** PKCE pair for Canva's OAuth. */
+function pkce() {
+  const verifier = randomBytes(48).toString('base64url');
+  return { verifier, challenge: createHash('sha256').update(verifier).digest('base64url') };
+}
 
 /** Creates the server's own church from the environment variables and lists it in the directory. */
 export function bootstrap(hub: Hub) {

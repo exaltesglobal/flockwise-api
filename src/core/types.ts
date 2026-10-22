@@ -71,6 +71,8 @@ export type ChurchEvent = {
   endsAt: string;
   location: string;
   imageUrl?: string | null;
+  /** Join link for an online or hybrid meeting (Zoom, Google Meet, YouTube), if any. */
+  meetingUrl?: string | null;
   goingCount: number;
   capacity?: number | null;
   myRsvp: RsvpStatus | null;
@@ -170,8 +172,11 @@ export type AdminEvent = Omit<ChurchEvent, 'myRsvp' | 'checkedIn'> & {
   campusId: string | null;
   checkinEnabled: boolean;
   checkinCount: number;
+  /** The Zoom meeting Flockwise created for this event, if any. */
+  zoom?: ZoomMeeting | null;
 };
-export type EventInput = Omit<AdminEvent, 'id' | 'goingCount' | 'attendance' | 'checkinCount' | 'campusName'>;
+export type ZoomMeeting = { meetingId: string; joinUrl: string; startUrl: string; passcode: string };
+export type EventInput = Omit<AdminEvent, 'id' | 'goingCount' | 'attendance' | 'checkinCount' | 'campusName' | 'zoom'>;
 export type EventAttendee = { personId: string; name: string; phone: string | null; rsvp: boolean; checkedIn: boolean; paid: boolean | null };
 
 // ---------- groups ----------
@@ -850,6 +855,38 @@ export type EmailAccountConfig = {
 };
 export type EmailAccountStatus = { connected: boolean; host: string; port: number; user: string; from: string; fromName: string; connectedAt: string | null; lastError: string | null; lastSentAt: string | null };
 
+// ----- connections: Zoom, Google Cloud Storage, Canva -----
+
+/** A church's Zoom (Server-to-Server OAuth app), for meeting links on events. */
+export type ZoomConfig = { id: 'zoom'; accountId: string; clientId: string; clientSecretSealed: string; userEmail: string; userName: string; connectedAt: string; connectedBy: string; lastError: string | null };
+export type ZoomStatus = { connected: boolean; accountId: string; userEmail: string; userName: string; connectedAt: string | null; lastError: string | null; meetings: number };
+/** A church's Google Cloud Storage bucket for photos and videos, with the service-account key sealed. */
+export type GcsConfig = { id: 'gcs'; bucket: string; projectId: string; clientEmail: string; privateKeySealed: string; /** Whether the bucket lets anyone read objects; otherwise links are signed for a week. */ publicRead: boolean; connectedAt: string; connectedBy: string; lastError: string | null };
+export type GcsStatus = { available: boolean; connected: boolean; bucket: string; projectId: string; clientEmail: string; publicRead: boolean; connectedAt: string | null; lastError: string | null; files: number; bytes: number };
+/** A church's Canva, connected by a staff member through OAuth; tokens sealed. */
+export type CanvaConfig = { id: 'canva'; accessTokenSealed: string; refreshTokenSealed: string; expiresAt: string; userName: string; teamName: string; connectedAt: string; connectedBy: string; lastError: string | null };
+export type CanvaStatus = { available: boolean; connected: boolean; userName: string; teamName: string; connectedAt: string | null; lastError: string | null; designs: number };
+export type ConnectionsStatus = { chitthi: ChitthiStatus; email: EmailAccountStatus; zoom: ZoomStatus; gcs: GcsStatus; canva: CanvaStatus };
+
+export type MediaFolder = 'general' | 'sermons' | 'events' | 'kids' | 'brand';
+export const MEDIA_FOLDERS: { id: MediaFolder; label: string }[] = [
+  { id: 'general', label: 'General' }, { id: 'sermons', label: 'Sermons' }, { id: 'events', label: 'Events' }, { id: 'kids', label: 'Kids & Sunday school' }, { id: 'brand', label: 'Brand & logos' },
+];
+/** A photo, video or file in the church's own bucket. */
+export type MediaItem = {
+  id: string; name: string; contentType: string; size: number; folder: MediaFolder;
+  /** Object path in the bucket. */
+  object: string;
+  /** Where to see it: a public link, or a signed one that lasts a week. */
+  url: string;
+  status: 'pending' | 'ready';
+  uploadedBy: string; createdAt: string;
+};
+export type MediaUpload = { item: MediaItem; uploadUrl: string; headers: Record<string, string> };
+export type MediaList = { data: MediaItem[]; gcs: GcsStatus };
+/** A Canva design Flockwise opened for the church. */
+export type CanvaDesign = { id: string; title: string; editUrl: string; viewUrl: string; thumbnailUrl: string | null; kind: string; createdAt: string };
+
 /** A phone that can receive push notifications, registered by the member app or the team app. */
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
@@ -1022,7 +1059,9 @@ export type AccountsSummary = {
 
 export type Collections = {
   settings: ChurchSettings & { id: string };
-  integrations: ChitthiConfig | RazorpayConfig | RazorpaySetup | WaBotConfig | EmailAccountConfig;
+  integrations: ChitthiConfig | RazorpayConfig | RazorpaySetup | WaBotConfig | EmailAccountConfig | ZoomConfig | GcsConfig | CanvaConfig;
+  media: MediaItem;
+  canvaDesigns: CanvaDesign;
   kycFiles: KycFile;
   recurring: RecurringGift;
   botMessages: BotMessage;
@@ -1110,7 +1149,7 @@ export const KINDS = [
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
   'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
-  'streams', 'streamViews', 'teamLogins', 'devices',
+  'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns',
 ] as const satisfies readonly Kind[];
 
 // ----- assisted Razorpay setup: Flockwise's team opens the church's Razorpay account and does its KYC -----

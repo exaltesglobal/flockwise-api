@@ -1,6 +1,6 @@
 // Host hooks for demo mode: everything stays in memory, gifts succeed instantly and
 // messages are only logged. Used by the web demo and by tests.
-import type { AiBlock, AiRequest, AiResponse, Env } from './engine.js';
+import type { AiBlock, AiRequest, AiResponse, Env, HttpRequest, HttpResponse } from './engine.js';
 import type { Channel } from './types.js';
 
 export type DemoOutboxItem = { channel: Channel | 'push'; to: string; subject: string; text: string };
@@ -57,7 +57,44 @@ export function createDemoEnv(opts: { now?: () => Date; webUrl?: string } = {}):
       for (const m of batch) outbox.push({ channel: 'push', to: m.token, subject: m.title, text: m.body });
       return batch.map(() => ({ ok: true }));
     },
+    http: async (req) => demoHttp(req),
+    google: {
+      accessToken: async (key) => (key.privateKey.includes('bad') ? Promise.reject(new Error('invalid_grant: the key was rejected')) : 'demo-google-token'),
+      signedUrl: async (_key, input) => `demo:${input.method}:${input.bucket}/${input.object}`,
+    },
+    canvaApp: { clientId: 'demo-canva', clientSecret: 'demo', redirectUrl: 'demo://canva/callback', pkce: () => ({ verifier: 'demo-verifier', challenge: 'demo-challenge' }) },
   };
+}
+
+const reply = (status: number, data: unknown): HttpResponse => ({ status, headers: {}, text: JSON.stringify(data) });
+
+/** Stand-ins for Zoom, Google Cloud Storage and Canva: anything containing "bad" fails, the rest succeeds. */
+function demoHttp(req: HttpRequest): HttpResponse {
+  const u = req.url;
+  const auth = req.headers?.Authorization ?? '';
+  if (u.startsWith('https://zoom.us/oauth/token')) return /bad/.test(u + auth) ? reply(400, { reason: 'Invalid client_id or client_secret' }) : reply(200, { access_token: 'demo-zoom-token', expires_in: 3600 });
+  if (u.startsWith('https://api.zoom.us/v2/users/me/meetings')) {
+    const b = JSON.parse(typeof req.body === 'string' ? req.body : '{}') as { topic?: string };
+    const id = 8000000000 + Math.floor(Math.random() * 999_999_999);
+    return reply(201, { id, topic: b.topic, join_url: `https://zoom.us/j/${id}?pwd=demo`, start_url: `https://zoom.us/s/${id}?zak=demo`, password: '123456' });
+  }
+  if (u.startsWith('https://api.zoom.us/v2/users/me')) return reply(200, { email: 'office@gracechurch.in', first_name: 'Grace', last_name: 'Church' });
+  if (u.startsWith('https://api.zoom.us/v2/meetings/')) return reply(204, null);
+  if (u.startsWith('https://storage.googleapis.com/storage/v1/b/')) {
+    if (/bad/.test(u)) return reply(404, { error: { message: 'Not Found' } });
+    if (u.includes('/iam')) return reply(200, { bindings: u.includes('public') ? [{ role: 'roles/storage.objectViewer', members: ['allUsers'] }] : [] });
+    if (req.method === 'DELETE') return reply(204, null);
+    return reply(200, { name: u.split('/b/')[1].split(/[?/]/)[0], location: 'ASIA-SOUTH1' });
+  }
+  if (u.startsWith('https://api.canva.com/rest/v1/oauth/token')) return reply(200, { access_token: 'demo-canva-access', refresh_token: 'demo-canva-refresh', expires_in: 14_400 });
+  if (u.startsWith('https://api.canva.com/rest/v1/users/me/profile')) return reply(200, { display_name: 'Grace Church Media', team_name: 'Grace Community Church' });
+  if (u.startsWith('https://api.canva.com/rest/v1/asset-uploads')) return reply(200, { job: { id: 'job_demo', status: 'success', asset: { id: 'asset_demo', name: 'Flockwise picture' } } });
+  if (u.startsWith('https://api.canva.com/rest/v1/designs')) {
+    const b = JSON.parse(typeof req.body === 'string' ? req.body : '{}') as { title?: string };
+    const id = `DAF${Math.random().toString(36).slice(2, 10)}`;
+    return reply(200, { design: { id, title: b.title ?? 'Design', urls: { edit_url: `https://www.canva.com/design/${id}/edit`, view_url: `https://www.canva.com/design/${id}/view` }, thumbnail: null } });
+  }
+  return reply(404, { message: 'Not found (demo)' });
 }
 
 /** Reads the claims back out of a demo access token. */

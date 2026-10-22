@@ -96,7 +96,20 @@ export type Env = {
   smtp?: (account: SmtpAccount, batch: Outgoing[]) => Promise<DeliveryResult[]>;
   /** Push notifications to the member and team apps (Expo). Absent when the host has no push. */
   push?: (batch: PushMessage[]) => Promise<PushResult[]>;
+  /** Plain HTTPS for the church's connections (Zoom, Google Cloud Storage, Canva). The demo answers with stand-ins. */
+  http?: (req: HttpRequest) => Promise<HttpResponse>;
+  /** Google service-account signing (access tokens and V4 signed URLs). Absent when the host cannot sign. */
+  google?: {
+    accessToken(key: GoogleKey, scope: string): Promise<string>;
+    signedUrl(key: GoogleKey, input: { bucket: string; object: string; method: 'PUT' | 'GET'; contentType?: string; expiresSeconds: number }): Promise<string>;
+  };
+  /** Flockwise's Canva app, so churches can connect their Canva. Absent when CANVA_CLIENT_ID is not set. */
+  canvaApp?: { clientId: string; clientSecret: string; redirectUrl: string; pkce(): { verifier: string; challenge: string } };
 };
+
+export type HttpRequest = { method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; url: string; headers?: Record<string, string>; body?: string | Uint8Array; timeoutMs?: number };
+export type HttpResponse = { status: number; headers: Record<string, string>; text: string };
+export type GoogleKey = { clientEmail: string; privateKey: string; projectId: string };
 
 /** What a signed access token says. The engine re-reads the staff role from the database on each request. */
 export type AuthClaims = { sub: string; staffId: string | null; scope: 'admin' | 'member'; keyId?: string; readOnly?: boolean };
