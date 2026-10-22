@@ -579,6 +579,9 @@ export function seedDemo(db: Db, env: Env) {
   }
   db.put('batches', { id: 'bt_2', name: 'Sunday offering (this week)', date: new Date(now).toISOString().slice(0, 10), status: 'open', expectedTotal: null, notes: '', createdBy: 'Vinod Mathew', createdAt: iso(now), committedAt: null, committedBy: null });
 
+  // Two Indian-language songs with simple original words, so the projector can show them in English letters too.
+  db.put('songs', { ...db.get('songs', 'sg_4')!, lyrics: 'Verse 1\nయేసు రాజా నీకే స్తుతి\nనా ప్రాణమా ఆయనను స్తుతించుము\nనీ ప్రేమ నిత్యము నిలుచును\n\nChorus\nస్తుతి స్తుతి స్తుతి యేసయ్యా\nమహిమ మహిమ నీకే యేసయ్యా', copyright: 'Public domain' });
+  db.put('songs', { ...db.get('songs', 'sg_7')!, lyrics: 'Verse 1\nमहिमा हो, महिमा हो\nयीशु के नाम की महिमा हो\nवह राजाओं का राजा है\n\nChorus\nहल्लेलूयाह, हल्लेलूयाह\nयीशु मसीह प्रभु है', copyright: 'Public domain' });
   db.put('songs', { ...db.get('songs', 'sg_1')!, chordChart: '{title: Goodness of God}\n{key: A}\n\n[Verse 1]\n[A]I love You, [D]Lord\nOh Your [A]mercy never [E]fails me\n[A]All my [D]days\nI\'ve been [A]held in Your [E]hands\n\n[Chorus]\n[D]All my life You have been [A]faithful\n[E]All my life You have been so, so [F#m]good\n[D]With every breath that I am [A]able\n[E]Oh I will sing of the goodness of [A]God', attachments: [{ id: 'sa_1', name: 'Lead sheet (PDF)', url: 'https://example.com/goodness-of-god.pdf', kind: 'chart' }, { id: 'sa_2', name: 'Original recording', url: 'https://www.youtube.com/watch?v=n0FBb6hnwTo', kind: 'video' }] });
 
   // Public-domain hymns with full lyrics, so the projector and stage display have real words to show.

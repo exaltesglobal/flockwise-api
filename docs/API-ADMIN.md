@@ -740,3 +740,11 @@ Team app (member token; every route checks the person is on that team, else 403)
 - `GET /me/tasks` → `MyTask[]` (open first, then by due date; each carries `channelName` and `teamId`). `PATCH /me/tasks/:id { done }` ticks the person's own task.
 
 Push kinds and the link they carry (`data.link`): `team.notice` and `team.message` → `/app/team/<teamId>/threads/<channelId>` (or `/app/team/threads/<channelId>` for a thread with no team); `task.assigned` → `/app/tasks/<postId>`. Email goes out for notices and tasks by default; rules are editable in Settings › Notifications. Office logins without a person record are emailed directly.
+
+## Indian-script lyrics in English letters (transliteration)
+
+`src/core/transliterate.ts` turns Telugu, Hindi/Marathi (Devanagari), Tamil, Kannada, Malayalam, Bengali, Punjabi (Gurmukhi), Gujarati and Odia text into plain English letters the way Indian song sheets write them ("Yesu nannu preminchenu", "Sthuthi sthuthi yesayyaa", "Prem karo ek doosare se"). It is deterministic and offline: one table over the shared Brahmic Unicode layout, with per-script rules (Hindi-family words drop the final "a", southern "ta" is "th", Tamil softens k/ch/t/p between vowels, anusvara is "m" before lip sounds and at the end of southern words). Exports: `transliterate(text)` (keeps `[Section]` headings and blank lines), `transliterateLine`, `transliterateLines`, `hasIndic`, `scriptOf`.
+
+- `PresentationTheme.transliterate` (default off; `PUT /admin/presentation-theme { transliterate: true }`). When on, every lyrics or text `Slide` carries `roman: string[]` (one entry per line, empty when the lines are already Latin). The projector shows each romanised line under its line, the stage display and the livestream lyrics bar show them joined with " / ".
+- Song form: when the projector lyrics are in an Indian script, a button fills the second-language lyrics with the English-letter version so the office can tidy it by hand.
+- Demo songs sg_4 (Yesu Raja, Telugu) and sg_7 (Mahima Ho, Hindi) have short original lyrics for trying it. Tests: `test/transliterate.test.ts`.

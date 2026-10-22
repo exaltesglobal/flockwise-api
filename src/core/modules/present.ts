@@ -1,13 +1,14 @@
 // Presentation: turns a service plan into projector slides (song lyrics by section, readings,
 // announcements), keeps every screen on the same slide, and adds song usage stats for worship teams.
 import { ApiError } from '../errors.js';
+import { hasIndic, transliterateLines } from '../transliterate.js';
 import type { Ctx, Router } from '../engine.js';
 import type { BandItem, Collections, LowerThird, ObsSettings, PlanItem, PresentationState, PresentationTheme, PresentationView, Slide, Song, SongStats } from '../types.js';
 import { OBS_MOMENTS } from '../types.js';
 import { church, DAY, find, pick, settings } from '../util.js';
 import { liveView } from './ministry.js';
 
-export const DEFAULT_THEME: PresentationTheme = { background: '#0f1f1c', textColor: '#ffffff', imageUrl: '', fontScale: 1, linesPerSlide: 4, showAlt: true, titleSlides: true, uppercase: false };
+export const DEFAULT_THEME: PresentationTheme = { background: '#0f1f1c', textColor: '#ffffff', imageUrl: '', fontScale: 1, linesPerSlide: 4, showAlt: true, titleSlides: true, uppercase: false, transliterate: false };
 const SECTION = /^(verse|chorus|refrain|bridge|pre-?chorus|intro|outro|tag|interlude|ending|instrumental|vamp|coda)\b/i;
 
 export const themeOf = (ctx: Ctx): PresentationTheme => ({ ...DEFAULT_THEME, ...(settings(ctx).presentation ?? {}) });
@@ -109,6 +110,7 @@ function songSlides(song: Song, item: PlanItem, itemIndex: number, theme: Presen
         lines,
         alt: alt ? alt.lines.slice(p * theme.linesPerSlide, (p + 1) * theme.linesPerSlide) : [],
         chords: chordLines.slice(p * theme.linesPerSlide, (p + 1) * theme.linesPerSlide),
+        roman: theme.transliterate && lines.some(hasIndic) ? transliterateLines(lines) : [],
       });
     });
   });
@@ -124,7 +126,7 @@ export function buildDeck(ctx: Ctx, items: PlanItem[], theme = themeOf(ctx)): Sl
     const textLines = (item.text ?? '').replace(/\r/g, '').split('\n');
     const hasText = textLines.some((l) => l.trim());
     if (theme.titleSlides || (!lyrics.length && !hasText))
-      slides.push({ id: `${item.id}:title`, itemIndex: i, itemTitle: item.title, kind: 'title', label: item.kind === 'song' ? 'Title' : item.kind[0].toUpperCase() + item.kind.slice(1), lines: [item.title, ...(song?.author ? [song.author] : item.person && item.kind !== 'song' ? [item.person] : [])], alt: [], chords: [] });
+      slides.push({ id: `${item.id}:title`, itemIndex: i, itemTitle: item.title, kind: 'title', label: item.kind === 'song' ? 'Title' : item.kind[0].toUpperCase() + item.kind.slice(1), lines: [item.title, ...(song?.author ? [song.author] : item.person && item.kind !== 'song' ? [item.person] : [])], alt: [], chords: [], roman: [] });
     slides.push(...lyrics);
     if (hasText) {
       // Blank lines split paragraphs; long paragraphs split by lines-per-slide (doubled, as text is shorter than lyrics).
@@ -132,7 +134,7 @@ export function buildDeck(ctx: Ctx, items: PlanItem[], theme = themeOf(ctx)): Sl
       let n = 0;
       for (const para of paras)
         for (const lines of chunk(para, theme.linesPerSlide * 2))
-          slides.push({ id: `${item.id}:text:${n++}`, itemIndex: i, itemTitle: item.title, kind: 'text', label: item.kind === 'reading' ? 'Reading' : 'Text', lines, alt: [], chords: [] });
+          slides.push({ id: `${item.id}:text:${n++}`, itemIndex: i, itemTitle: item.title, kind: 'text', label: item.kind === 'reading' ? 'Reading' : 'Text', lines, alt: [], chords: [], roman: theme.transliterate && lines.some(hasIndic) ? transliterateLines(lines) : [] });
     }
   });
   return slides;
@@ -298,7 +300,7 @@ export function registerPresent(r: Router) {
 
   r.get('/admin/presentation-theme', { staff: true }, (ctx) => themeOf(ctx));
   r.put('/admin/presentation-theme', { perm: ['services', 'settings'] }, (ctx) => {
-    const patch = pick<PresentationTheme>(ctx.body, ['background', 'textColor', 'imageUrl', 'fontScale', 'linesPerSlide', 'showAlt', 'titleSlides', 'uppercase']);
+    const patch = pick<PresentationTheme>(ctx.body, ['background', 'textColor', 'imageUrl', 'fontScale', 'linesPerSlide', 'showAlt', 'titleSlides', 'uppercase', 'transliterate']);
     if (patch.linesPerSlide !== undefined) patch.linesPerSlide = Math.max(1, Math.min(8, Math.round(Number(patch.linesPerSlide)) || 4));
     if (patch.fontScale !== undefined) patch.fontScale = Math.max(0.5, Math.min(2, Number(patch.fontScale) || 1));
     for (const k of ['background', 'textColor'] as const) if (patch[k] !== undefined && !/^#[0-9a-f]{3,8}$/i.test(String(patch[k]))) delete patch[k];

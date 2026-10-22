@@ -856,8 +856,14 @@ export type Slide = {
   alt: string[];
   /** Chord-and-lyric lines for the stage display. */
   chords: string[];
+  /** The lines in English letters when they are in an Indian script and the theme asks for it. */
+  roman: string[];
 };
-export type PresentationTheme = { background: string; textColor: string; imageUrl: string; fontScale: number; linesPerSlide: number; showAlt: boolean; titleSlides: boolean; uppercase: boolean };
+export type PresentationTheme = {
+  background: string; textColor: string; imageUrl: string; fontScale: number; linesPerSlide: number; showAlt: boolean; titleSlides: boolean; uppercase: boolean;
+  /** Show Telugu, Hindi, Tamil (and other Indian-script) words in English letters under the lyrics. */
+  transliterate?: boolean;
+};
 export type PresentationMode = 'live' | 'blank' | 'logo' | 'countdown';
 /** A name strap for the livestream: speaker, reader, Bible reference or announcement. */
 export type LowerThird = { id: string; title: string; subtitle: string };
