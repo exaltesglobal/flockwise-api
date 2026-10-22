@@ -227,7 +227,7 @@ export type Receipts80g = {
 };
 
 export type Pledge = { id: string; personId: string; personName: string; fundId: string; fundName: string; amount: number; startDate: string; endDate: string; createdAt: string };
-export type PledgeView = Pledge & { given: number; currency: Currency };
+export type PledgeView = Pledge & { given: number; currency: Currency; /** The AutoPay paying this pledge, if any. */ autopay?: { id: string; status: RecurringStatus; amount: number } | null };
 
 export type GivingStatement = {
   church: { name: string; address: string; pan: string | null; registration80g: string | null };
@@ -952,6 +952,7 @@ export type Collections = {
   settings: ChurchSettings & { id: string };
   integrations: ChitthiConfig | RazorpayConfig | RazorpaySetup;
   kycFiles: KycFile;
+  recurring: RecurringGift;
   apiKeys: ApiKeyRecord;
   automations: Automations & { id: string };
   greetings: Greeting;
@@ -1012,7 +1013,7 @@ export const KINDS = [
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys',
-  'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles',
+  'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring',
 ] as const satisfies readonly Kind[];
 
 // ----- assisted Razorpay setup: Flockwise's team opens the church's Razorpay account and does its KYC -----
@@ -1052,3 +1053,33 @@ export type RazorpaySetupView = {
   /** Documents still needed before the church can send them to us. */
   missing: KycDocKind[];
 };
+
+// ----- recurring gifts: Razorpay subscriptions, approved once by UPI AutoPay, card or e-mandate -----
+/** pending: waiting for the giver to approve the mandate; failing: a charge failed and Razorpay is retrying; halted: retries ran out. */
+export type RecurringStatus = 'pending' | 'active' | 'failing' | 'paused' | 'halted' | 'cancelled' | 'completed';
+export type RecurringGift = {
+  id: string;
+  donorId: string | null;
+  donorName: string;
+  fundId: string;
+  fundName: string;
+  /** Each charge, in paise. */
+  amount: number;
+  currency: Currency;
+  status: RecurringStatus;
+  /** Razorpay subscription id (sub_). */
+  providerRef: string | null;
+  fcra: boolean;
+  method: PaymentMethod | null;
+  /** Paying off a pledge in monthly charges. */
+  pledgeId: string | null;
+  /** Number of charges, or null for "until I stop it". */
+  totalCount: number | null;
+  chargedCount: number;
+  totalGiven: number;
+  lastChargedAt: string | null;
+  nextChargeAt: string | null;
+  createdAt: string;
+  endedAt: string | null;
+};
+export type RecurringSummary = { active: number; monthly: number; failing: number; pending: number; currency: Currency };

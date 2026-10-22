@@ -3,6 +3,7 @@
 import { Hono } from 'hono';
 import { html } from 'hono/html';
 
+import { applyRecurringEvent } from '../core/index.js';
 import type { Hub } from '../server.js';
 import { returnPath } from './giving.js';
 
@@ -35,6 +36,7 @@ export function devRoutes(hub: Hub) {
     const paid = form.result === 'paid';
     if (d.status === 'pending')
       await t.store.updateDonation(d.id, paid ? { status: 'succeeded', method: 'upi', providerPaymentId: `fake_${d.id}`, paidAt: new Date().toISOString() } : { status: 'failed' });
+      if (d.providerRef?.startsWith('test_sub_')) applyRecurringEvent(t.engine.systemCtx(), { event: paid ? 'subscription.charged' : 'subscription.cancelled', ref: d.providerRef, method: 'upi', currentEnd: paid ? Math.floor(Date.now() / 1000) + 30 * 86400 : null });
     return c.redirect(`${t.env.webUrl}${returnPath(d)}payment=${paid ? 'success' : 'cancelled'}`);
   });
 

@@ -8,7 +8,7 @@ import { aiConfigured, claude } from './ai.js';
 import { config } from './config.js';
 import { bootstrapChurch, createChurchEngine, createPlatform, Db, type Env } from './core/index.js';
 import type { Currency } from './core/types.js';
-import { razorpayCheckout } from './giving.js';
+import { razorpayCheckout, razorpaySubscriptions } from './giving.js';
 import { channelStatus, deliver, sendOtpEmail } from './providers.js';
 import { cancelSubscription, checkKeys, createPaymentLink, createPlan, createSubscription, getPaymentLink } from './razorpay.js';
 import { coreStore } from './store/core-store.js';
@@ -45,6 +45,11 @@ export function createHub() {
         return isDefault ? ch : { ...ch, sms: { configured: false, provider: 'not connected' }, whatsapp: { configured: false, provider: 'Connect Chitthi' } };
       },
       checkout: (d, o) => razorpayCheckout(getTenant()!)(d, o),
+      subscriptions: {
+        pause: (ref, fcra) => razorpaySubscriptions(getTenant()!).pause(ref, fcra),
+        resume: (ref, fcra) => razorpaySubscriptions(getTenant()!).resume(ref, fcra),
+        cancel: (ref, fcra) => razorpaySubscriptions(getTenant()!).cancel(ref, fcra),
+      },
       webUrl: config.webUrl,
       chitthi: async (apiKey, req) => {
         const res = await fetch(`${config.chitthiUrl}${req.path}`, {

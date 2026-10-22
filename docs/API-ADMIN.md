@@ -409,3 +409,17 @@ A one-time ₹1,999 service, paid to Flockwise (Agape Labs) on the platform's Ra
 | POST | `/admin/settings/payments/setup/submit` | Needs `orgType` and the required documents (PAN, registration, bank proof, signatory ID, plus the parent body's letter for `parent`). |
 
 The Flockwise team works the queue at `/platform/razorpay-setups` (list), `GET /platform/razorpay-setups/:churchId/docs/:docId` (file, logged) and `PATCH /platform/razorpay-setups/:churchId` `{status, teamNote}`. Marking a setup `done` or `refunded` deletes the stored files. The fee is confirmed by the `payment_link.paid` event on `/v1/webhooks/billing`.
+
+## Monthly gifts (UPI AutoPay)
+
+A monthly gift (`frequency: 'monthly'` on `POST /giving/intents`) is a Razorpay subscription on the church's account. The giver approves it once with UPI AutoPay, a card or a bank e-mandate. Flockwise keeps one `recurring` record for each subscription and updates it from the church's webhook. Add these events to it: `subscription.activated`, `subscription.charged`, `subscription.pending`, `subscription.halted`, `subscription.paused`, `subscription.resumed`, `subscription.cancelled` and `subscription.completed`.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/giving/recurring` | The member's own monthly gifts (status, amount, `nextChargeAt`, `chargedCount`, `totalGiven`). |
+| POST | `/giving/recurring/:id/pause` · `/resume` · `/cancel` | Changes the subscription at Razorpay first. A cancel takes effect at once. |
+| POST | `/giving/pledges` with `autopay: true` | Creates the pledge, then a subscription of `ceil(amount / months)` for the months up to `endDate`. Returns `checkoutUrl`, `monthly` and `months`. A pledge with an AutoPay running cannot be deleted until the AutoPay is cancelled. |
+| GET | `/admin/giving/recurring?status=active\|attention\|paused\|pending\|cancelled` | `{summary: {active, monthly, failing, pending}, rows}` (giving.view). |
+| POST | `/admin/giving/recurring/:id/cancel` | giving.edit. |
+
+The statuses are `pending` (not approved yet), `active`, `failing` (a charge failed and Razorpay is retrying), `paused`, `halted` (retries ran out), `cancelled` and `completed`.

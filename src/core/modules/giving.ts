@@ -21,6 +21,7 @@ import {
 } from '../util.js';
 import { onTicketPaid } from './church.js';
 import { onFormPaid } from './forms.js';
+import { monthsLeft, startRecurring } from './recurring.js';
 
 const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 
@@ -44,12 +45,66 @@ export function onDonationSucceeded(ctx: Ctx, d: Collections['donations']) {
   return next;
 }
 
+/** Creates a pending gift and its checkout. Monthly gifts also start a recurring gift (UPI AutoPay). */
+async function giftIntent(ctx: Ctx, input: Record<string, any>, extra: { pledgeId?: string; totalCount?: number } = {}) { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const me = find(ctx, 'people', ctx.me(), 'Profile');
+  const s = settings(ctx);
+  const fields: Record<string, string> = {};
+  if (!Number.isInteger(input.amount) || input.amount < 100) fields.amount = 'Enter an amount of at least 1.';
+  if (input.amount > 1_00_00_000_00) fields.amount = 'For gifts above 1 crore please contact the church office.';
+  if (input.frequency !== 'once' && input.frequency !== 'monthly') fields.frequency = 'Choose one time or monthly.';
+  if (input.pan && !PAN_RE.test(input.pan)) fields.pan = 'PAN should look like ABCDE1234F.';
+  if (input.currency !== s.currency) fields.currency = `This church accepts ${s.currency}.`;
+  if (Object.keys(fields).length) throw new ApiError(422, 'invalid', 'Please check the highlighted fields.', fields);
+  const fund = ctx.db.get('funds', input.fundId);
+  if (!fund || !fund.active || fund.system) throw new ApiError(404, 'fund_not_found', 'That fund is not accepting gifts right now.');
+  const fcra = s.country === 'IN' && input.donorCitizenship === 'OTHER';
+  if (fcra && !s.fcra.registered) throw new ApiError(422, 'fcra_not_registered', 'This church cannot accept gifts from foreign citizens or OCI holders.');
+  const d: Collections['donations'] = {
+    id: ctx.id('dn'),
+    donorId: me.id,
+    donorName: fullName(me),
+    donorEmail: me.email,
+    donorPhone: me.phone,
+    fundId: fund.id,
+    fundName: fund.name,
+    amount: input.amount,
+    currency: input.currency,
+    frequency: input.frequency,
+    status: 'pending',
+    method: null,
+    pan: input.pan && fund.taxDeductible && !fcra ? input.pan : null,
+    donorCitizenship: fcra ? 'OTHER' : 'IN',
+    fcra,
+    provider: 'demo',
+    providerRef: null,
+    providerPaymentId: null,
+    createdAt: ctx.now.toISOString(),
+    paidAt: null,
+    eventId: null,
+    receiptNumber: null,
+  };
+  const co = await ctx.env.checkout(d, { description: `${fund.name} · ${s.name}`, fundTaxDeductible: fund.taxDeductible, ...extra });
+  const saved = ctx.db.put('donations', {
+    ...d,
+    provider: co.provider,
+    providerRef: co.providerRef,
+    status: co.status ?? 'pending',
+    paidAt: co.status === 'succeeded' ? ctx.now.toISOString() : null,
+    method: co.status === 'succeeded' ? 'upi' : null,
+  });
+  if (saved.status === 'succeeded') onDonationSucceeded(ctx, saved);
+  const recurring = saved.frequency === 'monthly' && (saved.providerRef || saved.status === 'succeeded') ? startRecurring(ctx, saved, extra) : null;
+  return { donation: saved, checkoutUrl: co.checkoutUrl, recurring };
+}
+
 function pledgeView(ctx: Ctx, p: Collections['pledges']): PledgeView {
   const given = ctx.db
     .all('donations')
     .filter((d) => d.donorId === p.personId && d.fundId === p.fundId && d.status === 'succeeded' && dateOnly(giftDate(d)) >= p.startDate && dateOnly(giftDate(d)) <= p.endDate)
     .reduce((s, d) => s + d.amount, 0);
-  return { ...p, given, currency: settings(ctx).currency };
+  const g = ctx.db.all('recurring').find((x) => x.pledgeId === p.id && x.status !== 'cancelled');
+  return { ...p, given, currency: settings(ctx).currency, autopay: g ? { id: g.id, status: g.status, amount: g.amount } : null };
 }
 
 function statement(ctx: Ctx, personId: string, fy?: string): GivingStatement {
@@ -81,55 +136,8 @@ export function registerGiving(r: Router) {
       .map(({ id, name, description, taxDeductible }) => ({ id, name, description, taxDeductible })),
   );
   r.post('/giving/intents', {}, async (ctx) => {
-    const me = find(ctx, 'people', ctx.me(), 'Profile');
-    const s = settings(ctx);
-    const input = ctx.body;
-    const fields: Record<string, string> = {};
-    if (!Number.isInteger(input.amount) || input.amount < 100) fields.amount = 'Enter an amount of at least 1.';
-    if (input.amount > 1_00_00_000_00) fields.amount = 'For gifts above 1 crore please contact the church office.';
-    if (input.frequency !== 'once' && input.frequency !== 'monthly') fields.frequency = 'Choose one time or monthly.';
-    if (input.pan && !PAN_RE.test(input.pan)) fields.pan = 'PAN should look like ABCDE1234F.';
-    if (input.currency !== s.currency) fields.currency = `This church accepts ${s.currency}.`;
-    if (Object.keys(fields).length) throw new ApiError(422, 'invalid', 'Please check the highlighted fields.', fields);
-    const fund = ctx.db.get('funds', input.fundId);
-    if (!fund || !fund.active || fund.system) throw new ApiError(404, 'fund_not_found', 'That fund is not accepting gifts right now.');
-    const fcra = s.country === 'IN' && input.donorCitizenship === 'OTHER';
-    if (fcra && !s.fcra.registered) throw new ApiError(422, 'fcra_not_registered', 'This church cannot accept gifts from foreign citizens or OCI holders.');
-    const d: Collections['donations'] = {
-      id: ctx.id('dn'),
-      donorId: me.id,
-      donorName: fullName(me),
-      donorEmail: me.email,
-      donorPhone: me.phone,
-      fundId: fund.id,
-      fundName: fund.name,
-      amount: input.amount,
-      currency: input.currency,
-      frequency: input.frequency,
-      status: 'pending',
-      method: null,
-      pan: input.pan && fund.taxDeductible && !fcra ? input.pan : null,
-      donorCitizenship: fcra ? 'OTHER' : 'IN',
-      fcra,
-      provider: 'demo',
-      providerRef: null,
-      providerPaymentId: null,
-      createdAt: ctx.now.toISOString(),
-      paidAt: null,
-      eventId: null,
-      receiptNumber: null,
-    };
-    const co = await ctx.env.checkout(d, { description: `${fund.name} · ${s.name}`, fundTaxDeductible: fund.taxDeductible });
-    const saved = ctx.db.put('donations', {
-      ...d,
-      provider: co.provider,
-      providerRef: co.providerRef,
-      status: co.status ?? 'pending',
-      paidAt: co.status === 'succeeded' ? ctx.now.toISOString() : null,
-      method: co.status === 'succeeded' ? 'upi' : null,
-    });
-    if (saved.status === 'succeeded') onDonationSucceeded(ctx, saved);
-    return { donationId: d.id, checkoutUrl: co.checkoutUrl };
+    const out = await giftIntent(ctx, ctx.body);
+    return { donationId: out.donation.id, checkoutUrl: out.checkoutUrl };
   });
   r.get('/giving/donations', {}, (ctx) => {
     const me = ctx.me();
@@ -144,18 +152,30 @@ export function registerGiving(r: Router) {
     const me = ctx.me();
     return ctx.db.all('pledges').filter((p) => p.personId === me).map((p) => pledgeView(ctx, p));
   });
-  r.post('/giving/pledges', {}, (ctx) => {
+  r.post('/giving/pledges', {}, async (ctx) => {
     const me = find(ctx, 'people', ctx.me(), 'Profile');
     requireFields(ctx.body, ['fundId', 'amount', 'endDate']);
     const fund = find(ctx, 'funds', ctx.body.fundId, 'Fund');
     const amount = Math.round(Number(ctx.body.amount));
     if (!(amount >= 100)) throw new ApiError(422, 'invalid', 'Enter an amount.', { amount: 'Required' });
     const p = ctx.db.put('pledges', { id: ctx.id('pl'), personId: me.id, personName: fullName(me), fundId: fund.id, fundName: fund.name, amount, startDate: String(ctx.body.startDate ?? dateOnly(ctx.now)).slice(0, 10), endDate: String(ctx.body.endDate).slice(0, 10), createdAt: ctx.now.toISOString() });
-    return pledgeView(ctx, p);
+    if (!ctx.body.autopay) return pledgeView(ctx, p);
+    // Pay the pledge in equal monthly AutoPay instalments until its end date.
+    const months = monthsLeft(ctx.now, p.startDate, p.endDate);
+    const monthly = Math.ceil(p.amount / months / 100) * 100;
+    try {
+      const out = await giftIntent(ctx, { amount: monthly, currency: settings(ctx).currency, fundId: fund.id, frequency: 'monthly', pan: ctx.body.pan, donorCitizenship: ctx.body.donorCitizenship }, { pledgeId: p.id, totalCount: months });
+      return { ...pledgeView(ctx, p), checkoutUrl: out.checkoutUrl, monthly, months };
+    } catch (e) {
+      ctx.db.del('pledges', p.id);
+      throw e;
+    }
   });
   r.del('/giving/pledges/:id', {}, (ctx) => {
     const p = find(ctx, 'pledges', ctx.params[0], 'Pledge');
     if (p.personId !== ctx.me()) throw new ApiError(403, 'forbidden', 'Not your pledge.');
+    if (ctx.db.all('recurring').some((g) => g.pledgeId === p.id && ['pending', 'active', 'failing', 'paused'].includes(g.status)))
+      throw new ApiError(409, 'autopay_on', 'Cancel the AutoPay for this pledge first.');
     ctx.db.del('pledges', p.id);
     return undefined;
   });

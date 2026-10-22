@@ -56,8 +56,17 @@ export function getPaymentLink(acct: RazorpayAccount, id: string) {
   return call<PaymentLink>(acct, 'GET', `/payment_links/${encodeURIComponent(id)}`);
 }
 
-export function cancelSubscription(acct: RazorpayAccount, id: string) {
-  return call<Subscription>(acct, 'POST', `/subscriptions/${encodeURIComponent(id)}/cancel`, { cancel_at_cycle_end: 1 });
+/** Plans end at the close of the paid period; a giver's monthly gift stops at once (`atCycleEnd` false). */
+export function cancelSubscription(acct: RazorpayAccount, id: string, atCycleEnd = true) {
+  return call<Subscription>(acct, 'POST', `/subscriptions/${encodeURIComponent(id)}/cancel`, { cancel_at_cycle_end: atCycleEnd ? 1 : 0 });
+}
+
+export function pauseSubscription(acct: RazorpayAccount, id: string) {
+  return call<Subscription>(acct, 'POST', `/subscriptions/${encodeURIComponent(id)}/pause`, { pause_at: 'now' });
+}
+
+export function resumeSubscription(acct: RazorpayAccount, id: string) {
+  return call<Subscription>(acct, 'POST', `/subscriptions/${encodeURIComponent(id)}/resume`, { resume_at: 'now' });
 }
 
 /** True when Razorpay accepts the keys (a harmless read). */

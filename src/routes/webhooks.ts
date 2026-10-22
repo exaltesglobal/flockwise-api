@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 
 import { config } from '../config.js';
-import { applyBillingEvent, markSetupPaid, SETUP_KIND, type BillingInterval, type PlanId } from '../core/index.js';
+import { applyBillingEvent, applyRecurringEvent, markSetupPaid, SETUP_KIND, type BillingInterval, type PlanId } from '../core/index.js';
 import { applyWebhook, churchAccounts } from '../giving.js';
 import { verifyWebhook } from '../razorpay.js';
 import type { Hub, Tenant } from '../server.js';
@@ -13,7 +13,14 @@ export function webhookRoutes(hub: Hub) {
 
   async function giving(raw: string, t: Tenant) {
     try {
-      await applyWebhook(t.store, JSON.parse(raw));
+      const evt = JSON.parse(raw);
+      await applyWebhook(t.store, evt);
+      // Keep the recurring gift (UPI AutoPay) in step: status, charges, next charge date.
+      const sub = evt.payload?.subscription?.entity;
+      if (typeof evt.event === 'string' && evt.event.startsWith('subscription.') && sub?.id) {
+        const pay = evt.payload?.payment?.entity;
+        applyRecurringEvent(t.engine.systemCtx(), { event: evt.event, ref: sub.id, currentEnd: sub.current_end ?? null, amount: pay?.amount, method: pay?.method === 'upi' ? 'upi' : pay?.method === 'card' ? 'card' : pay?.method ? 'netbanking' : null });
+      }
     } catch (e) {
       console.error('Webhook handling failed', e);
       return false;

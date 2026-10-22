@@ -270,7 +270,26 @@ export function seedDemo(db: Db, env: Env) {
       }),
     );
   }
-  for (let mo = 0; mo < 6; mo++) db.put('donations', gift({ donorId: DEMO_MEMBER, donorName: 'Priya Thomas', donorEmail: 'priya@example.com', fundId: 'fd_tithe', amount: 500000, frequency: 'monthly', createdAt: at(-20 - mo * 30, 10), pan: 'ABCPT1234K' }));
+  for (let mo = 0; mo < 6; mo++) db.put('donations', gift({ donorId: DEMO_MEMBER, donorName: 'Priya Thomas', donorEmail: 'priya@example.com', fundId: 'fd_tithe', amount: 500000, frequency: 'monthly', createdAt: at(-20 - mo * 30, 10), pan: 'ABCPT1234K', method: 'upi', providerRef: 'sub_demo_priya' }));
+  // Monthly gifts on UPI AutoPay (Razorpay subscriptions), in every state the office sees.
+  const recurring = (o: Partial<Collections['recurring']> & Pick<Collections['recurring'], 'id' | 'donorId' | 'donorName' | 'fundId' | 'amount' | 'chargedCount'>) => {
+    const fund = funds.find((f) => f.id === o.fundId)!;
+    db.put('recurring', {
+      fundName: fund.name, currency: 'INR', status: 'active', providerRef: `sub_demo_${o.id}`, fcra: false, method: 'upi', pledgeId: null, totalCount: null,
+      totalGiven: o.amount * o.chargedCount, lastChargedAt: at(-20, 10), nextChargeAt: at(10, 10), createdAt: at(-20 - (o.chargedCount - 1) * 30, 10), endedAt: null, ...o,
+    });
+  };
+  recurring({ id: 'rg_priya', donorId: DEMO_MEMBER, donorName: 'Priya Thomas', fundId: 'fd_tithe', amount: 500000, chargedCount: 6, providerRef: 'sub_demo_priya' });
+  const states: Collections['recurring']['status'][] = ['active', 'active', 'active', 'active', 'active', 'active', 'active', 'failing', 'paused', 'halted', 'pending'];
+  for (const [i, p] of adults.slice(30, 30 + states.length).entries()) {
+    const status = states[i];
+    const charged = status === 'pending' ? 0 : 2 + (i % 9);
+    recurring({
+      id: `rg_${i + 1}`, donorId: p.id, donorName: `${p.firstName} ${p.lastName}`, fundId: i % 4 === 3 ? 'fd_missions' : 'fd_tithe', amount: pick([100000, 200000, 250000, 500000, 1000000]), chargedCount: charged, status,
+      method: status === 'pending' ? null : i % 5 === 4 ? 'card' : 'upi', lastChargedAt: charged ? at(-15 - i, 10) : null, nextChargeAt: ['halted', 'pending'].includes(status) ? null : at(15 - i, 10),
+    });
+  }
+  recurring({ id: 'rg_pledge', donorId: adults[10].id, donorName: `${adults[10].firstName} ${adults[10].lastName}`, fundId: 'fd_building', amount: 250000, chargedCount: 3, pledgeId: 'pl_2', totalCount: 12 });
   db.put('donations', gift({ donorId: DEMO_MEMBER, donorName: 'Priya Thomas', fundId: 'fd_missions', amount: 100000, createdAt: at(-45, 12), method: 'card' }));
   db.put('pledges', { id: 'pl_1', personId: DEMO_MEMBER, personName: 'Priya Thomas', fundId: 'fd_building', fundName: 'Building Fund', amount: 6000000, startDate: at(-90, 0).slice(0, 10), endDate: at(275, 0).slice(0, 10), createdAt: at(-90, 10) });
   db.put('donations', gift({ donorId: DEMO_MEMBER, donorName: 'Priya Thomas', fundId: 'fd_building', amount: 1500000, createdAt: at(-60, 11), pan: 'ABCPT1234K' }));

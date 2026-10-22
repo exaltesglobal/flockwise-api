@@ -44,7 +44,7 @@ export type Env = {
   deliver(channel: Channel, batch: Outgoing[]): Promise<DeliveryResult[]>;
   channels(): ChannelStatus;
   /** Starts a hosted checkout for a pending donation row and returns where to send the donor. */
-  checkout(donation: DonationRecord, opts: { description: string; fundTaxDeductible: boolean }): Promise<{ checkoutUrl: string; providerRef: string | null; provider: DonationRecord['provider']; status?: DonationRecord['status'] }>;
+  checkout(donation: DonationRecord, opts: { description: string; fundTaxDeductible: boolean; totalCount?: number; pledgeId?: string }): Promise<{ checkoutUrl: string; providerRef: string | null; provider: DonationRecord['provider']; status?: DonationRecord['status'] }>;
   /** Where the member portal lives, for links in messages. */
   webUrl: string;
   /** Calls the Chitthi API (WhatsApp) with a church's key. */
@@ -62,6 +62,12 @@ export type Env = {
     oneTime?(input: { churchId: string; kind: string; amount: number; description: string; email: string; name: string; returnUrl: string }): Promise<{ url: string; providerRef: string }>;
     /** Asks Razorpay whether a one-time payment link was paid, in case the webhook is late. */
     linkPaid?(providerRef: string): Promise<boolean>;
+  };
+  /** Pauses, resumes or cancels a giver's Razorpay subscription on the church's account. Absent in the demo, where it applies at once. */
+  subscriptions?: {
+    pause(ref: string, fcra: boolean): Promise<void>;
+    resume(ref: string, fcra: boolean): Promise<void>;
+    cancel(ref: string, fcra: boolean): Promise<void>;
   };
   /** Checks a church's Razorpay keys with Razorpay. Absent in the demo. */
   verifyRazorpay?: (keyId: string, keySecret: string) => Promise<boolean>;

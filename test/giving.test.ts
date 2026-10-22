@@ -182,3 +182,52 @@ test('http: API keys, MCP endpoint and sealed Chitthi key', async () => {
   assert.ok(!rec.apiKeySealed.includes('realkey'));
   assert.equal(server.env.unseal(rec.apiKeySealed), 'chk_live_realkey1234567890');
 });
+
+test('UPI AutoPay: the recurring gift follows Razorpay, and the giver can pause, resume and cancel', async () => {
+  const mine = async () => (await app.request('/v1/giving/recurring', json('GET', undefined, member.accessToken))).json();
+  let [g] = await mine();
+  assert.equal(g.fundId, 'fd_building');
+  assert.equal(g.status, 'active');
+  assert.equal(g.chargedCount, 2);
+  assert.equal(g.totalGiven, 500000);
+  assert.equal(g.method, 'upi');
+
+  const sub = (event: string, extra = {}) => hook({ event, payload: { subscription: { entity: { id: 'sub_1', status: 'x', current_end: 1_900_000_000, ...extra } } } });
+  await sub('subscription.pending');
+  assert.equal((await mine())[0].status, 'failing');
+  const admin = await (await app.request('/v1/admin/giving/recurring?status=attention', json('GET', undefined, owner.accessToken))).json();
+  assert.equal(admin.rows.length, 1);
+  assert.equal(admin.summary.failing, 1);
+  await sub('subscription.activated');
+  g = (await mine())[0];
+  assert.equal(g.status, 'active');
+  assert.equal(g.nextChargeAt, new Date(1_900_000_000_000).toISOString());
+
+  calls.length = 0;
+  const paused = await (await app.request(`/v1/giving/recurring/${g.id}/pause`, json('POST', {}, member.accessToken))).json();
+  assert.equal(paused.status, 'paused');
+  assert.deepEqual(calls.at(-1), { path: '/subscriptions/sub_1/pause', body: { pause_at: 'now' } });
+  assert.equal((await app.request(`/v1/giving/recurring/${g.id}/pause`, json('POST', {}, member.accessToken))).status, 409);
+  await app.request(`/v1/giving/recurring/${g.id}/resume`, json('POST', {}, member.accessToken));
+  assert.equal(calls.at(-1)!.path, '/subscriptions/sub_1/resume');
+  const cancelled = await (await app.request(`/v1/giving/recurring/${g.id}/cancel`, json('POST', {}, member.accessToken))).json();
+  assert.equal(cancelled.status, 'cancelled');
+  assert.deepEqual(calls.at(-1), { path: '/subscriptions/sub_1/cancel', body: { cancel_at_cycle_end: 0 } });
+});
+
+test('a pledge can be paid by monthly AutoPay instalments', async () => {
+  calls.length = 0;
+  const end = new Date();
+  end.setUTCMonth(end.getUTCMonth() + 9);
+  const res = await app.request('/v1/giving/pledges', json('POST', { fundId: 'fd_building', amount: 1_000_000, endDate: end.toISOString().slice(0, 10), autopay: true }, member.accessToken));
+  const p = await res.json();
+  assert.equal(res.status, 200, JSON.stringify(p));
+  assert.equal(p.months, 10);
+  assert.equal(p.monthly, 100_000);
+  assert.equal(p.checkoutUrl, 'https://rzp.io/i/sub');
+  const s = calls.find((c) => c.path === '/subscriptions')!;
+  assert.equal(s.body.total_count, 10);
+  assert.equal(s.body.notes.pledge_id, p.id);
+  assert.equal(p.autopay.status, 'pending');
+  assert.equal((await app.request(`/v1/giving/pledges/${p.id}`, json('DELETE', undefined, member.accessToken))).status, 409, 'cancel the AutoPay first');
+});

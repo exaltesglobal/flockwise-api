@@ -5,7 +5,7 @@ import { config, type RazorpayAccount } from './config.js';
 import { razorpayConfig, type Db, type Env } from './core/index.js';
 import type { RazorpaySealed } from './core/types.js';
 import { ApiError } from './errors.js';
-import { createPaymentLink, createPlan, createSubscription } from './razorpay.js';
+import { cancelSubscription, createPaymentLink, createPlan, createSubscription, pauseSubscription, resumeSubscription } from './razorpay.js';
 import type { Donation, PaymentMethod, Store } from './store/types.js';
 
 export const newId = (prefix: string) => `${prefix}_${randomBytes(9).toString('base64url')}`;
@@ -16,6 +16,21 @@ export function churchAccounts(t: { db: Db; env: Env; isDefault: boolean }): { m
   const open = (a: RazorpaySealed | null | undefined): RazorpayAccount | null => (a ? { keyId: a.keyId, keySecret: t.env.unseal(a.keySecretSealed), webhookSecret: t.env.unseal(a.webhookSecretSealed) } : null);
   if (c) return { main: open(c.main), fcra: open(c.fcra) };
   return t.isDefault ? { main: config.razorpay.main, fcra: config.razorpay.fcra } : { main: null, fcra: null };
+}
+
+/** env.subscriptions for the engine: a giver pausing, resuming or cancelling a monthly gift. */
+export function razorpaySubscriptions(t: { db: Db; env: Env; isDefault: boolean }): NonNullable<Env['subscriptions']> {
+  const acct = (fcra: boolean) => {
+    const { main, fcra: f } = churchAccounts(t);
+    const a = fcra ? f : main;
+    if (!a) throw new ApiError(409, 'no_keys', 'This church’s Razorpay account is not connected, so the gift cannot be changed here. Please contact the church office.');
+    return a;
+  };
+  return {
+    pause: async (ref, fcra) => void (await pauseSubscription(acct(fcra), ref)),
+    resume: async (ref, fcra) => void (await resumeSubscription(acct(fcra), ref)),
+    cancel: async (ref, fcra) => void (await cancelSubscription(acct(fcra), ref, false)),
+  };
 }
 
 /** Gifts from foreign citizens / OCI holders to an Indian church must go to its FCRA account. */
@@ -35,7 +50,7 @@ export function razorpayCheckout(t: { id: string; db: Db; env: Env; isDefault: b
     const { acct } = accountFor(t, d.donorCitizenship);
     if (!acct) {
       // No Razorpay keys yet: the built-in test checkout lets you try the whole flow.
-      return { checkoutUrl: `${config.apiPublicUrl}/v1/dev/checkout/${d.id}?church=${encodeURIComponent(t.id)}`, providerRef: null, provider: 'fake' };
+      return { checkoutUrl: `${config.apiPublicUrl}/v1/dev/checkout/${d.id}?church=${encodeURIComponent(t.id)}`, providerRef: d.frequency === 'monthly' ? `test_sub_${d.id}` : null, provider: 'fake' };
     }
     const notes = { donation_id: d.id, church_id: t.id, fund: d.fundName, member_id: d.donorId ?? '' };
     if (d.frequency === 'once') {
@@ -56,7 +71,7 @@ export function razorpayCheckout(t: { id: string; db: Db; env: Env; isDefault: b
       planId = (await createPlan(acct, { amount: d.amount, currency: d.currency, name: `Monthly gift ${d.amount / 100} ${d.currency}` })).id;
       await store.savePlanId(planKey, planId);
     }
-    const sub = await createSubscription(acct, { planId, notes });
+    const sub = await createSubscription(acct, { planId, notes: opts.pledgeId ? { ...notes, pledge_id: opts.pledgeId } : notes, totalCount: opts.totalCount });
     return { checkoutUrl: sub.short_url, providerRef: sub.id, provider: 'razorpay' };
   };
 }
