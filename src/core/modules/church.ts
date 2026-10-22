@@ -303,7 +303,7 @@ export function registerChurch(r: Router) {
   r.get('/admin/settings', {}, (ctx) => ({ ...settings(ctx), id: churchId(ctx) }));
   r.patch('/admin/settings', { perm: 'settings' }, (ctx) => {
     const s = settings(ctx);
-    const patch = pick<Collections['settings']>(ctx.body, ['name', 'city', 'address', 'phone', 'email', 'website', 'timezone', 'languages', 'logoUrl', 'childAgeLimit']);
+    const patch = pick<Collections['settings']>(ctx.body, ['name', 'city', 'address', 'phone', 'email', 'website', 'timezone', 'languages', 'logoUrl', 'childAgeLimit', 'zoneLabel']);
     const next = {
       ...s,
       ...patch,

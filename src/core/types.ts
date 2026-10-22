@@ -122,10 +122,12 @@ export type Person = {
   custom?: Record<string, string | number | boolean | null>;
   /** Personal check-in code, encoded in the member's QR as FW1:<code>. */
   checkinCode: string;
+  /** The zone, prayer cell or family unit the household belongs to. */
+  zoneId?: string | null;
 };
 
 export type PersonInput = Partial<Omit<Person, 'id' | 'joinedAt' | 'lastAttendedAt' | 'groups' | 'checkinCode'>> & { firstName: string; lastName: string };
-export type PeopleQuery = { q?: string; status?: PersonStatus | ''; campusId?: string; tag?: string; cursor?: string };
+export type PeopleQuery = { q?: string; status?: PersonStatus | ''; campusId?: string; zoneId?: string; tag?: string; cursor?: string };
 export type PeoplePage = { data: Person[]; nextCursor: string | null; total: number };
 export type ImportSource = 'excel' | 'csv' | 'elvanto' | 'planning_center';
 export type ImportResult = { created: number; updated: number; skipped: number; errors: { row: number; message: string }[] };
@@ -452,6 +454,8 @@ export type ChurchSettings = Church & {
   screenKey?: string;
   /** AI requests allowed each month (the plan's allowance). */
   aiMonthlyLimit?: number;
+  /** The church's own word for a zone: Zone, Prayer cell, Kudumba unit, Ward, Area. */
+  zoneLabel?: string;
 };
 
 export type Permission =
@@ -829,6 +833,64 @@ export type Certificate = {
   copy: number;
 };
 
+/** A zone, area, prayer cell or family unit (kudumba unit, ward) that households belong to. */
+export type Zone = {
+  id: string;
+  name: string;
+  /** An area can contain smaller units. */
+  parentId: string | null;
+  leaderIds: string[];
+  meetingDay: string | null;
+  area: string | null;
+  notes: string | null;
+  active: boolean;
+  createdAt: string;
+};
+export type ZoneView = Zone & {
+  leaders: { id: string; name: string; phone: string | null }[];
+  families: number;
+  people: number;
+  visitedThisYear: number;
+  lastVisitAt: string | null;
+  children: number;
+};
+export type ZoneFamily = {
+  /** The household name, or `solo:<personId>` for someone without a household. */
+  key: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  people: { id: string; name: string; status: PersonStatus; age: number | null }[];
+  lastVisitAt: string | null;
+  visitsThisYear: number;
+  nextVisitOn: string | null;
+};
+export type ZoneDetail = { zone: ZoneView; families: ZoneFamily[]; visits: VisitView[]; units: ZoneView[] };
+export type VisitPurpose = 'home' | 'new_family' | 'hospital' | 'house_blessing' | 'bereavement' | 'other';
+export type Visit = {
+  id: string;
+  /** The household visited (same key as ZoneFamily). */
+  familyKey: string;
+  familyName: string;
+  personIds: string[];
+  zoneId: string | null;
+  purpose: VisitPurpose;
+  status: 'planned' | 'done' | 'cancelled';
+  plannedFor: string | null;
+  visitedOn: string | null;
+  /** Staff ids, and names for visitors who are not staff. */
+  visitorIds: string[];
+  visitorNames: string[];
+  notes: string | null;
+  prayerPoints: string | null;
+  followUp: string | null;
+  confidential: boolean;
+  createdAt: string;
+  createdBy: string;
+};
+export type VisitView = Visit & { zoneName: string | null; visitors: string[] };
+export type ZoneReportRow = { zoneId: string | null; zoneName: string; families: number; visited: number; percent: number; visitsDone: number; planned: number };
+
 export type Collections = {
   settings: ChurchSettings & { id: string };
   integrations: ChitthiConfig | RazorpayConfig;
@@ -880,6 +942,8 @@ export type Collections = {
   groupResources: GroupResource;
   sermons: Sermon;
   registers: RegisterEntry;
+  zones: Zone;
+  visits: Visit;
 };
 export type Kind = keyof Collections;
 export const KINDS = [
@@ -888,5 +952,5 @@ export const KINDS = [
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys',
-  'registers',
+  'registers', 'zones', 'visits',
 ] as const satisfies readonly Kind[];

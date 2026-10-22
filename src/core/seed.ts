@@ -490,4 +490,53 @@ export function seedDemo(db: Db, env: Env) {
   reg('confirmation', `${thisYear}-05-25`, 'Rohan Thomas', { birthDate: `${thisYear - 15}-02-09`, baptismDate: `${thisYear - 15}-04-15`, baptismPlace: 'Grace Community Church, Hyderabad', fatherName: 'Thomas Mathew', motherName: 'Mercy Thomas', sponsor: 'David Samuel' });
   reg('burial', `${thisYear}-06-12`, 'Mathew Abraham', { deathDate: `${thisYear}-06-10`, age: '84', relation: 'Husband of Annamma Abraham', address: 'Kukatpally, Hyderabad', causeOfDeath: 'Old age', cemetery: 'Christian Cemetery, Narayanguda', graveNumber: 'C-114' });
   reg('transfer', `${thisYear}-07-03`, 'Sam and Rebecca John', { toChurch: 'St. Mark’s CSI Church, Bengaluru', toAddress: 'MG Road, Bengaluru 560001', memberSince: '2016-03-06', family: 'Their children Aaron and Hannah John', reason: 'Moving for work' });
+
+  // ----- zones and home visits -----
+  db.put('settings', { ...db.get('settings', 'church')!, zoneLabel: 'Prayer cell' });
+  const zoneDefs = [
+    { id: 'zn_kondapur', name: 'Kondapur', area: 'Kondapur, Kothaguda', meetingDay: 'Wednesday 7:30 pm', match: ['Kondapur', 'Kothaguda'] },
+    { id: 'zn_madhapur', name: 'Madhapur & Hitech City', area: 'Madhapur, Hitech City, Gachibowli', meetingDay: 'Thursday 7:30 pm', match: ['Madhapur', 'Gachibowli', 'Hitech'] },
+    { id: 'zn_secbad', name: 'Secunderabad', area: 'Secunderabad, Begumpet', meetingDay: 'Friday 7 pm', match: ['Secunderabad', 'Begumpet', 'Bowenpally'] },
+    { id: 'zn_kukatpally', name: 'Kukatpally & Miyapur', area: 'Kukatpally, Miyapur, KPHB', meetingDay: 'Tuesday 7:30 pm', match: ['Kukatpally', 'Miyapur', 'KPHB'] },
+  ];
+  const adultsByZone = new Map<string, Collections['people'][]>();
+  const zonePeople = db.all('people').filter((p) => p.status !== 'inactive');
+  zonePeople.forEach((p, i) => {
+    const hit = zoneDefs.find((z) => z.match.some((m) => (p.address ?? '').includes(m)));
+    // Most households are in a cell; a few are still waiting to be placed.
+    const zone = hit ?? (i % 6 === 5 ? null : zoneDefs[i % zoneDefs.length]);
+    if (!zone) return;
+    db.put('people', { ...db.get('people', p.id)!, zoneId: zone.id });
+    if (!p.birthDate || Number(p.birthDate.slice(0, 4)) < new Date(now).getUTCFullYear() - 25) adultsByZone.set(zone.id, [...(adultsByZone.get(zone.id) ?? []), p]);
+  });
+  // Households share a zone with their first member.
+  const firstZone = new Map<string, string | null | undefined>();
+  for (const p of db.all('people')) {
+    if (!p.householdName) continue;
+    if (!firstZone.has(p.householdName)) firstZone.set(p.householdName, p.zoneId);
+    else if (p.zoneId !== firstZone.get(p.householdName)) db.put('people', { ...p, zoneId: firstZone.get(p.householdName) ?? null });
+  }
+  for (const z of zoneDefs) {
+    const leaders = (adultsByZone.get(z.id) ?? []).filter((p) => p.id !== DEMO_MEMBER).slice(0, 2).map((p) => p.id);
+    db.put('zones', { id: z.id, name: z.name, parentId: null, leaderIds: leaders, meetingDay: z.meetingDay, area: z.area, notes: null, active: true, createdAt: iso(now - 300 * DAY) });
+  }
+  const famKey = (p: Collections['people']) => (p.householdName ? `h:${p.householdName}` : `solo:${p.id}`);
+  const fams = new Map<string, Collections['people'][]>();
+  for (const p of db.all('people').filter((x) => x.zoneId && x.status !== 'inactive')) fams.set(famKey(p), [...(fams.get(famKey(p)) ?? []), p]);
+  const purposes = ['home', 'home', 'home', 'new_family', 'hospital', 'house_blessing'] as const;
+  const notesFor: Record<(typeof purposes)[number], string[]> = {
+    home: ['Prayed together for the children’s exams.', 'Father’s job situation; pray for steady work.', 'Grandmother unwell; would like communion at home.', 'New baby; family asked for a dedication date.'],
+    new_family: ['Moved from Kerala last month. Shared the cell meeting details.'],
+    hospital: ['Recovering after surgery, doing well.'],
+    house_blessing: ['Blessed the new flat. Joyful time with neighbours.'],
+  };
+  [...fams.entries()].forEach(([key, members], i) => {
+    if (i % 3 === 2) return; // about a third not visited yet this year
+    const daysAgo = 10 + ((i * 37) % 240);
+    const purpose = purposes[i % purposes.length];
+    db.put('visits', { id: id('vs'), familyKey: key, familyName: key.startsWith('h:') ? key.slice(2) : `${members[0].firstName} ${members[0].lastName}`, personIds: members.map((p) => p.id), zoneId: members[0].zoneId ?? null, purpose, status: 'done', plannedFor: null, visitedOn: iso(now - daysAgo * DAY).slice(0, 10), visitorIds: [i % 2 ? 'st_4' : 'st_1'], visitorNames: i % 4 === 0 ? ['Cell leader'] : [], notes: notesFor[purpose][i % notesFor[purpose].length], prayerPoints: null, followUp: i % 5 === 0 ? 'Visit again next month' : null, confidential: false, createdAt: iso(now - daysAgo * DAY), createdBy: 'Pastor Samuel Raj' });
+  });
+  [...fams.entries()].filter((_, i) => i % 3 === 2).slice(0, 4).forEach(([key, members], i) => {
+    db.put('visits', { id: id('vs'), familyKey: key, familyName: key.startsWith('h:') ? key.slice(2) : `${members[0].firstName} ${members[0].lastName}`, personIds: members.map((p) => p.id), zoneId: members[0].zoneId ?? null, purpose: 'home', status: 'planned', plannedFor: iso(now + (i + 1) * 2 * DAY).slice(0, 10), visitedOn: null, visitorIds: ['st_1'], visitorNames: [], notes: null, prayerPoints: null, followUp: null, confidential: false, createdAt: iso(now), createdBy: 'Pastor Samuel Raj' });
+  });
 }

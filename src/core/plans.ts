@@ -62,7 +62,7 @@ const GATES: [RegExp, PlanId][] = [
   [/^\/admin\/api-keys/, 'cathedral'],
   [/^\/admin\/ai\/briefing/, 'cathedral'],
   [/^\/admin\/(services|songs|workflows|workflow-cards|people-fields|bookings|resources|calendar|insights|presentation|ai\/(?!status))/, 'thrive'],
-  [/^\/admin\/(checkin|volunteers|groups|forms|care|sermons|integrations|registers)/, 'grow'],
+  [/^\/admin\/(checkin|volunteers|groups|forms|care|sermons|integrations|registers|zones|visits)/, 'grow'],
   [/^\/admin\/giving\/(pledges|receipts|batches|statements|10bd|form)/, 'grow'],
 ];
 

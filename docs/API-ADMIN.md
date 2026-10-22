@@ -367,3 +367,18 @@ Baptism, confirmation, marriage and burial registers, plus membership transfer l
 - `POST /admin/registers/:id/notes` (people.edit) `{ text }`.
 - `POST /admin/registers/:id/void` (owner, admin or pastor) `{ reason }`: entries are never deleted.
 - `POST /admin/registers/:id/certificate` (people.view) → `Certificate` (rows to print, or the letter text for a transfer) and counts the copy.
+
+## Zones and home visits (Grow plan)
+
+Zones are areas, prayer cells or family units (the church picks its own word in `settings.zoneLabel`). Households (people sharing `householdName`) belong to a zone through each person's `zoneId`; a zone can sit inside a larger area (`parentId`) and its counts include its units.
+
+- `GET /admin/zones` (people.view) → `ZoneView[]` with leaders, families, people, `visitedThisYear` and `lastVisitAt`.
+- `GET /admin/zones/:id` (people.view) → `ZoneDetail`: the zone, its families (last visit, visits this year, next planned), recent visits and units.
+- `POST /admin/zones`, `PATCH /admin/zones/:id` (people.edit) `{ name, parentId?, leaderIds?, meetingDay?, area?, notes?, active? }`.
+- `DELETE /admin/zones/:id` (people.edit): people and units move up to the parent area.
+- `POST /admin/zones/:id/members` (people.edit) `{ personIds }`: brings each person's whole household. `DELETE /admin/zones/:id/families/:key` removes a household.
+- `GET /admin/zones/report?since=YYYY-MM-DD` (people.view) → families visited per zone since 1 January (or `since`).
+- `GET /admin/visits?status=planned|done|cancelled&zoneId=&mine=1&familyKey=` (people.view) → `VisitView[]`. Confidential notes are hidden except from owners, admins, pastors and the visitors.
+- `GET /admin/visits/due?since=&zoneId=` (people.view) → member and regular families with no visit since 1 January (or `since`).
+- `POST /admin/visits` (care) `{ personId | familyKey, date, status?: 'done', purpose, visitorIds?, visitorNames?, notes?, prayerPoints?, followUp?, confidential? }` plans or logs a visit for the person's household.
+- `PATCH /admin/visits/:id` (care) marks done or cancelled, moves the date, edits notes. `DELETE /admin/visits/:id` (care) removes a planned visit; visits that happened stay on record.

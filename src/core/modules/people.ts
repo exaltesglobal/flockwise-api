@@ -35,12 +35,12 @@ function countExisting(ctx: Ctx, rows: Record<string, unknown>[]) {
 
 const EDITABLE: (keyof PersonInput)[] = [
   'firstName', 'lastName', 'phone', 'email', 'gender', 'birthDate', 'status', 'householdName', 'address', 'language', 'tags', 'notes',
-  'campusId', 'baptismDate', 'anniversary', 'allergies', 'medicalNotes', 'consent',
+  'campusId', 'baptismDate', 'anniversary', 'allergies', 'medicalNotes', 'consent', 'zoneId',
 ];
 
 function cleanInput(body: Record<string, unknown>) {
   const input = pick<PersonInput>(body, EDITABLE);
-  for (const k of ['phone', 'email', 'birthDate', 'householdName', 'address', 'notes', 'baptismDate', 'anniversary', 'allergies', 'medicalNotes'] as const)
+  for (const k of ['phone', 'email', 'birthDate', 'householdName', 'address', 'notes', 'baptismDate', 'anniversary', 'allergies', 'medicalNotes', 'zoneId'] as const)
     if (input[k] === '') input[k] = null;
   if (input.email) input.email = normEmail(input.email);
   if (input.birthDate && !/^\d{4}-\d{2}-\d{2}$/.test(input.birthDate)) throw new ApiError(422, 'invalid', 'Birth date should be a date.', { birthDate: 'Use YYYY-MM-DD' });
@@ -206,6 +206,7 @@ export function registerPeople(r: Router) {
       .filter((p) => !status || p.status === status)
       .filter((p) => !tag || p.tags.includes(tag))
       .filter((p) => !campusId || p.campusId === campusId)
+      .filter((p) => !ctx.query.zoneId || (ctx.query.zoneId === 'none' ? !p.zoneId : p.zoneId === ctx.query.zoneId))
       .sort((x, y) => x.lastName.localeCompare(y.lastName) || x.firstName.localeCompare(y.firstName));
     const res = page(list, ctx.query.cursor);
     return { ...res, data: res.data.map((p) => personView(ctx, p)) };

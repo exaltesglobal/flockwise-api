@@ -20,10 +20,11 @@ import { createMcp } from './mcp.js';
 import { bindAiHandle, registerAi } from './modules/ai.js';
 import { registerBilling } from './modules/billing.js';
 import { registerRegisters } from './modules/registers.js';
+import { registerZones } from './modules/zones.js';
 import { ApiError } from './errors.js';
 import { atLeast, effectivePlan, getSubscription } from './plans.js';
 
-export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry, registerCelebrations, registerPresent, registerIntegrations, registerAi, registerBilling, registerPayments, registerRegisters];
+export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry, registerCelebrations, registerPresent, registerIntegrations, registerAi, registerBilling, registerPayments, registerRegisters, registerZones];
 
 export function createChurchEngine(db: Db, env: Env) {
   const engine = createEngine(db, env, MODULES);
@@ -48,6 +49,7 @@ export { Db, type Dump, type Env };
 export { ApiError };
 export * from './plans.js';
 export { REGISTER_FIELDS, REGISTER_KINDS, REGISTER_LABELS } from './modules/registers.js';
+export { VISIT_PURPOSES } from './modules/zones.js';
 export type { AiBlock, AiMessage, AiRequest, AiResponse, AuthClaims, DeliveryResult, Outgoing, Request } from './engine.js';
 export { onDonationSucceeded } from './modules/giving.js';
 export { DEMO_CODE } from './modules/auth.js';
