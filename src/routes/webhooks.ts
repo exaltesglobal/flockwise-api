@@ -6,7 +6,7 @@ import { applyWebhook, churchAccounts } from '../giving.js';
 import { verifyChitthi, verifyWebhook } from '../razorpay.js';
 import type { Hub, Tenant } from '../server.js';
 
-type RzpNotes = { church_id?: string; kind?: string; plan?: string; interval?: string };
+type RzpNotes = { church_id?: string; kind?: string; plan?: string; interval?: string; chitthi?: string };
 
 export function webhookRoutes(hub: Hub) {
   const app = new Hono();
@@ -102,6 +102,7 @@ export function webhookRoutes(hub: Hub) {
         type,
         plan: notes.plan as PlanId,
         interval: notes.interval as BillingInterval,
+        chitthi: notes.chitthi === '1',
         providerRef: sub.id,
         periodEnd: sub.current_end ? new Date(sub.current_end * 1000).toISOString() : null,
       });

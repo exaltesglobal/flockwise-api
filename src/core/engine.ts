@@ -7,7 +7,7 @@ import { permsOf, scopeOf, type Scope } from './perms.js';
 import { atLeast, checkPlan, effectivePlan, getSubscription, type BillingInterval, type PlanId } from './plans.js';
 import type { CatalogSong, Channel, ChannelStatus, ChurchNetworkHost, Collections, DonationRecord, Kind, Permission, StaffRole } from './types.js';
 
-export type BillingCheckout = { churchId: string; churchName: string; plan: PlanId; interval: BillingInterval; currency: 'INR' | 'USD'; amount: number; email: string; name: string };
+export type BillingCheckout = { churchId: string; churchName: string; plan: PlanId; interval: BillingInterval; currency: 'INR' | 'USD'; amount: number; email: string; name: string; /** Add-ons billed with the plan, e.g. ['chitthi']. */ addons?: string[] };
 /** `html` is the branded version of `text`; providers send both when it is there. */
 export type Outgoing = { to: string; name: string; subject: string; text: string; html?: string };
 export type DeliveryResult = { ok: boolean; error?: string };

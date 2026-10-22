@@ -986,6 +986,21 @@ export type ChitthiStatus = {
   connected: boolean; workspace: string; keyHint: string; template: string; language: string; params: number;
   connectedAt: string | null; lastError: string | null; lastSentAt: string | null; signupUrl: string;
 };
+/** WhatsApp by Chitthi bought with the plan: our team makes the workspace, registers the number and connects the key. */
+export type ChitthiSetupStatus = 'requested' | 'in_progress' | 'ready' | 'cancelled';
+export type ChitthiSetup = {
+  id: 'chitthiSetup';
+  status: ChitthiSetupStatus;
+  requestedAt: string;
+  requestedBy: string;
+  requestedByEmail: string;
+  /** The WhatsApp number the church wants to send from, and the business name Meta should show. */
+  phone: string;
+  businessName: string;
+  readyAt: string | null;
+  /** A note from the Flockwise team that the church sees. */
+  teamNote: string;
+};
 export type ChitthiTemplate = { name: string; language: string; category: string; body: string; params: number };
 
 /** The church's own mailbox (Gmail, Google Workspace, Outlook, Hostinger or any SMTP). Every email leaves from it. */
@@ -1209,7 +1224,7 @@ export type AccountsSummary = {
 
 export type Collections = {
   settings: ChurchSettings & { id: string };
-  integrations: ChitthiConfig | RazorpayConfig | RazorpaySetup | WaBotConfig | EmailAccountConfig | ZoomConfig | GcsConfig | CanvaConfig | SongLicenceConfig;
+  integrations: ChitthiConfig | RazorpayConfig | RazorpaySetup | ChitthiSetup | WaBotConfig | EmailAccountConfig | ZoomConfig | GcsConfig | CanvaConfig | SongLicenceConfig;
   media: MediaItem;
   canvaDesigns: CanvaDesign;
   kycFiles: KycFile;

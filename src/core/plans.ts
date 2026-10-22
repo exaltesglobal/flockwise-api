@@ -74,6 +74,9 @@ export const FEATURES: { group: string; items: { label: string; from: PlanId; no
 
 /** Add-ons a church can buy on top of its plan. */
 export const AI_PACK = { kind: 'ai_pack', credits: 500, price: { INR: 49_900, USD: 900 } } as const;
+/** WhatsApp by Chitthi on the same invoice: a Chitthi workspace our team sets up and connects. A month at a time; yearly is ten months. Cathedral has it included. */
+export const CHITTHI_ADDON = { kind: 'chitthi', price: { INR: 99_900, USD: 1_200 }, includedFrom: 'cathedral' as PlanId } as const;
+export const chitthiIncluded = (plan: PlanId) => PLAN_ORDER.indexOf(plan) >= PLAN_ORDER.indexOf(CHITTHI_ADDON.includedFrom);
 /** Extra AI credits bought this month. */
 export const aiExtra = (db: Db, month: string) => Number(db.get('meta', `ai-extra:${month}`)?.value ?? 0);
 export const TRIAL_DAYS = 30;
@@ -139,6 +142,8 @@ export type Subscription = {
   founding?: boolean;
   /** A per-church people limit set by the Flockwise team (custom deals). */
   peopleLimit?: number | null;
+  /** WhatsApp by Chitthi is on this subscription (billed with the plan). */
+  chitthi?: boolean;
   updatedAt: string;
 };
 
@@ -217,14 +222,15 @@ export function checkLimit(db: Db, now: Date, what: 'people' | 'staff' | 'campus
   throw new ApiError(402, 'plan_limit', `Your plan includes up to ${limits[what].toLocaleString('en-IN')} ${label}. Upgrade in Settings › Plan and billing to add more.`, { limit: String(limits[what]) });
 }
 
-export function priceFor(plan: PlanId, currency: string, interval: BillingInterval) {
+export function priceFor(plan: PlanId, currency: string, interval: BillingInterval, chitthi = false) {
   const cur = currency === 'INR' ? 'INR' : 'USD';
-  return { currency: cur, amount: PLANS[plan].price[cur][interval] } as const;
+  const addon = chitthi && !chitthiIncluded(plan) ? CHITTHI_ADDON.price[cur] * (interval === 'yearly' ? 10 : 1) : 0;
+  return { currency: cur, amount: PLANS[plan].price[cur][interval] + addon } as const;
 }
 
 /** Monthly recurring revenue of a subscription in its currency's smallest unit. */
 export function monthlyValue(sub: Subscription, currency: string, now: Date) {
   if (sub.founding || sub.status !== 'active' || effectivePlan(sub, now) === 'seed') return 0;
-  const p = priceFor(sub.plan, currency, sub.interval);
+  const p = priceFor(sub.plan, currency, sub.interval, !!sub.chitthi);
   return sub.interval === 'yearly' ? Math.round(p.amount / 12) : p.amount;
 }

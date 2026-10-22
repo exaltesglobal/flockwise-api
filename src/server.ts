@@ -103,13 +103,14 @@ export function createHub() {
     const acct = config.billing!;
     return {
       async checkout(input) {
-        const key = `bplan:${input.plan}:${input.interval}:${input.currency}:${input.amount}`;
+        const addons = input.addons?.length ? `+${input.addons.join('+')}` : '';
+        const key = `bplan:${input.plan}${addons}:${input.interval}:${input.currency}:${input.amount}`;
         let planId = platform.db.get('meta', key)?.value;
         if (!planId) {
-          planId = (await createPlan(acct, { amount: input.amount, currency: input.currency, name: `Flockwise ${input.plan} (${input.interval})`, period: input.interval })).id;
+          planId = (await createPlan(acct, { amount: input.amount, currency: input.currency, name: `Flockwise ${input.plan}${addons} (${input.interval})`, period: input.interval })).id;
           platform.db.put('meta', { id: key, value: planId });
         }
-        const sub = await createSubscription(acct, { planId, totalCount: input.interval === 'yearly' ? 10 : 120, notes: { kind: 'flockwise_plan', church_id: input.churchId, plan: input.plan, interval: input.interval } });
+        const sub = await createSubscription(acct, { planId, totalCount: input.interval === 'yearly' ? 10 : 120, notes: { kind: 'flockwise_plan', church_id: input.churchId, plan: input.plan, interval: input.interval, ...(input.addons?.includes('chitthi') ? { chitthi: '1' } : {}) } });
         return { url: sub.short_url, providerRef: sub.id };
       },
       async cancel(ref) {

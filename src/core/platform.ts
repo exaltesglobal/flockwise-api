@@ -10,6 +10,7 @@ import type { createChurchEngine } from './index.js';
 import { activePeople } from './modules/people.js';
 import { createNetworks } from './network.js';
 import { songTeamRoute, storedSongs } from './catalog/team.js';
+import { teamChitthiRow, teamUpdateChitthi } from './modules/chitthi-setup.js';
 import { SETUP_FEE, teamReadDoc, teamSetupRow, teamUpdateSetup } from './modules/razorpay-setup.js';
 import { effectivePlan, getSubscription, monthlyValue, PLAN_ORDER, PLANS, saveSubscription, startTrial, type PlanId, type Subscription } from './plans.js';
 import type { Currency, Session } from './types.js';
@@ -229,6 +230,7 @@ export function createPlatform({ db, env, host, admins }: PlatformOpts) {
       messages,
       signups: weeks,
       razorpaySetupsOpen: rows.filter((r) => ['paid', 'in_progress'].includes(host.get(r.id) ? (teamSetupRow(host.get(r.id)!.db)?.status ?? '') : '')).length,
+      chitthiSetupsOpen: rows.filter((r) => ['requested', 'in_progress'].includes(host.get(r.id) ? (teamChitthiRow(host.get(r.id)!.db)?.status ?? '') : '')).length,
     };
   }
 
@@ -239,6 +241,7 @@ export function createPlatform({ db, env, host, admins }: PlatformOpts) {
     if (method === 'GET' && a === 'audit') return db.all('audit').sort((x, y) => y.at.localeCompare(x.at)).slice(0, 200);
     if (method === 'GET' && a === 'plans') return PLAN_ORDER.map((p) => PLANS[p]);
     if (a === 'razorpay-setups') return setupRoute(method, id, b, parts[3], body, email);
+    if (a === 'chitthi-setups') return chitthiRoute(method, id, body, email);
     if (a !== 'churches') throw new ApiError(404, 'not_found', 'Not found.');
     if (method === 'GET' && !id) {
       const q = norm(query.q);
@@ -294,6 +297,29 @@ export function createPlatform({ db, env, host, admins }: PlatformOpts) {
       saveSubscription(engine.db, next);
       teamLog(email, 'plan', e.id, `Set ${e.name} to ${PLANS[next.plan].name} (${next.founding ? 'founding' : next.status})${body.trialDays ? `, trial +${body.trialDays} days` : ''}`);
       return churchRow(e);
+    }
+    throw new ApiError(404, 'not_found', 'Not found.');
+  }
+
+  /** WhatsApp by Chitthi across every church: workspaces to make and keys to paste. */
+  async function chitthiRoute(method: string, id: string | undefined, body: Record<string, unknown>, email: string): Promise<unknown> {
+    if (method === 'GET' && !id) {
+      const rows = entries().flatMap((e) => {
+        const eng = host.get(e.id);
+        const row = eng ? teamChitthiRow(eng.db) : null;
+        return row ? [{ ...row, churchId: e.id, churchName: e.name, city: e.city, ownerEmail: e.ownerEmail, plan: churchRow(e).plan }] : [];
+      });
+      const order = ['requested', 'in_progress', 'ready', 'cancelled'];
+      rows.sort((x, y) => order.indexOf(x.status) - order.indexOf(y.status) || x.requestedAt.localeCompare(y.requestedAt));
+      return { open: rows.filter((r) => r.status === 'requested' || r.status === 'in_progress').length, rows };
+    }
+    const e = entry(String(id));
+    const eng = e ? host.get(e.id) : undefined;
+    if (!e || !eng) throw new ApiError(404, 'not_found', 'Church not found.');
+    if (method === 'PATCH') {
+      const next = await teamUpdateChitthi(eng.systemCtx(), body);
+      teamLog(email, 'chitthi', e.id, `WhatsApp by Chitthi for ${e.name}: ${next.status}${next.connected ? ' (connected)' : ''}${next.teamNote ? ` (${next.teamNote})` : ''}`);
+      return { ...next, churchId: e.id, churchName: e.name };
     }
     throw new ApiError(404, 'not_found', 'Not found.');
   }

@@ -26,6 +26,24 @@ function emailStatus(ctx: Ctx): EmailAccountStatus {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Checks a Chitthi API key with Chitthi and stores it sealed. Used by the office and by the Flockwise team when it sets a workspace up for a church. */
+export async function connectChitthi(ctx: Ctx, rawKey: string, templateBody: Record<string, unknown> = {}, by = 'Flockwise team'): Promise<ChitthiConfig> {
+  const apiKey = rawKey.trim();
+  if (!/^chk_(live|test)_[A-Za-z0-9_-]{8,}$/.test(apiKey)) throw new ApiError(400, 'invalid_key', 'Paste the API key from Chitthi › Settings › Developer. It starts with chk_live_.');
+  const res = await ctx.env.chitthi(apiKey, { method: 'GET', path: '/api/integrations/hooks' }).catch(() => null);
+  if (!res) throw new ApiError(502, 'chitthi_unreachable', 'Could not reach Chitthi. Try again in a minute.');
+  if (res.status === 401) throw new ApiError(400, 'invalid_key', 'Chitthi did not accept this key. Make a new one in Chitthi › Settings › Developer.');
+  if (res.status >= 300) throw new ApiError(502, 'chitthi_error', errMessage(res.data, res.status));
+  const now = ctx.now.toISOString();
+  const t = cleanTemplate(templateBody);
+  const c: ChitthiConfig = ctx.db.put('integrations', {
+    id: 'chitthi', apiKeySealed: ctx.env.seal(apiKey), keyHint: `${apiKey.slice(0, 9)}…${apiKey.slice(-4)}`, workspace: String(res.data?.workspace ?? 'Chitthi'),
+    ...t, connectedAt: now, connectedBy: by, lastError: null, lastSentAt: null,
+  } satisfies ChitthiConfig) as ChitthiConfig;
+  ctx.audit('connected', 'integration', 'chitthi', `Connected Chitthi workspace ${c.workspace} for WhatsApp`);
+  return c;
+}
+
 /** Channel status with WhatsApp marked as going through Chitthi when the church connected it. */
 export function channelStatus(ctx: Ctx): ChannelStatus {
   const base = ctx.env.channels();
@@ -118,19 +136,7 @@ If you did not do this, change the mailbox password.` }]).catch((e: Error) => [{
   });
 
   r.post('/admin/integrations/chitthi', { perm: 'settings' }, async (ctx) => {
-    const apiKey = String(ctx.body.apiKey ?? '').trim();
-    if (!/^chk_(live|test)_[A-Za-z0-9_-]{8,}$/.test(apiKey)) throw new ApiError(400, 'invalid_key', 'Paste the API key from Chitthi › Settings › Developer. It starts with chk_live_.');
-    const res = await ctx.env.chitthi(apiKey, { method: 'GET', path: '/api/integrations/hooks' }).catch(() => null);
-    if (!res) throw new ApiError(502, 'chitthi_unreachable', 'Could not reach Chitthi. Try again in a minute.');
-    if (res.status === 401) throw new ApiError(400, 'invalid_key', 'Chitthi did not accept this key. Make a new one in Chitthi › Settings › Developer.');
-    if (res.status >= 300) throw new ApiError(502, 'chitthi_error', errMessage(res.data, res.status));
-    const now = ctx.now.toISOString();
-    const t = cleanTemplate(ctx.body);
-    const c: ChitthiConfig = ctx.db.put('integrations', {
-      id: 'chitthi', apiKeySealed: ctx.env.seal(apiKey), keyHint: `${apiKey.slice(0, 9)}…${apiKey.slice(-4)}`, workspace: String(res.data?.workspace ?? 'Chitthi'),
-      ...t, connectedAt: now, connectedBy: ctx.staff!.name, lastError: null, lastSentAt: null,
-    } satisfies ChitthiConfig) as ChitthiConfig;
-    ctx.audit('connected', 'integration', 'chitthi', `Connected Chitthi workspace ${c.workspace} for WhatsApp`);
+    await connectChitthi(ctx, String(ctx.body.apiKey ?? ''), ctx.body, ctx.staff!.name);
     return chitthiStatus(ctx);
   });
 
