@@ -1,0 +1,28 @@
+{
+  "name": "flockwise-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Flockwise backend API. v0.1 covers giving with Razorpay; auth, people and the rest of docs/API.md follow.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p .",
+    "start": "node dist/index.js",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc -p . --noEmit",
+    "token": "tsx src/token.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.5",
+    "hono": "^4.13.13",
+    "mysql2": "^3.24.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}
