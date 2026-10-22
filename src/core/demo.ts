@@ -28,6 +28,20 @@ export function createDemoEnv(opts: { now?: () => Date; webUrl?: string } = {}):
     channels: () => ({ email: { configured: false, provider: 'demo' }, sms: { configured: false, provider: 'demo' }, whatsapp: { configured: false, provider: 'demo' } }),
     checkout: async () => ({ checkoutUrl: '', providerRef: null, provider: 'demo', status: 'succeeded' }),
     webUrl: opts.webUrl ?? '',
+    // A stand-in Chitthi: any well-formed key works except ones containing "bad".
+    chitthi: async (apiKey, req) => {
+      if (apiKey.includes('bad')) return { status: 401, data: { error: { message: 'Missing or invalid API key.' } } };
+      if (req.path === '/api/integrations/hooks') return { status: 200, data: { workspace: 'Grace Church WhatsApp', hooks: [] } };
+      if (req.path === '/api/v1/templates') return { status: 200, data: { data: [{ name: 'church_update', language: 'en', category: 'UTILITY', body: 'Hello from church: {{1}}', params: 1 }, { name: 'church_update_hi', language: 'hi', category: 'UTILITY', body: 'नमस्ते {{1}}, {{2}}', params: 2 }] } };
+      if (req.path === '/api/v1/messages') {
+        const b = req.body as { to: string; text?: string; template?: string; params?: string[] };
+        outbox.push({ channel: 'whatsapp', to: b.to, subject: b.template ? `chitthi:${b.template}` : 'chitthi', text: b.text ?? (b.params ?? []).join(' | ') });
+        return { status: 201, data: { id: 'msg_demo', wa_message_id: 'wamid.demo', conversation_id: 'cv_demo' } };
+      }
+      return { status: 404, data: { error: { message: 'Not found' } } };
+    },
+    seal: (v) => `demo:${v}`,
+    unseal: (v) => v.replace(/^demo:/, ''),
   };
 }
 

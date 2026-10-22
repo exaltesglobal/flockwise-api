@@ -15,13 +15,18 @@ import { registerCelebrations } from './modules/celebrations.js';
 import { registerMinistry } from './modules/ministry.js';
 import { registerPresent } from './modules/present.js';
 import { registerWorkflows } from './modules/workflows.js';
+import { registerIntegrations } from './modules/integrations.js';
+import { createMcp } from './mcp.js';
 
-export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry, registerCelebrations, registerPresent];
+export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry, registerCelebrations, registerPresent, registerIntegrations];
 
 export function createChurchEngine(db: Db, env: Env) {
   const engine = createEngine(db, env, MODULES);
+  const mcp = createMcp(engine.handle, engine.verifyKey);
   return {
     ...engine,
+    /** The MCP server: one JSON-RPC message in, the reply out (null for notifications). */
+    mcp: (body: unknown, apiKey: string | null | undefined) => mcp(body, apiKey, db.get('settings', 'church')?.name ?? 'the church'),
     /** Runs scheduled messages and daily automations. Safe to call often. */
     tick: () => runDue(makeCtx(db, env, { auth: null })),
     /** A system context, for adapters (e.g. the payment webhook). */

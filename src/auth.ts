@@ -1,6 +1,6 @@
 // Access tokens are HS256 JWTs signed with JWT_SECRET and valid for an hour. Refresh
 // tokens are random, stored hashed by the engine, and rotated on every refresh.
-import { createHash, createHmac, randomInt, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 
 import { config } from './config.js';
 import type { AuthClaims } from './core/index.js';
@@ -41,4 +41,19 @@ export function randomString(length: number, alphabet: string) {
   let out = '';
   for (let i = 0; i < length; i++) out += alphabet[randomInt(alphabet.length)];
   return out;
+}
+
+// Sealing for stored partner credentials (AES-256-GCM, key derived from JWT_SECRET).
+const sealKey = () => createHash('sha256').update(`${config.jwtSecret}:seal`).digest();
+export function seal(value: string) {
+  const iv = randomBytes(12);
+  const c = createCipheriv('aes-256-gcm', sealKey(), iv);
+  const enc = Buffer.concat([c.update(value, 'utf8'), c.final()]);
+  return `v1.${Buffer.concat([iv, c.getAuthTag(), enc]).toString('base64url')}`;
+}
+export function unseal(sealed: string) {
+  const raw = Buffer.from(sealed.replace(/^v1\./, ''), 'base64url');
+  const d = createDecipheriv('aes-256-gcm', sealKey(), raw.subarray(0, 12));
+  d.setAuthTag(raw.subarray(12, 28));
+  return Buffer.concat([d.update(raw.subarray(28)), d.final()]).toString('utf8');
 }

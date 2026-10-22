@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 
@@ -47,7 +47,11 @@ export function createApp(engine: Engine, store: Store) {
     if (path === '/auth/otp/request' && limited(`otp:${ip}`, 20, 3600_000)) throw new ApiError(429, 'too_many_codes', 'Too many sign-in attempts from this network. Please try again later.');
     if (path.startsWith('/public/') && c.req.method !== 'GET' && limited(`public:${ip}`, 30, 3600_000)) throw new ApiError(429, 'too_many_requests', 'Too many submissions from this network. Please try again later.');
     if (path === '/auth/otp/verify' && limited(`verify:${ip}`, 40, 3600_000)) throw new ApiError(429, 'too_many_attempts', 'Too many attempts. Please try again later.');
-    const auth = verifyAccess(c.req.header('authorization')?.replace(/^Bearer\s+/i, ''));
+    const bearer = c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
+    // Integrations call with a church API key; people call with a short-lived access token.
+    const apiKey = bearer?.startsWith('fw_live_') ? bearer : null;
+    if (apiKey && limited(`key:${apiKey.slice(0, 16)}`, 600, 60_000)) throw new ApiError(429, 'rate_limited', 'Too many requests for this API key. Slow down to 600 a minute.');
+    const auth = apiKey ? null : verifyAccess(bearer);
     let body: unknown = undefined;
     if (c.req.method !== 'GET' && c.req.method !== 'DELETE') {
       const text = await c.req.text();
@@ -58,10 +62,31 @@ export function createApp(engine: Engine, store: Store) {
         throw new ApiError(400, 'bad_json', 'The request was not valid JSON.');
       }
     }
-    const result = await engine.handle({ method: c.req.method, path, query: c.req.query(), body, auth, ip });
+    const result = await engine.handle({ method: c.req.method, path, query: c.req.query(), body, auth, apiKey, ip });
     if (result === undefined) return c.body(null, 204);
     return c.json(result as object, c.req.method === 'POST' && /\/(intents|ticket)$/.test(path) ? 201 : 200);
   });
+
+  // MCP server for AI assistants (Streamable HTTP; stateless, JSON replies). docs/MCP.md
+  app.use('/mcp', cors({ origin: '*', allowHeaders: ['Authorization', 'Content-Type', 'Mcp-Protocol-Version', 'Mcp-Session-Id'], allowMethods: ['POST', 'GET', 'DELETE'] }));
+  app.get('/mcp', (c) => c.json({ error: { code: 'method_not_allowed', message: 'POST JSON-RPC messages to this URL.' } }, 405));
+  app.delete('/mcp', (c) => c.body(null, 405));
+  // The key can also be part of the URL, for assistants that only take a connector URL.
+  const mcpPost = async (c: Context, key: string | null) => {
+    if (key && limited(`key:${key.slice(0, 16)}`, 600, 60_000)) throw new ApiError(429, 'rate_limited', 'Too many requests for this API key.');
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }, 400);
+    }
+    const out = await engine.mcp(body, key);
+    return out === null ? c.body(null, 202) : c.json(out as object);
+  };
+  app.post('/mcp', (c) => mcpPost(c, c.req.header('authorization')?.replace(/^Bearer\s+/i, '') ?? null));
+  app.use('/mcp/:key', cors({ origin: '*', allowHeaders: ['Content-Type', 'Mcp-Protocol-Version', 'Mcp-Session-Id'], allowMethods: ['POST', 'GET', 'DELETE'] }));
+  app.post('/mcp/:key', (c) => mcpPost(c, c.req.param('key')));
+  app.get('/mcp/:key', (c) => c.json({ error: { code: 'method_not_allowed', message: 'POST JSON-RPC messages to this URL.' } }, 405));
 
   app.notFound((c) => c.json({ error: { code: 'not_found', message: 'Not found.' } }, 404));
   return app;

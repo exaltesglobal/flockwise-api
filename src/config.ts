@@ -52,6 +52,8 @@ export const config = {
     template: env.WHATSAPP_TEMPLATE ?? '',
     templateLang: env.WHATSAPP_TEMPLATE_LANG ?? 'en',
   },
+  /** Chitthi (Agape Labs' WhatsApp platform). Each church connects its own workspace key in Settings. */
+  chitthiUrl: (env.CHITTHI_URL ?? 'https://app.chitthi.live').replace(/\/$/, ''),
 };
 
 export type RazorpayAccount = { keyId: string; keySecret: string; webhookSecret: string };

@@ -1,7 +1,7 @@
 // Builds the engine with the server's hooks (JWT, email, SMS, WhatsApp, Razorpay).
 import { randomBytes } from 'node:crypto';
 
-import { hashSecret, randomString, signAccess } from './auth.js';
+import { hashSecret, randomString, seal, signAccess, unseal } from './auth.js';
 import { config } from './config.js';
 import { bootstrapChurch, createChurchEngine, Db, type Env } from './core/index.js';
 import type { Currency } from './core/types.js';
@@ -24,6 +24,17 @@ export function buildServer(db = new Db()) {
     channels: channelStatus,
     checkout: (d, o) => razorpayCheckout(store!)(d, o),
     webUrl: config.webUrl,
+    chitthi: async (apiKey, req) => {
+      const res = await fetch(`${config.chitthiUrl}${req.path}`, {
+        method: req.method,
+        headers: { Authorization: `Bearer ${apiKey}`, ...(req.body ? { 'Content-Type': 'application/json' } : {}) },
+        body: req.body ? JSON.stringify(req.body) : undefined,
+        signal: AbortSignal.timeout(15_000),
+      });
+      return { status: res.status, data: await res.json().catch(() => null) };
+    },
+    seal,
+    unseal,
   };
   const engine = createChurchEngine(db, env);
   store = coreStore(engine);

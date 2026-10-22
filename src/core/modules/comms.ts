@@ -6,6 +6,7 @@ import type { Ctx, Router } from '../engine.js';
 import type { Audience, AudiencePreview, Automations, Channel, Collections, Message, MessageInput } from '../types.js';
 import { checkinsFor, DAY, find, fullName, localDate, localHour, pick, requireFields, rsvpsFor, settings } from '../util.js';
 import { sendStaffDigest } from './celebrations.js';
+import { channelStatus, deliverAll } from './integrations.js';
 import { listMembers, runListWorkflows } from './workflows.js';
 
 const CHANNELS: Channel[] = ['email', 'sms', 'whatsapp'];
@@ -92,10 +93,10 @@ async function deliver(ctx: Ctx, msg: Message, people: Collections['people'][]):
   let sent = 0;
   let failed = 0;
   for (let i = 0; i < batch.length; i += 100) {
-    const results = await ctx.env.deliver(msg.channel, batch.slice(i, i + 100)).catch(() => batch.slice(i, i + 100).map(() => ({ ok: false })));
+    const results = await deliverAll(ctx, msg.channel, batch.slice(i, i + 100)).catch(() => batch.slice(i, i + 100).map(() => ({ ok: false })));
     for (const r of results) r.ok ? sent++ : failed++;
   }
-  const simulated = !ctx.env.channels()[msg.channel].configured;
+  const simulated = !channelStatus(ctx)[msg.channel].configured;
   return ctx.db.put('messages', {
     ...msg,
     status: failed && !sent ? 'failed' : 'sent',
@@ -242,7 +243,7 @@ export function newCase(ctx: Ctx, p: Collections['people'], type: Collections['c
 
 export function registerComms(r: Router) {
   r.get('/admin/messages', { perm: 'comms' }, (ctx) => ({ data: ctx.db.all('messages').sort((x, y) => (y.sentAt ?? y.scheduledAt ?? y.createdAt).localeCompare(x.sentAt ?? x.scheduledAt ?? x.createdAt)).slice(0, 200), nextCursor: null }));
-  r.get('/admin/messages/channels', { perm: 'comms' }, (ctx) => ctx.env.channels());
+  r.get('/admin/messages/channels', { perm: 'comms' }, (ctx) => channelStatus(ctx));
   r.post('/admin/messages/audience', { perm: 'comms' }, (ctx): AudiencePreview => {
     const channel = (CHANNELS.includes(ctx.body.channel) ? ctx.body.channel : 'email') as Channel;
     const people = resolveAudience(ctx, ctx.body.audience ?? { type: 'everyone', ids: [] });

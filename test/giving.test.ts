@@ -154,3 +154,27 @@ test('return page redirects to the web app', async () => {
   assert.equal(res.status, 302);
   assert.equal(res.headers.get('location'), 'https://app.example/app/give?payment=cancelled');
 });
+
+test('http: API keys, MCP endpoint and sealed Chitthi key', async () => {
+  const owner = (await signIn('owner@church.test', 'admin')).accessToken;
+  const made = await (await app.request('/v1/admin/api-keys', json('POST', { name: 'Claude', access: 'full' }, owner))).json();
+  assert.match(made.secret, /^fw_live_/);
+  const me = await app.request('/v1/admin/settings', json('GET', undefined, made.secret));
+  assert.equal(me.status, 200);
+  const bad = await app.request('/v1/admin/settings', json('GET', undefined, 'fw_live_nope'));
+  assert.equal(bad.status, 401);
+  const init = await (await app.request('/mcp', json('POST', { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }, made.secret))).json();
+  assert.equal(init.result.serverInfo.name, 'flockwise');
+  const note = await app.request(`/mcp/${made.secret}`, json('POST', { jsonrpc: '2.0', method: 'notifications/initialized' }));
+  assert.equal(note.status, 202);
+  const tools = await (await app.request(`/mcp/${made.secret}`, json('POST', { jsonrpc: '2.0', id: 2, method: 'tools/list' }))).json();
+  assert.ok(tools.result.tools.length > 10);
+  const anon = await app.request('/mcp', json('POST', { jsonrpc: '2.0', id: 1, method: 'initialize' }));
+  assert.equal(anon.status, 401);
+  // Chitthi: the test fetch answers 200 for anything, so the key is accepted; it must be stored sealed.
+  const st = await (await app.request('/v1/admin/integrations/chitthi', json('POST', { apiKey: 'chk_live_realkey1234567890' }, owner))).json();
+  assert.equal(st.connected, true);
+  const rec = server.db.get('integrations', 'chitthi')!;
+  assert.ok(!rec.apiKeySealed.includes('realkey'));
+  assert.equal(server.env.unseal(rec.apiKeySealed), 'chk_live_realkey1234567890');
+});

@@ -26,10 +26,15 @@ export type Env = {
   checkout(donation: DonationRecord, opts: { description: string; fundTaxDeductible: boolean }): Promise<{ checkoutUrl: string; providerRef: string | null; provider: DonationRecord['provider']; status?: DonationRecord['status'] }>;
   /** Where the member portal lives, for links in messages. */
   webUrl: string;
+  /** Calls the Chitthi API (WhatsApp) with a church's key. */
+  chitthi(apiKey: string, req: { method: 'GET' | 'POST'; path: string; body?: unknown }): Promise<{ status: number; data: any }>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  /** Encrypts a stored credential (e.g. a partner API key) and reads it back. */
+  seal(value: string): string;
+  unseal(sealed: string): string;
 };
 
 /** What a signed access token says. The engine re-reads the staff role from the database on each request. */
-export type AuthClaims = { sub: string; staffId: string | null; scope: 'admin' | 'member' };
+export type AuthClaims = { sub: string; staffId: string | null; scope: 'admin' | 'member'; keyId?: string; readOnly?: boolean };
 
 export type Request = {
   method: string;
@@ -37,6 +42,8 @@ export type Request = {
   query?: Record<string, string | undefined>;
   body?: unknown;
   auth: AuthClaims | null;
+  /** A public API key (fw_live_...), when the caller is an integration rather than a signed-in person. */
+  apiKey?: string | null;
   ip?: string;
 };
 
@@ -117,9 +124,30 @@ export function createEngine(db: Db, env: Env, modules: ((r: Router) => void)[])
   const router = new Router();
   for (const m of modules) m(router);
 
+  /** Turns an API key into the claims of the staff member who made it. */
+  function keyAuth(token: string): AuthClaims {
+    const bad = () => new ApiError(401, 'invalid_api_key', 'This API key is not valid or has been revoked.');
+    const hash = env.hash(token);
+    const key = db.all('apiKeys').find((k) => k.hash === hash && !k.revokedAt);
+    if (!key) throw bad();
+    const staff = db.get('staff', key.staffId);
+    // Office staff may have no member profile linked; their sign-in profile is found by email.
+    const personId = staff?.personId ?? db.all('people').find((p) => p.email?.toLowerCase() === staff?.email.toLowerCase())?.id;
+    if (!staff || staff.status !== 'active' || !personId) throw bad();
+    const today = env.now().toISOString();
+    if (key.lastUsedAt?.slice(0, 10) !== today.slice(0, 10)) db.put('apiKeys', { ...key, lastUsedAt: today });
+    return { sub: personId, staffId: staff.id, scope: 'admin', keyId: key.id, readOnly: key.access === 'read' };
+  }
+
   async function handle(req: Request): Promise<unknown> {
     const method = req.method.toUpperCase();
     const path = req.path.replace(/\/+$/, '') || '/';
+    if (!req.auth && req.apiKey) {
+      req = { ...req, auth: keyAuth(req.apiKey) };
+      // Keys reach church data only; they cannot make more keys, change connections or change staff roles.
+      if (!path.startsWith('/admin/') || /^\/admin\/(api-keys|integrations)/.test(path) || (path.startsWith('/admin/staff') && method !== 'GET')) throw new ApiError(403, 'forbidden', 'API keys cannot use this endpoint.');
+      if (req.auth!.readOnly && method !== 'GET') throw new ApiError(403, 'read_only_key', 'This API key can only read. Make a full-access key to change data.');
+    }
     for (const route of router.routes) {
       if (route.method !== method) continue;
       const match = route.re.exec(path);
@@ -139,7 +167,7 @@ export function createEngine(db: Db, env: Env, modules: ((r: Router) => void)[])
     throw new ApiError(404, 'not_found', `No endpoint for ${method} ${path}.`);
   }
 
-  return { handle, router, db, env };
+  return { handle, router, db, env, verifyKey: keyAuth };
 }
 
 export type Engine = ReturnType<typeof createEngine>;

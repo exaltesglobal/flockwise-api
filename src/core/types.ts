@@ -742,8 +742,39 @@ export type SongStats = {
   keys: { key: string; uses: number }[];
 };
 
+// ---------- integrations ----------
+
+/** The church's Chitthi connection: WhatsApp messages go out through its Chitthi workspace. */
+export type ChitthiConfig = {
+  id: 'chitthi';
+  /** The Chitthi API key, sealed by the host; never sent to the browser. */
+  apiKeySealed: string;
+  keyHint: string;
+  workspace: string;
+  /** Approved template for messages outside the 24-hour window; empty sends plain text. */
+  template: string;
+  language: string;
+  /** How many {{n}} body values the template takes. */
+  params: number;
+  connectedAt: string;
+  connectedBy: string;
+  lastError: string | null;
+  lastSentAt: string | null;
+};
+export type ChitthiStatus = {
+  connected: boolean; workspace: string; keyHint: string; template: string; language: string; params: number;
+  connectedAt: string | null; lastError: string | null; lastSentAt: string | null; signupUrl: string;
+};
+export type ChitthiTemplate = { name: string; language: string; category: string; body: string; params: number };
+
+/** A key for the public API and the MCP server. It acts as the staff member who made it. */
+export type ApiKeyRecord = { id: string; name: string; prefix: string; hash: string; staffId: string; access: 'read' | 'full'; createdAt: string; lastUsedAt: string | null; revokedAt: string | null };
+export type ApiKeyView = Omit<ApiKeyRecord, 'hash'> & { createdByName: string };
+
 export type Collections = {
   settings: ChurchSettings & { id: string };
+  integrations: ChitthiConfig;
+  apiKeys: ApiKeyRecord;
   automations: Automations & { id: string };
   greetings: Greeting;
   presentations: PresentationState;
@@ -797,5 +828,5 @@ export const KINDS = [
   'funds', 'donations', 'pledges', 'plans', 'announcements', 'staff', 'rooms', 'checkins', 'teams', 'assignments', 'blockouts',
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
-  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations',
+  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys',
 ] as const satisfies readonly Kind[];
