@@ -423,3 +423,14 @@ A monthly gift (`frequency: 'monthly'` on `POST /giving/intents`) is a Razorpay 
 | POST | `/admin/giving/recurring/:id/cancel` | giving.edit. |
 
 The statuses are `pending` (not approved yet), `active`, `failing` (a charge failed and Razorpay is retrying), `paused`, `halted` (retries ran out), `cancelled` and `completed`.
+
+## WhatsApp assistant (Grow plan, needs Chitthi)
+
+People message the church's WhatsApp number (run on Chitthi) and get an answer at once. The menu is 1 service times, 2 events this week, 3 prayer request, 4 give online, 5 latest sermon, 6 "I'm new here" and 7 talk to someone. Common words also work in English and Hindi, such as "hi", "namaste", "prayer", "tithe" and "time". STOP and START change the person's WhatsApp consent.
+
+- A prayer request is saved for pastors only. "I'm new" adds a visitor tagged `WhatsApp` with a follow-up care case. "Talk" opens a care case.
+- `GET /admin/integrations/whatsapp-bot` returns the status (`WaBotStatus`): on or off, the welcome line, counts for the last 30 days and the latest 50 messages.
+- `POST /admin/integrations/whatsapp-bot` with `{ welcome? }` turns the assistant on, or saves the welcome line. The first time, it subscribes a Chitthi webhook (`message.received`) to `POST /v1/webhooks/chitthi/<churchId>`. Chitthi's Growth plan is needed for webhooks, and without it the call answers 402 `chitthi_plan`.
+- `DELETE /admin/integrations/whatsapp-bot` turns it off and removes the Chitthi webhook.
+- `POST /admin/integrations/whatsapp-bot/try` with `{ text }` returns `{ intent, reply }` without sending anything or saving anything.
+- The webhook checks the `Chitthi-Signature` header (`t=<unix>,v1=<hex HMAC-SHA256 of "t.body">`, 5 minutes tolerance) with the secret Chitthi returned when the hook was made. It answers 410 when the church is unknown or the assistant is off, so Chitthi stops sending. Replies go out through Chitthi `POST /api/v1/messages` as free text. Customers who message first are inside WhatsApp's 24-hour window, so no template is needed.

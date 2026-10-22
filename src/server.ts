@@ -65,6 +65,7 @@ export function createHub() {
       verifyRazorpay: checkKeys,
       serverPaymentKeys: isDefault && !!config.razorpay.main,
       razorpayPartnerUrl: config.razorpayPartnerUrl,
+      webhookBase: `${config.apiPublicUrl}/v1/webhooks`,
       ...(config.billing ? { billing: billingHooks() } : {}),
       ...(aiConfigured() ? { ai: claude } : {}),
     };

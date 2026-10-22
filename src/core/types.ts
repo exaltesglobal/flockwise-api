@@ -950,9 +950,10 @@ export type AccountsSummary = {
 
 export type Collections = {
   settings: ChurchSettings & { id: string };
-  integrations: ChitthiConfig | RazorpayConfig | RazorpaySetup;
+  integrations: ChitthiConfig | RazorpayConfig | RazorpaySetup | WaBotConfig;
   kycFiles: KycFile;
   recurring: RecurringGift;
+  botMessages: BotMessage;
   apiKeys: ApiKeyRecord;
   automations: Automations & { id: string };
   greetings: Greeting;
@@ -1013,7 +1014,7 @@ export const KINDS = [
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys',
-  'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring',
+  'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages',
 ] as const satisfies readonly Kind[];
 
 // ----- assisted Razorpay setup: Flockwise's team opens the church's Razorpay account and does its KYC -----
@@ -1083,3 +1084,30 @@ export type RecurringGift = {
   endedAt: string | null;
 };
 export type RecurringSummary = { active: number; monthly: number; failing: number; pending: number; currency: Currency };
+
+// ----- WhatsApp assistant: answers members and visitors on the church's WhatsApp number (through Chitthi) -----
+export type BotIntent = 'menu' | 'services' | 'events' | 'prayer_ask' | 'prayer' | 'give' | 'sermon' | 'new' | 'talk' | 'stop' | 'start' | 'unknown';
+export type WaBotConfig = {
+  id: 'waBot';
+  enabled: boolean;
+  /** Chitthi webhook subscription for message.received. */
+  hookId: string | null;
+  secretSealed: string | null;
+  /** First lines of the menu, e.g. "Welcome to Grace Church! 🙏" */
+  welcome: string;
+  connectedAt: string;
+  connectedBy: string;
+  lastMessageAt: string | null;
+  lastError: string | null;
+};
+export type BotMessage = { id: string; at: string; phone: string; name: string; personId: string | null; text: string; intent: BotIntent; reply: string; sent: boolean };
+export type WaBotStatus = {
+  chitthiConnected: boolean;
+  enabled: boolean;
+  welcome: string;
+  connectedAt: string | null;
+  lastMessageAt: string | null;
+  lastError: string | null;
+  last30: { messages: number; people: number; prayers: number; newcomers: number; talk: number };
+  recent: BotMessage[];
+};

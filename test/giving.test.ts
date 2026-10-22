@@ -29,6 +29,7 @@ globalThis.fetch = (async (url: string, init: RequestInit) => {
     '/payment_links': { id: 'plink_1', short_url: 'https://rzp.io/i/abc', status: 'created' },
     '/plans': { id: 'plan_1' },
     '/subscriptions': { id: 'sub_1', short_url: 'https://rzp.io/i/sub', status: 'created' },
+    '/api/integrations/hooks': { id: 'hk_1', secret: 'chitthi-hook-secret' },
   };
   return new Response(JSON.stringify(out[path] ?? {}), { status: 200 });
 }) as typeof fetch;
@@ -230,4 +231,21 @@ test('a pledge can be paid by monthly AutoPay instalments', async () => {
   assert.equal(s.body.notes.pledge_id, p.id);
   assert.equal(p.autopay.status, 'pending');
   assert.equal((await app.request(`/v1/giving/pledges/${p.id}`, json('DELETE', undefined, member.accessToken))).status, 409, 'cancel the AutoPay first');
+});
+
+test('WhatsApp assistant: subscribes a Chitthi webhook and answers signed messages only', async () => {
+  const on = await (await app.request('/v1/admin/integrations/whatsapp-bot', json('POST', {}, owner.accessToken))).json();
+  assert.equal(on.enabled, true);
+  const sub = calls.find((c) => c.path === '/api/integrations/hooks' && c.body?.event === 'message.received');
+  assert.equal(sub?.body.target_url, 'https://api.example/v1/webhooks/chitthi/ch_1');
+  const raw = JSON.stringify({ event: 'message.received', data: { contact: { phone: '+919000000077', name: 'Asha' }, text: '4', type: 'text' } });
+  const t = Math.floor(Date.now() / 1000);
+  const sig = (secret: string) => `t=${t},v1=${createHmac('sha256', secret).update(`${t}.${raw}`).digest('hex')}`;
+  const bad = await app.request('/v1/webhooks/chitthi/ch_1', { method: 'POST', body: raw, headers: { 'chitthi-signature': sig('wrong') } });
+  assert.equal(bad.status, 400);
+  const good = await app.request('/v1/webhooks/chitthi/ch_1', { method: 'POST', body: raw, headers: { 'chitthi-signature': sig('chitthi-hook-secret') } });
+  assert.equal(good.status, 200);
+  const sent = calls.find((c) => c.path === '/api/messages' && c.body?.to === '+919000000077');
+  assert.match(sent?.body.text, /app\.example\/app\/give/);
+  assert.equal((await app.request('/v1/webhooks/chitthi/nope', { method: 'POST', body: raw })).status, 410);
 });

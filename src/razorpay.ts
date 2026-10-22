@@ -103,3 +103,12 @@ export function verifyLinkCallback(p: { linkId: string; referenceId: string; sta
   const payload = `${p.linkId}|${p.referenceId}|${p.status}|${p.paymentId}`;
   return safeEqualHex(createHmac('sha256', keySecret).update(payload).digest('hex'), p.signature);
 }
+
+/** Chitthi signs webhooks as `t=<unix>,v1=<hex HMAC-SHA256 of "<t>.<body>">`. Rejects anything older than five minutes. */
+export function verifyChitthi(rawBody: string, header: string | null, secret: string, toleranceSec = 300) {
+  if (!header || !secret) return false;
+  const parts = Object.fromEntries(header.split(',').map((p) => p.trim().split('=', 2) as [string, string]));
+  const t = Number(parts.t);
+  if (!Number.isFinite(t) || !parts.v1 || Math.abs(Date.now() / 1000 - t) > toleranceSec) return false;
+  return safeEqualHex(createHmac('sha256', secret).update(`${t}.${rawBody}`).digest('hex'), parts.v1);
+}

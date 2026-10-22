@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 
 import { config } from '../config.js';
-import { applyBillingEvent, applyRecurringEvent, markSetupPaid, SETUP_KIND, type BillingInterval, type PlanId } from '../core/index.js';
+import { applyBillingEvent, applyRecurringEvent, botConfig, handleBotMessage, markSetupPaid, SETUP_KIND, type BillingInterval, type PlanId } from '../core/index.js';
 import { applyWebhook, churchAccounts } from '../giving.js';
-import { verifyWebhook } from '../razorpay.js';
+import { verifyChitthi, verifyWebhook } from '../razorpay.js';
 import type { Hub, Tenant } from '../server.js';
 
 type RzpNotes = { church_id?: string; kind?: string; plan?: string; interval?: string };
@@ -47,6 +47,21 @@ export function webhookRoutes(hub: Hub) {
     const secrets = [main?.webhookSecret, fcra?.webhookSecret].filter((s): s is string => !!s);
     if (!secrets.some((s) => verifyWebhook(raw, c.req.header('x-razorpay-signature'), s))) return c.json({ error: { code: 'bad_signature', message: 'Invalid signature' } }, 400);
     return (await giving(raw, t)) ? c.json({ ok: true }) : c.json({ ok: false }, 500);
+  });
+
+  // The WhatsApp assistant: Chitthi forwards message.received for a church's WhatsApp number.
+  app.post('/webhooks/chitthi/:church', async (c) => {
+    const t = hub.tenants.get(c.req.param('church'));
+    if (!t) return c.json({ error: { code: 'not_found', message: 'Unknown church' } }, 410); // 410 tells Chitthi to unsubscribe
+    const cfg = botConfig({ db: t.db });
+    if (!cfg?.enabled || !cfg.secretSealed) return c.json({ error: { code: 'off', message: 'The assistant is off' } }, 410);
+    const raw = await c.req.text();
+    if (!verifyChitthi(raw, c.req.header('chitthi-signature') ?? null, t.env.unseal(cfg.secretSealed))) return c.json({ error: { code: 'bad_signature', message: 'Invalid signature' } }, 400);
+    const evt = JSON.parse(raw) as { event?: string; data?: { contact?: { phone?: string; name?: string | null }; text?: string; type?: string } };
+    const phone = evt.data?.contact?.phone;
+    if (evt.event !== 'message.received' || !phone) return c.json({ ok: true, ignored: true });
+    await handleBotMessage(t.engine.systemCtx(), { phone, name: evt.data?.contact?.name ?? '', text: evt.data?.text ?? '', type: evt.data?.type });
+    return c.json({ ok: true });
   });
 
   // Churches paying Flockwise for their plan (Flockwise's own Razorpay account).

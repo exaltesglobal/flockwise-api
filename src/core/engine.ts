@@ -48,7 +48,7 @@ export type Env = {
   /** Where the member portal lives, for links in messages. */
   webUrl: string;
   /** Calls the Chitthi API (WhatsApp) with a church's key. */
-  chitthi(apiKey: string, req: { method: 'GET' | 'POST'; path: string; body?: unknown }): Promise<{ status: number; data: any }>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  chitthi(apiKey: string, req: { method: 'GET' | 'POST' | 'DELETE'; path: string; body?: unknown }): Promise<{ status: number; data: any }>; // eslint-disable-line @typescript-eslint/no-explicit-any
   /** Claude, when the server has an API key. Absent means AI features are switched off. */
   ai?: (req: AiRequest) => Promise<AiResponse>;
   /**
@@ -73,6 +73,8 @@ export type Env = {
   verifyRazorpay?: (keyId: string, keySecret: string) => Promise<boolean>;
   /** True when the host has its own Razorpay keys for this church (the server's original church). */
   serverPaymentKeys?: boolean;
+  /** Public base URL for incoming webhooks (…/v1/webhooks). Absent in the demo. */
+  webhookBase?: string;
   /** Our Razorpay partner sign-up link for assisted setup. */
   razorpayPartnerUrl?: string;
   /** Encrypts a stored credential (e.g. a partner API key) and reads it back. */
