@@ -67,6 +67,7 @@ const GATES: [RegExp, PlanId][] = [
   [/^\/admin\/offerings/, 'grow'],
   [/^\/admin\/sunday-school/, 'grow'],
   [/^\/admin\/missions/, 'grow'],
+  [/^\/admin\/livestream/, 'grow'],
 ];
 
 export type Subscription = {

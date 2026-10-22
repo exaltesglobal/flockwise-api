@@ -460,6 +460,7 @@ export type ChurchSettings = Church & {
   zoneLabel?: string;
   tally?: Partial<TallySettings>;
   privacy?: Partial<PrivacySettings>;
+  livestream?: Partial<LiveSettings>;
 };
 
 export type Permission =
@@ -975,6 +976,8 @@ export type Collections = {
   missionSupport: MissionSupport;
   missionReports: MissionReport;
   missionPayouts: MissionPayout;
+  streams: LiveStream;
+  streamViews: StreamView;
   apiKeys: ApiKeyRecord;
   automations: Automations & { id: string };
   greetings: Greeting;
@@ -1038,6 +1041,7 @@ export const KINDS = [
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
   'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
+  'streams', 'streamViews',
 ] as const satisfies readonly Kind[];
 
 // ----- assisted Razorpay setup: Flockwise's team opens the church's Razorpay account and does its KYC -----
@@ -1550,4 +1554,66 @@ export type OfflineSyncResult = {
   /** Already checked in on another desk, so nothing new was recorded for them. */
   skipped: { personId: string; name: string; securityCode: string | null }[];
   error?: string;
+};
+
+// ----- livestream: YouTube live on the church page and in the member app, with online attendance -----
+export type LiveSettings = {
+  /** The church's YouTube channel (UC…), used when no stream is scheduled. */
+  channelId: string;
+  /** Minutes someone must watch to count as attending online. */
+  countAfterMinutes: number;
+  /** Show the stream on the public church page to people who are not signed in. */
+  publicWatch: boolean;
+};
+export type LiveStatus = 'scheduled' | 'live' | 'ended';
+export type LiveStream = {
+  id: string;
+  title: string;
+  youtubeId: string;
+  eventId: string | null;
+  startsAt: string;
+  /** Set by "Go live"; a scheduled stream also counts as live from its start time. */
+  startedAt: string | null;
+  endedAt: string | null;
+  /** The online count written to the event's headcount when the stream ended. */
+  recorded: number | null;
+  createdAt: string;
+};
+/** One viewer of one stream. Viewers send a ping every minute while the video is on screen. */
+export type StreamView = {
+  id: string;
+  streamId: string;
+  /** A random id the viewer's browser keeps, or the member's person id. */
+  viewer: string;
+  personId: string | null;
+  source: 'app' | 'public';
+  /** Minutes since the stream started in which this viewer pinged. */
+  minutes: number[];
+  firstAt: string;
+  lastAt: string;
+};
+export type LiveStreamView = LiveStream & {
+  status: LiveStatus;
+  eventTitle: string | null;
+  /** Pinged in the last two minutes. */
+  watching: number;
+  viewers: number;
+  /** Watched at least countAfterMinutes. */
+  attended: number;
+  members: number;
+  avgMinutes: number;
+  peak: number;
+};
+export type LiveStreamDetail = LiveStreamView & {
+  /** Viewers in each minute from the start. */
+  timeline: { minute: number; count: number }[];
+  people: { personId: string; name: string; householdName: string | null; minutes: number; firstAt: string }[];
+  guests: number;
+};
+export type LiveOverview = { settings: LiveSettings; live: LiveStreamView | null; upcoming: LiveStreamView[]; past: LiveStreamView[] };
+/** What a viewer sees: the stream that is live, else the next one, else the channel's live page. */
+export type LiveNow = {
+  stream: { id: string; title: string; youtubeId: string; status: LiveStatus; startsAt: string; watching: number } | null;
+  channelId: string | null;
+  church: string;
 };

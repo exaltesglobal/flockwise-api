@@ -533,3 +533,23 @@ A check-in desk keeps working when the church's internet drops. Perm: `checkin`.
 | POST | `/admin/checkin/:eventId/sync` | `{items: OfflineItem[]}` (max 500), each `{clientId, personIds, method, at, code}`. Returns `{results: OfflineSyncResult[]}`. Safe to repeat: an item already synced returns its check-ins unchanged. People checked in meanwhile by another desk come back in `skipped`. The desk's security code is kept so printed labels still match. `at` is used if it is not in the future and not more than a day before the event. Room capacity and "check-in turned off" are not enforced, because the people are already in the building. |
 
 The search, check-in and label logic the desk runs offline is shared with the server in `src/core/offline-checkin.ts` (`offlineSearch`, `offlineCheckIn`, `labelsFor`). Pickups, paging and reprints need the internet.
+
+## Livestream
+
+The church's YouTube live service, embedded on the public church page (`/live`) and in the member app (`/app/live`), with online attendance. Read: `services`, `events` or `comms`. Write: `services` or `events`. Plan: Grow.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/admin/livestream` | `LiveOverview`: settings, the live stream, upcoming and the last 30 past streams with viewers, attended, members, average minutes and peak. Streams nobody ended close themselves 4 hours after they start. |
+| PUT | `/admin/livestream/settings` | `{channelId?, countAfterMinutes? (1-60, default 5), publicWatch? (default true)}`. `channelId` takes the UC… id or a youtube.com/channel/UC… link; @handles are refused. |
+| POST | `/admin/livestream/streams` | `{url, title?, eventId?, startsAt?}`. Any YouTube link (watch, youtu.be, /live/, /embed/, /shorts/). Title and start time default to the event's. |
+| GET/PATCH/DELETE | `/admin/livestream/streams/:id` | `LiveStreamDetail` adds a per-minute viewer timeline and the members who watched. DELETE removes the viewer records too; a headcount already written stays. |
+| POST | `/admin/livestream/streams/:id/start` | Marks it live now. A scheduled stream is also live from its start time without this. |
+| POST | `/admin/livestream/streams/:id/end` | Counts viewers who watched at least `countAfterMinutes`, writes that as the "Online" headcount of the linked event (replacing an earlier one) and updates the event's attendance. Members who attended get their last-attended date updated. |
+
+Viewers (no staff permission):
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/public/live` | `LiveNow`: the live stream, else the next one within 7 days, plus the channel id. Signed-in members always see it; guests only when `publicWatch` is on. |
+| POST | `/public/live/:id/ping` | `{viewer}`: sent once a minute while the video is on screen. Signed-in members are counted by person; guests by the random `viewer` id their browser keeps (8 to 64 letters, digits, `-`, `_`). Returns `{ok, status, watching}`; `ok` is false when the stream is not live. |

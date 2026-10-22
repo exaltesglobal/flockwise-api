@@ -368,6 +368,28 @@ export function seedDemo(db: Db, env: Env) {
   // ----- this Sunday's bulletin -----
   db.put('bulletins', { id: 'bl_1', eventId: 'ev_1', date: at(toSunday, 9).slice(0, 10), title: 'Sunday Worship (English)', intro: 'Welcome to Grace Church! If this is your first Sunday with us, please stop by the welcome desk after the service. We would love to meet you.', verse: '“Bring the whole tithe into the storehouse… and see if I will not throw open the floodgates of heaven.” Malachi 3:10', sections: ['order', 'announcements', 'events', 'celebrations', 'serving', 'giving'], status: 'published', publishedAt: at(-1, 18), shareKey: 'demo7bulln', createdAt: at(-2, 10), updatedAt: at(-1, 18) });
 
+  // ----- livestream: last Sunday's stream with its online viewers, and this Sunday's scheduled -----
+  {
+    const rl = rng(5150);
+    const settingsRec = db.get('settings', 'church')!;
+    db.put('settings', { ...settingsRec, livestream: { channelId: 'UCgracechurchhyderabad01', countAfterMinutes: 5, publicWatch: true } });
+    const lastStart = at(toSunday - 7, 9);
+    const watchers = adults.filter((p) => p.id !== DEMO_MEMBER && rl() < 0.12);
+    let guests = 0;
+    const viewers = [...watchers.map((p) => p.id), ...Array.from({ length: 96 }, () => `g${(++guests).toString(36).padStart(8, '0')}`)];
+    let attended = 0;
+    for (const viewer of viewers) {
+      const join = Math.floor(rl() * 25);
+      const stay = rl() < 0.15 ? 1 + Math.floor(rl() * 4) : 20 + Math.floor(rl() * (118 - join - 20));
+      const minutes = Array.from({ length: stay }, (_, i) => join + i);
+      if (minutes.length >= 5) attended++;
+      const person = !viewer.startsWith('g');
+      db.put('streamViews', { id: `st_last:${viewer}`, streamId: 'st_last', viewer, personId: person ? viewer : null, source: person ? 'app' : 'public', minutes, firstAt: iso(Date.parse(lastStart) + join * 60_000), lastAt: iso(Date.parse(lastStart) + (join + stay) * 60_000) });
+    }
+    db.put('streams', { id: 'st_last', title: 'Sunday Worship (English)', youtubeId: 'DEMOSTREAM1', eventId: 'ev_7', startsAt: lastStart, startedAt: iso(Date.parse(lastStart) - 4 * 60_000), endedAt: at(toSunday - 7, 11), recorded: attended, createdAt: at(toSunday - 9, 10) });
+    db.put('streams', { id: 'st_next', title: 'Sunday Worship (English)', youtubeId: 'DEMOSTREAM2', eventId: 'ev_1', startsAt: at(toSunday, 9), startedAt: null, endedAt: null, recorded: null, createdAt: at(-1, 10) });
+  }
+
   // ----- announcements -----
   db.put('announcements', { id: 'an_1', title: 'Christmas choir auditions', body: 'Auditions for the Christmas choir are open after both services this Sunday. Speak to Pastor Samuel at the welcome desk.', publishedAt: at(-1, 9), status: 'published', imageUrl: null });
   db.put('announcements', { id: 'an_2', title: 'Blood donation drive', body: 'Together with a city blood bank we are hosting a donation camp in the fellowship hall. Please bring a photo ID.', publishedAt: at(-3, 18), status: 'published', imageUrl: null });
