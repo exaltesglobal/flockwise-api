@@ -132,6 +132,8 @@ function cleanItems(ctx: Ctx, items: unknown): PlanItem[] {
       minutes: Math.max(0, Math.min(240, Number(raw.minutes) || 0)),
       notes: String(raw.notes ?? ''),
       person: String(raw.person ?? ''),
+      arrangement: Array.isArray(raw.arrangement) ? raw.arrangement.map(String).map((x) => x.trim()).filter(Boolean).slice(0, 40) : [],
+      text: String(raw.text ?? '').slice(0, 10_000),
     };
   });
 }
@@ -302,7 +304,11 @@ export function registerServing(r: Router) {
   });
   r.put('/admin/services/:eventId', { perm: 'services' }, (ctx) => {
     const ev = find(ctx, 'events', ctx.params[0], 'Event');
-    const plan = ctx.db.put('plans', { id: ev.id, eventId: ev.id, theme: String(ctx.body.theme ?? ''), notes: String(ctx.body.notes ?? ''), items: cleanItems(ctx, ctx.body.items), updatedAt: ctx.now.toISOString() });
+    const plan = ctx.db.put('plans', {
+      id: ev.id, eventId: ev.id, theme: String(ctx.body.theme ?? ''), notes: String(ctx.body.notes ?? ''), items: cleanItems(ctx, ctx.body.items), updatedAt: ctx.now.toISOString(),
+      rehearsalAt: ctx.body.rehearsalAt ? new Date(String(ctx.body.rehearsalAt)).toISOString() : null,
+      rehearsalNotes: String(ctx.body.rehearsalNotes ?? '').slice(0, 4000),
+    });
     ctx.audit('updated', 'plan', ev.id, `Updated the order of service for ${ev.title}`);
     return plan;
   });
@@ -334,13 +340,13 @@ export function registerServing(r: Router) {
   });
   r.post('/admin/songs', { perm: 'services' }, (ctx) => {
     requireFields(ctx.body, ['title']);
-    const s = ctx.db.put('songs', { id: ctx.id('sg'), title: String(ctx.body.title), author: String(ctx.body.author ?? ''), defaultKey: String(ctx.body.defaultKey ?? ''), bpm: ctx.body.bpm ? Number(ctx.body.bpm) : null, ccli: String(ctx.body.ccli ?? ''), tags: Array.isArray(ctx.body.tags) ? ctx.body.tags.map(String) : [], lyrics: String(ctx.body.lyrics ?? ''), chordChart: String(ctx.body.chordChart ?? ''), attachments: cleanAttachments(ctx, ctx.body.attachments) });
+    const s = ctx.db.put('songs', { id: ctx.id('sg'), title: String(ctx.body.title), author: String(ctx.body.author ?? ''), defaultKey: String(ctx.body.defaultKey ?? ''), bpm: ctx.body.bpm ? Number(ctx.body.bpm) : null, ccli: String(ctx.body.ccli ?? ''), tags: Array.isArray(ctx.body.tags) ? ctx.body.tags.map(String) : [], lyrics: String(ctx.body.lyrics ?? ''), chordChart: String(ctx.body.chordChart ?? ''), lyricsAlt: String(ctx.body.lyricsAlt ?? ''), arrangement: cleanArrangement(ctx.body.arrangement), attachments: cleanAttachments(ctx, ctx.body.attachments) });
     ctx.audit('created', 'song', s.id, `Added song ${s.title}`);
     return s;
   });
   r.patch('/admin/songs/:id', { perm: 'services' }, (ctx) => {
     const s = find(ctx, 'songs', ctx.params[0], 'Song');
-    return ctx.db.put('songs', { ...s, ...pick(ctx.body, ['title', 'author', 'defaultKey', 'bpm', 'ccli', 'tags', 'lyrics', 'chordChart']), ...(ctx.body.attachments !== undefined ? { attachments: cleanAttachments(ctx, ctx.body.attachments) } : {}) });
+    return ctx.db.put('songs', { ...s, ...pick(ctx.body, ['title', 'author', 'defaultKey', 'bpm', 'ccli', 'tags', 'lyrics', 'chordChart', 'lyricsAlt']), ...(ctx.body.arrangement !== undefined ? { arrangement: cleanArrangement(ctx.body.arrangement) } : {}), ...(ctx.body.attachments !== undefined ? { attachments: cleanAttachments(ctx, ctx.body.attachments) } : {}) });
   });
   r.del('/admin/songs/:id', { perm: 'services' }, (ctx) => {
     ctx.db.del('songs', ctx.params[0]);
@@ -349,6 +355,8 @@ export function registerServing(r: Router) {
 }
 
 /** Links to charts, lyrics sheets and recordings (Google Drive, Dropbox, YouTube...). */
+const cleanArrangement = (raw: unknown) => (Array.isArray(raw) ? raw.map(String).map((x) => x.trim()).filter(Boolean).slice(0, 40) : []);
+
 function cleanAttachments(ctx: Ctx, raw: unknown): SongAttachment[] {
   if (!Array.isArray(raw)) return [];
   return raw

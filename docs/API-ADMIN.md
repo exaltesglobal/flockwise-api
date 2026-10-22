@@ -301,6 +301,19 @@ Workflow triggers: `manual`, `new_visitor` (a visitor is added), `form` (a regis
 | GET | `/admin/songs/ccli-report?from=&to=` | `services` or `volunteers` |
 
 Songs also take `chordChart` (ChordPro text) and `attachments: [{ name, url, kind }]`.
+Songs also take `lyricsAlt` (the same song in a second language, with matching section headings) and `arrangement` (section order, e.g. `["Verse 1","Chorus","Verse 2","Chorus"]`). Plan items take `arrangement` (overrides the song's for that service) and `text` (reading or announcement words shown on the projector). Plans take `rehearsalAt` and `rehearsalNotes`.
+
+### Presentation and song stats
+
+| Method | Path | Needs |
+|---|---|---|
+| GET | `/admin/services/:eventId/presentation` | any office login |
+| POST | `/admin/services/:eventId/presentation` `{ action: next\|prev\|goto\|item\|blank\|logo\|live\|message, index?, message? }` | `services` or `checkin` |
+| GET | `/admin/presentation-theme` | any office login |
+| PUT | `/admin/presentation-theme` `{ background, textColor, imageUrl, fontScale, linesPerSlide, showAlt, titleSlides, uppercase }` | `services` or `settings` |
+| GET | `/admin/songs/stats` | `services` |
+
+The presentation view returns `{ event, churchName, logoUrl, slides[], state { index, mode, message }, theme, timer }`. Lyrics are split into slides by section headings (`Verse 1`, `[Chorus]`, `Bridge:`, ChordPro `{soc}`) and `linesPerSlide`. Screens poll the GET about once a second to stay in step with the operator.
 
 ### Check-in: headcounts and volunteers
 

@@ -25,7 +25,7 @@ function liveFor(ctx: Ctx, eventId: string): LiveState {
   return ctx.db.get('live', eventId) ?? { id: eventId, eventId, itemIndex: 0, startedAt: null, itemStartedAt: null, endedAt: null };
 }
 
-function liveView(ctx: Ctx, ev: Collections['events']): LiveView {
+export function liveView(ctx: Ctx, ev: Collections['events']): LiveView {
   const plan = ctx.db.all('plans').find((p) => p.eventId === ev.id) ?? { id: '', eventId: ev.id, theme: '', notes: '', items: [], updatedAt: ctx.now.toISOString() };
   const live = liveFor(ctx, ev.id);
   const item = plan.items[live.itemIndex];

@@ -424,6 +424,31 @@ export function seedDemo(db: Db, env: Env) {
 
   db.put('songs', { ...db.get('songs', 'sg_1')!, chordChart: '{title: Goodness of God}\n{key: A}\n\n[Verse 1]\n[A]I love You, [D]Lord\nOh Your [A]mercy never [E]fails me\n[A]All my [D]days\nI\'ve been [A]held in Your [E]hands\n\n[Chorus]\n[D]All my life You have been [A]faithful\n[E]All my life You have been so, so [F#m]good\n[D]With every breath that I am [A]able\n[E]Oh I will sing of the goodness of [A]God', attachments: [{ id: 'sa_1', name: 'Lead sheet (PDF)', url: 'https://example.com/goodness-of-god.pdf', kind: 'chart' }, { id: 'sa_2', name: 'Original recording', url: 'https://www.youtube.com/watch?v=n0FBb6hnwTo', kind: 'video' }] });
 
+  // Public-domain hymns with full lyrics, so the projector and stage display have real words to show.
+  const hymns: [string, string, string, number, string, string[]][] = [
+    ['Amazing Grace', 'John Newton (1779)', 'G', 72,
+      'Verse 1\nAmazing grace! How sweet the sound\nThat saved a wretch like me!\nI once was lost, but now am found;\nWas blind, but now I see.\n\nVerse 2\n’Twas grace that taught my heart to fear,\nAnd grace my fears relieved;\nHow precious did that grace appear\nThe hour I first believed.\n\nVerse 3\nThrough many dangers, toils and snares,\nI have already come;\n’Tis grace hath brought me safe thus far,\nAnd grace will lead me home.\n\nVerse 4\nWhen we’ve been there ten thousand years,\nBright shining as the sun,\nWe’ve no less days to sing God’s praise\nThan when we’d first begun.',
+      ['Verse 1', 'Verse 2', 'Verse 3', 'Verse 4']],
+    ['Blessed Assurance', 'Fanny Crosby (1873)', 'D', 100,
+      'Verse 1\nBlessed assurance, Jesus is mine!\nO what a foretaste of glory divine!\nHeir of salvation, purchase of God,\nBorn of His Spirit, washed in His blood.\n\nChorus\nThis is my story, this is my song,\nPraising my Savior all the day long;\nThis is my story, this is my song,\nPraising my Savior all the day long.\n\nVerse 2\nPerfect submission, perfect delight,\nVisions of rapture now burst on my sight;\nAngels descending bring from above\nEchoes of mercy, whispers of love.\n\nVerse 3\nPerfect submission, all is at rest;\nI in my Savior am happy and blest,\nWatching and waiting, looking above,\nFilled with His goodness, lost in His love.',
+      ['Verse 1', 'Chorus', 'Verse 2', 'Chorus', 'Verse 3', 'Chorus']],
+    ['It Is Well with My Soul', 'Horatio Spafford (1873)', 'C', 66,
+      'Verse 1\nWhen peace like a river attendeth my way,\nWhen sorrows like sea billows roll;\nWhatever my lot, Thou hast taught me to say,\nIt is well, it is well with my soul.\n\nChorus\nIt is well with my soul,\nIt is well, it is well with my soul.\n\nVerse 2\nThough Satan should buffet, though trials should come,\nLet this blest assurance control,\nThat Christ has regarded my helpless estate,\nAnd hath shed His own blood for my soul.\n\nVerse 3\nAnd Lord, haste the day when my faith shall be sight,\nThe clouds be rolled back as a scroll;\nThe trump shall resound, and the Lord shall descend,\nEven so, it is well with my soul.',
+      ['Verse 1', 'Chorus', 'Verse 2', 'Chorus', 'Verse 3', 'Chorus']],
+  ];
+  hymns.forEach(([title, author, key, bpm, lyrics, arrangement], i) =>
+    db.put('songs', { id: `sg_h${i + 1}`, title, author, defaultKey: key, bpm, ccli: '', tags: ['Hymn'], lyrics, arrangement }));
+  const plan1 = db.get('plans', 'ev_1')!;
+  db.put('plans', {
+    ...plan1,
+    rehearsalAt: at(Math.max(1, toSunday - 3), 19),
+    rehearsalNotes: 'Run the closing hymn twice. Start Amazing Grace a cappella, band in on verse 2.',
+    items: plan1.items.map((it) =>
+      it.kind === 'reading'
+        ? { ...it, text: 'John 10:11-14 (KJV)\n\nI am the good shepherd: the good shepherd giveth his life for the sheep.\n\nBut he that is an hireling, and not the shepherd, whose own the sheep are not, seeth the wolf coming, and leaveth the sheep, and fleeth: and the wolf catcheth them, and scattereth them.\n\nThe hireling fleeth, because he is an hireling, and careth not for the sheep.\n\nI am the good shepherd, and know my sheep, and am known of mine.' }
+        : it.songId === 'sg_12' ? { ...it, title: 'Amazing Grace', songId: 'sg_h1', key: 'G' } : it),
+  });
+
   const grMembers = db.all('groupMembers').filter((m) => m.groupId === 'gr_1').map((m) => db.get('people', m.personId)!).filter(Boolean);
   if (grMembers.length >= 2) {
     db.put('groupPosts', { id: 'gp_1', groupId: 'gr_1', authorId: grMembers[0].id, authorName: `${grMembers[0].firstName} ${grMembers[0].lastName}`, text: 'This week we are at the Josephs’ home. Bring a friend! We continue in James chapter 2.', at: iso(now - DAY), pinned: true });

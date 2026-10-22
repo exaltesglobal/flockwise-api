@@ -305,9 +305,21 @@ export type MyServing = {
 // ---------- service planning ----------
 
 export type PlanItemKind = 'song' | 'reading' | 'sermon' | 'prayer' | 'announcement' | 'offering' | 'video' | 'other';
-export type PlanItem = { id: string; kind: PlanItemKind; title: string; songId: string | null; key: string | null; minutes: number; notes: string; person: string };
-export type Plan = { id: string; eventId: string; theme: string; notes: string; items: PlanItem[]; updatedAt: string };
-export type Song = { id: string; title: string; author: string; defaultKey: string; bpm: number | null; ccli: string; tags: string[]; lyrics: string; chordChart?: string; attachments?: SongAttachment[] };
+export type PlanItem = {
+  id: string; kind: PlanItemKind; title: string; songId: string | null; key: string | null; minutes: number; notes: string; person: string;
+  /** Section order for this service, e.g. ["Verse 1", "Chorus", "Verse 2", "Chorus"]. Empty uses the song's own order. */
+  arrangement?: string[];
+  /** Words to project for readings, announcements and sermon points. */
+  text?: string;
+};
+export type Plan = { id: string; eventId: string; theme: string; notes: string; items: PlanItem[]; updatedAt: string; rehearsalAt?: string | null; rehearsalNotes?: string };
+export type Song = {
+  id: string; title: string; author: string; defaultKey: string; bpm: number | null; ccli: string; tags: string[]; lyrics: string; chordChart?: string; attachments?: SongAttachment[];
+  /** Lyrics in a second language with the same section headings, shown under the main lyrics. */
+  lyricsAlt?: string;
+  /** Default section order. */
+  arrangement?: string[];
+};
 export type SongView = Song & { timesUsed: number; lastUsedAt: string | null };
 export type ServiceSummary = { event: AdminEvent; items: number; minutes: number; songs: string[]; theme: string; volunteers: { filled: number; needed: number } };
 export type ServiceDetail = { event: AdminEvent; plan: Plan; team: { teamName: string; positionName: string; name: string; status: AssignmentStatus }[] };
@@ -435,6 +447,7 @@ export type ChurchSettings = Church & {
   /** Children are people younger than this; they check in to rooms with security codes. */
   childAgeLimit: number;
   publicPage?: PublicPage;
+  presentation?: Partial<PresentationTheme>;
 };
 
 export type Permission =
@@ -675,10 +688,45 @@ export type Greeting = { id: string; personId: string; kind: CelebrationKind; ye
 export type MemberCelebration = { personId: string; name: string; kind: CelebrationKind; date: string; daysAway: number; isMe: boolean; wishedByMe: boolean; wishes: number };
 export type MemberCelebrations = { upcoming: MemberCelebration[]; myWishes: { kind: CelebrationKind; fromName: string; message: string; at: string }[] };
 
+// ---------- presentation ----------
+
+export type Slide = {
+  id: string;
+  itemIndex: number;
+  itemTitle: string;
+  kind: 'title' | 'lyrics' | 'text';
+  /** Section name, e.g. "Chorus". */
+  label: string;
+  lines: string[];
+  /** Second-language lines, when the song has them. */
+  alt: string[];
+  /** Chord-and-lyric lines for the stage display. */
+  chords: string[];
+};
+export type PresentationTheme = { background: string; textColor: string; imageUrl: string; fontScale: number; linesPerSlide: number; showAlt: boolean; titleSlides: boolean; uppercase: boolean };
+export type PresentationMode = 'live' | 'blank' | 'logo';
+export type PresentationState = { id: string; eventId: string; index: number; mode: PresentationMode; message: string; updatedAt: string };
+export type PresentationView = {
+  event: { id: string; title: string; startsAt: string; endsAt: string };
+  churchName: string;
+  logoUrl: string | null;
+  slides: Slide[];
+  state: PresentationState;
+  theme: PresentationTheme;
+  timer: { itemTitle: string | null; itemEndsAt: string | null; serviceEndsAt: string | null };
+};
+export type SongStats = {
+  top: { songId: string; title: string; uses: number; lastUsedAt: string | null }[];
+  resting: { songId: string; title: string; lastUsedAt: string | null }[];
+  byLeader: { person: string; songs: number; distinct: number; favourite: string | null }[];
+  keys: { key: string; uses: number }[];
+};
+
 export type Collections = {
   settings: ChurchSettings & { id: string };
   automations: Automations & { id: string };
   greetings: Greeting;
+  presentations: PresentationState;
   people: Omit<Person, 'groups'>;
   campuses: Campus;
   events: Omit<AdminEvent, 'goingCount' | 'checkinCount' | 'campusName'>;
@@ -729,5 +777,5 @@ export const KINDS = [
   'funds', 'donations', 'pledges', 'plans', 'announcements', 'staff', 'rooms', 'checkins', 'teams', 'assignments', 'blockouts',
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
-  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings',
+  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations',
 ] as const satisfies readonly Kind[];

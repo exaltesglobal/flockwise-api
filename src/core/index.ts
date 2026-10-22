@@ -13,9 +13,10 @@ import { registerCalendar } from './modules/calendar.js';
 import { registerForms } from './modules/forms.js';
 import { registerCelebrations } from './modules/celebrations.js';
 import { registerMinistry } from './modules/ministry.js';
+import { registerPresent } from './modules/present.js';
 import { registerWorkflows } from './modules/workflows.js';
 
-export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry, registerCelebrations];
+export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry, registerCelebrations, registerPresent];
 
 export function createChurchEngine(db: Db, env: Env) {
   const engine = createEngine(db, env, MODULES);
