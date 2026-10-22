@@ -92,7 +92,7 @@ function assign(ctx: Ctx, ev: Collections['events'], teamId: string, positionId:
     ? ctx.db.put('assignments', { ...existing, status: 'pending', respondedAt: null })
     : ctx.db.put('assignments', { id: ctx.id('as'), eventId: ev.id, teamId, positionId, personId, status: 'pending', createdAt: ctx.now.toISOString(), respondedAt: null, note: null });
   const pos = t.positions.find((p) => p.id === positionId)?.name ?? '';
-  void notify(ctx, 'rota.assigned', { personIds: [personId], title: `You're on the rota: ${ev.title}`, body: `${t.name}${pos ? ` · ${pos}` : ''} at ${ev.title}, ${whenText(ctx, ev)}. Please accept or decline in the app.`, link: '/app/serving' });
+  void notify(ctx, 'rota.assigned', { personIds: [personId], title: `You're on the rota: ${ev.title}`, body: `${t.name}${pos ? ` · ${pos}` : ''} at ${ev.title}, ${whenText(ctx, ev)}. Please accept or decline in the app.`, link: `/app/serving/${a.id}` });
   return a;
 }
 
