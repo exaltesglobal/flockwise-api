@@ -22,8 +22,8 @@ export function withChurchMail(db: Db, env: Env): Env {
     db.put('integrations', { ...c, lastError: failed && !sent ? failed.error ?? 'Sending failed' : null, lastSentAt: sent ? env.now().toISOString() : c.lastSentAt });
     return out;
   };
-  return {
-    ...env,
+  // Hosts may build the env on a prototype (the web demo does), so override on top of it rather than copying.
+  return Object.assign(Object.create(env) as Env, {
     deliver: (channel, batch) => (channel === 'email' ? send(batch) : env.deliver(channel, batch)),
     sendOtpEmail: async (to, code, churchName) => {
       const c = emailAccount(db);
@@ -36,5 +36,5 @@ export function withChurchMail(db: Db, env: Env): Env {
       const c = emailAccount(db);
       return c && env.smtp ? { ...base, email: { configured: true, provider: c.from } } : base;
     },
-  };
+  } satisfies Partial<Env>);
 }
