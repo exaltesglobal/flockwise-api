@@ -413,7 +413,7 @@ export function seedDemo(db: Db, env: Env) {
   db.put('sermons', sermon('sm_3', 'Faith that works', 'Mercy Daniel', 21, 'James', 'James 2:14-26', 'What does living faith look like on a Monday morning?'));
   db.put('sermons', sermon('sm_4', 'The God who sees', 'Pastor Samuel Raj', 28, 'Stand-alone', 'Genesis 16', 'Hagar meets the God who sees her in the wilderness.'));
 
-  db.put('settings', { ...db.get('settings', 'church')!, publicPage: { enabled: false, tagline: 'A home for everyone in Hyderabad', about: 'Grace Community Church has been serving Hyderabad since 1998. We are a family of families from every part of India, meeting in English and Telugu.', serviceTimes: 'Sundays 9:00 am (English) and 11:30 am (Telugu), Kondapur\nSundays 10:00 am, Secunderabad Hall', heroImageUrl: '', showEvents: true, showGroups: true, showSermons: true, showGiving: true } });
+  db.put('settings', { ...db.get('settings', 'church')!, publicPage: { enabled: true, tagline: 'A home for everyone in Hyderabad', about: 'Grace Community Church has been serving Hyderabad since 1998. We are a family of families from every part of India, meeting in English and Telugu.', serviceTimes: 'Sundays 9:00 am (English) and 11:30 am (Telugu), Kondapur\nSundays 10:00 am, Secunderabad Hall', heroImageUrl: '', showEvents: true, showGroups: true, showSermons: true, showGiving: true } });
 
   const cash = db.all('donations').filter((d) => d.method === 'cash' || d.method === 'cheque').slice(0, 12);
   if (cash.length) {
