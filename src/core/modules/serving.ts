@@ -4,6 +4,7 @@ import type { Ctx, Router } from '../engine.js';
 import type { Assignment, AvailablePerson, Collections, MyServing, Plan, PlanItem, Schedule, ScheduleOverview, ServiceDetail, ServiceSummary, SongAttachment, SongView, Team, TeamView } from '../types.js';
 import { bySoonest, dateOnly, DAY, eventView, find, fullName, memberEvent, pick, requireFields, settings, upcoming } from '../util.js';
 import { sendDirect } from './comms.js';
+import { notify } from './notify.js';
 
 const COLORS = ['#1F6B5C', '#F2A93B', '#3B82F6', '#A855F7', '#EF4444', '#14B8A6', '#F97316', '#64748B'];
 const PLAN_KINDS: PlanItem['kind'][] = ['song', 'reading', 'sermon', 'prayer', 'announcement', 'offering', 'video', 'other'];
@@ -87,8 +88,16 @@ function assign(ctx: Ctx, ev: Collections['events'], teamId: string, positionId:
   const c = conflict(ctx, ev, personId);
   if (c && !force) throw new ApiError(409, 'conflict', `${name(ctx, personId)} can't serve: ${c}.`);
   const existing = ctx.db.all('assignments').find((a) => a.eventId === ev.id && a.teamId === teamId && a.positionId === positionId && a.personId === personId);
-  if (existing) return ctx.db.put('assignments', { ...existing, status: 'pending', respondedAt: null });
-  return ctx.db.put('assignments', { id: ctx.id('as'), eventId: ev.id, teamId, positionId, personId, status: 'pending', createdAt: ctx.now.toISOString(), respondedAt: null, note: null });
+  const a = existing
+    ? ctx.db.put('assignments', { ...existing, status: 'pending', respondedAt: null })
+    : ctx.db.put('assignments', { id: ctx.id('as'), eventId: ev.id, teamId, positionId, personId, status: 'pending', createdAt: ctx.now.toISOString(), respondedAt: null, note: null });
+  const pos = t.positions.find((p) => p.id === positionId)?.name ?? '';
+  void notify(ctx, 'rota.assigned', { personIds: [personId], title: `You're on the rota: ${ev.title}`, body: `${t.name}${pos ? ` · ${pos}` : ''} at ${ev.title}, ${whenText(ctx, ev)}. Please accept or decline in the app.`, link: '/app/serving' });
+  return a;
+}
+
+function whenText(ctx: Ctx, ev: Collections['events']) {
+  return new Date(ev.startsAt).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: settings(ctx).timezone || 'Asia/Kolkata' });
 }
 
 /** Fills open positions with team members who are free, preferring those who served least recently. */

@@ -7,6 +7,7 @@ import type { DoorQr, FamilyCheckinResult } from '../types.js';
 import { checkinsFor, find, fullName } from '../util.js';
 import { checkIn } from './checkin.js';
 import { checkinEvent, parent } from './family.js';
+import { notify } from './notify.js';
 
 const SLOT_MS = 60_000;
 /** The code is accepted for this many slots after it was shown (a slow phone, a queue at the door). */
@@ -70,6 +71,7 @@ export function registerDoor(r: Router) {
     if (res.checkins.length) ctx.audit('checked_in', 'checkin', ev.id, `${fullName(me)} scanned the door QR for ${res.checkins.map((c) => c.personName).join(', ')}`);
     const after = checkinEvent(ctx, me, ev);
     const code = res.securityCode ?? after.members.find((m) => ids.includes(m.id) && m.securityCode)?.securityCode ?? null;
+    if (res.checkins.length) void notify(ctx, 'door.scanned', { personIds: after.members.filter((m) => !m.isChild).map((m) => m.id), title: `${res.checkins.map((c) => c.personName.split(' ')[0]).join(', ')} arrived`, body: `Checked in at the door for ${ev.title}.`, except: me.id });
     return { securityCode: code, checkedIn: res.checkins.map((c) => c.personId), event: after };
   });
 }

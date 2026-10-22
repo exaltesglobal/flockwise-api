@@ -11,6 +11,7 @@ import { registerPeople } from './modules/people.js';
 import { registerServing } from './modules/serving.js';
 import { registerTeamAuth } from './modules/team-auth.js';
 import { registerDoor } from './modules/door.js';
+import { registerNotify } from './modules/notify.js';
 import { registerCalendar } from './modules/calendar.js';
 import { registerForms } from './modules/forms.js';
 import { registerCelebrations } from './modules/celebrations.js';
@@ -39,7 +40,7 @@ import { registerNetworkLink } from './modules/network-link.js';
 import { ApiError } from './errors.js';
 import { atLeast, effectivePlan, getSubscription } from './plans.js';
 
-export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry, registerCelebrations, registerPresent, registerIntegrations, registerAi, registerBilling, registerPayments, registerRegisters, registerZones, registerAccounts, registerRazorpaySetup, registerRecurring, registerWhatsAppBot, registerOfferings, registerPrivacy, registerPager, registerBulletin, registerSundaySchool, registerMissions, registerLivestream, registerFamily, registerNetworkLink, registerTeamAuth, registerDoor];
+export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry, registerCelebrations, registerPresent, registerIntegrations, registerAi, registerBilling, registerPayments, registerRegisters, registerZones, registerAccounts, registerRazorpaySetup, registerRecurring, registerWhatsAppBot, registerOfferings, registerPrivacy, registerPager, registerBulletin, registerSundaySchool, registerMissions, registerLivestream, registerFamily, registerNetworkLink, registerTeamAuth, registerDoor, registerNotify];
 
 export function createChurchEngine(db: Db, env: Env) {
   const engine = createEngine(db, env, MODULES);
@@ -65,7 +66,7 @@ export { ApiError };
 export * from './plans.js';
 export { REGISTER_FIELDS, REGISTER_KINDS, REGISTER_LABELS } from './modules/registers.js';
 export { VISIT_PURPOSES } from './modules/zones.js';
-export type { AiBlock, AiMessage, AiRequest, AiResponse, AuthClaims, DeliveryResult, Outgoing, Request } from './engine.js';
+export type { AiBlock, AiMessage, AiRequest, AiResponse, AuthClaims, DeliveryResult, Outgoing, PushMessage, PushResult, SmtpAccount, Request } from './engine.js';
 export { onDonationSucceeded } from './modules/giving.js';
 export { DEMO_CODE } from './modules/auth.js';
 export { PERMISSIONS, ROLE_LABELS } from './perms.js';

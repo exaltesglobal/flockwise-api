@@ -2,6 +2,7 @@
 // request into `handle({ method, path, query, body, auth })` and send back the result.
 import type { Db } from './db.js';
 import { ApiError } from './errors.js';
+import { withChurchMail } from './mail.js';
 import { PERMISSIONS } from './perms.js';
 import { atLeast, checkPlan, effectivePlan, getSubscription, type BillingInterval, type PlanId } from './plans.js';
 import type { Channel, ChannelStatus, ChurchNetworkHost, Collections, DonationRecord, Kind, Permission, StaffRole } from './types.js';
@@ -9,6 +10,11 @@ import type { Channel, ChannelStatus, ChurchNetworkHost, Collections, DonationRe
 export type BillingCheckout = { churchId: string; churchName: string; plan: PlanId; interval: BillingInterval; currency: 'INR' | 'USD'; amount: number; email: string; name: string };
 export type Outgoing = { to: string; name: string; subject: string; text: string };
 export type DeliveryResult = { ok: boolean; error?: string };
+/** A church's own mailbox, unsealed, for the host to send through. */
+export type SmtpAccount = { host: string; port: number; user: string; pass: string; from: string; fromName: string };
+export type PushMessage = { token: string; title: string; body: string; data?: Record<string, string> };
+/** `gone` means the phone uninstalled the app; the engine forgets that token. */
+export type PushResult = { ok: boolean; error?: string; gone?: boolean };
 
 /** A provider-neutral slice of the Claude Messages API, so the engine can run in the browser demo too. */
 export type AiBlock =
@@ -85,6 +91,10 @@ export type Env = {
   /** Encrypts a stored credential (e.g. a partner API key) and reads it back. */
   seal(value: string): string;
   unseal(sealed: string): string;
+  /** Sends email through a church's own mailbox. Absent when the host cannot do SMTP. */
+  smtp?: (account: SmtpAccount, batch: Outgoing[]) => Promise<DeliveryResult[]>;
+  /** Push notifications to the member and team apps (Expo). Absent when the host has no push. */
+  push?: (batch: PushMessage[]) => Promise<PushResult[]>;
 };
 
 /** What a signed access token says. The engine re-reads the staff role from the database on each request. */
@@ -174,7 +184,9 @@ export function makeCtx(db: Db, env: Env, req: Pick<Request, 'auth' | 'body' | '
   return ctx;
 }
 
-export function createEngine(db: Db, env: Env, modules: ((r: Router) => void)[]) {
+export function createEngine(db: Db, hostEnv: Env, modules: ((r: Router) => void)[]) {
+  // Email leaves from the church's own mailbox once the office connects one.
+  const env = withChurchMail(db, hostEnv);
   const router = new Router();
   for (const m of modules) m(router);
 

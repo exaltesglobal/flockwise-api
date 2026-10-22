@@ -4,7 +4,7 @@
 import nodemailer from 'nodemailer';
 
 import { config, emailConfigured } from './config.js';
-import type { DeliveryResult, Outgoing } from './core/index.js';
+import type { DeliveryResult, Outgoing, PushMessage, PushResult, SmtpAccount } from './core/index.js';
 import type { Channel, ChannelStatus } from './core/types.js';
 
 let transport: nodemailer.Transporter | null = null;
@@ -105,4 +105,56 @@ export async function sendOtpEmail(to: string, code: string, churchName: string)
   }
   const r = await sendEmail({ to, name: '', subject, text });
   if (!r.ok) throw new Error(r.error ?? 'Email failed');
+}
+
+// ----- a church's own mailbox -----
+const mailboxes = new Map<string, nodemailer.Transporter>();
+/** Sends through the church's SMTP account (Gmail app password, Workspace, Outlook, Hostinger…). */
+export async function sendViaMailbox(a: SmtpAccount, batch: Outgoing[]): Promise<DeliveryResult[]> {
+  const key = `${a.host}:${a.port}:${a.user}:${a.pass}`;
+  let t = mailboxes.get(key);
+  if (!t) {
+    if (mailboxes.size > 200) mailboxes.clear();
+    t = nodemailer.createTransport({ host: a.host, port: a.port, secure: a.port === 465, auth: { user: a.user, pass: a.pass }, connectionTimeout: 15_000, socketTimeout: 20_000 });
+    mailboxes.set(key, t);
+  }
+  const from = a.fromName ? { name: a.fromName, address: a.from } : a.from;
+  const out: DeliveryResult[] = [];
+  for (const m of batch) {
+    try {
+      await t.sendMail({ from, to: m.to, subject: m.subject, text: m.text });
+      out.push({ ok: true });
+    } catch (e) {
+      out.push({ ok: false, error: (e as Error).message.slice(0, 200) });
+    }
+  }
+  return out;
+}
+
+// ----- push to the member and team apps (Expo) -----
+const EXPO_PUSH = 'https://exp.host/--/api/v2/push/send';
+export async function expoPush(batch: PushMessage[]): Promise<PushResult[]> {
+  const out: PushResult[] = [];
+  for (let i = 0; i < batch.length; i += 100) {
+    const chunk = batch.slice(i, i + 100);
+    try {
+      const res = await fetch(EXPO_PUSH, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(process.env.EXPO_ACCESS_TOKEN ? { Authorization: `Bearer ${process.env.EXPO_ACCESS_TOKEN}` } : {}) },
+        body: JSON.stringify(chunk.map((m) => ({ to: m.token, title: m.title, body: m.body, data: m.data ?? {}, sound: 'default', channelId: 'default' }))),
+        signal: AbortSignal.timeout(15_000),
+      });
+      const json = (await res.json().catch(() => null)) as { data?: { status: string; message?: string; details?: { error?: string } }[] } | null;
+      const tickets = json?.data ?? [];
+      chunk.forEach((_, j) => {
+        const t = tickets[j];
+        if (!t) out.push({ ok: false, error: `Expo ${res.status}` });
+        else if (t.status === 'ok') out.push({ ok: true });
+        else out.push({ ok: false, error: t.message ?? t.details?.error ?? 'push failed', gone: t.details?.error === 'DeviceNotRegistered' });
+      });
+    } catch (e) {
+      chunk.forEach(() => out.push({ ok: false, error: (e as Error).message }));
+    }
+  }
+  return out;
 }

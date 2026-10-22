@@ -21,6 +21,7 @@ import {
   pick,
   requireFields,
 } from '../util.js';
+import { notify, pastorIds } from './notify.js';
 import { cleanCustom, triggerWorkflows } from './workflows.js';
 import { logConsent } from './privacy.js';
 
@@ -169,7 +170,6 @@ export function registerPeople(r: Router) {
     if (patch.email) patch.email = normEmail(patch.email);
     return memberProfile(ctx.db.put('people', { ...p, ...patch }));
   });
-  r.post('/me/devices', {}, () => undefined);
   r.get('/me/preferences', {}, (ctx) => {
     const p = find(ctx, 'people', ctx.me(), 'Profile');
     return { consent: p.consent, checkinCode: p.checkinCode, campusId: p.campusId };
@@ -223,7 +223,10 @@ export function registerPeople(r: Router) {
     checkLimit(ctx.db, ctx.now, 'people', activePeople(ctx.db));
     const p = ctx.db.put('people', newPerson(ctx, { lastName: '', ...cleanInput(ctx.body), ...withCustom(ctx, ctx.body), firstName: String(ctx.body.firstName) }));
     ctx.audit('created', 'person', p.id, `Added ${fullName(p)}`);
-    if (p.status === 'visitor') triggerWorkflows(ctx, 'new_visitor', p.id);
+    if (p.status === 'visitor') {
+      triggerWorkflows(ctx, 'new_visitor', p.id);
+      void notify(ctx, 'visitor.new', { personIds: pastorIds(ctx), title: `New visitor: ${p.firstName} ${p.lastName}`.trim(), body: `${ctx.staff?.name ?? 'The office'} added ${p.firstName} as a visitor. Say hello and add them to a follow-up.`, link: `/admin/people/${p.id}`, except: ctx.staff?.personId ?? null });
+    }
     return personView(ctx, p);
   });
   r.post('/admin/people/import', { perm: 'people.edit' }, (ctx) => {

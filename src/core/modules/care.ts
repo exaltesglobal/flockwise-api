@@ -1,6 +1,7 @@
 // Pastoral care (follow-ups, visits, counselling), prayer requests, people at risk of
 // drifting away, plus the dashboard and insights numbers.
 import { ApiError } from '../errors.js';
+import { notify, pastorIds } from './notify.js';
 import type { Ctx, Router } from '../engine.js';
 import type { AtRiskPerson, CareCase, CareInput, Collections, Dashboard, Insights, PrayerView } from '../types.js';
 import {
@@ -181,6 +182,11 @@ function insights(ctx: Ctx): Insights {
   };
 }
 
+/** The person record behind a staff login, for notifications. */
+function staffPerson(ctx: Ctx, s: Collections['staff']) {
+  return (ctx.db.get('people', s.personId) ?? ctx.db.all('people').find((p) => (p.email ?? '').toLowerCase() === s.email.toLowerCase()))?.id ?? null;
+}
+
 export function registerCare(r: Router) {
   // ----- member: prayer wall -----
   r.get('/prayer', {}, (ctx) => {
@@ -196,6 +202,7 @@ export function registerCare(r: Router) {
     requireFields(ctx.body, ['text']);
     const text = String(ctx.body.text).trim().slice(0, 1000);
     const p = ctx.db.put('prayer', { id: ctx.id('pr'), personId: me.id, name: fullName(me), text, visibility: ctx.body.visibility === 'church' ? 'church' : 'pastors', status: 'open', prayedBy: [], createdAt: ctx.now.toISOString(), answeredNote: null });
+    void notify(ctx, 'prayer.new', { personIds: pastorIds(ctx), title: `Prayer request from ${fullName(me)}`, body: text.slice(0, 200), link: '/admin/care', except: me.id });
     return prayerView(ctx, p, me.id);
   });
   r.post('/prayer/:id/pray', {}, (ctx) => {
@@ -255,6 +262,7 @@ export function registerCare(r: Router) {
       confidential: !!body.confidential,
     });
     ctx.audit('created', 'care', c.id, `Opened care case for ${c.personName}`);
+    if (assignee) void notify(ctx, 'care.assigned', { personIds: [staffPerson(ctx, assignee)].filter((x): x is string => !!x), title: `Care: ${c.title}`, body: `${c.personName}${c.priority === 'urgent' ? ' · urgent' : ''}. ${ctx.staff?.name ?? 'The office'} asked you to follow up.`, link: '/admin/care', except: ctx.staff?.personId ?? null });
     return c;
   });
   r.patch('/admin/care/:id', { perm: 'care' }, (ctx) => {
@@ -267,6 +275,7 @@ export function registerCare(r: Router) {
     }
     if (ctx.body.assignedTo !== undefined) {
       const s = ctx.body.assignedTo ? find(ctx, 'staff', ctx.body.assignedTo, 'Team member') : null;
+      if (s && s.id !== c.assignedTo) void notify(ctx, 'care.assigned', { personIds: [staffPerson(ctx, s)].filter((x): x is string => !!x), title: `Care: ${c.title}`, body: `${c.personName}. ${ctx.staff?.name ?? 'The office'} asked you to follow up.`, link: '/admin/care', except: ctx.staff?.personId ?? null });
       next.assignedTo = s?.id ?? null;
       next.assignedName = s?.name ?? null;
     }

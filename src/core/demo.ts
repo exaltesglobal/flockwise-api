@@ -3,9 +3,11 @@
 import type { AiBlock, AiRequest, AiResponse, Env } from './engine.js';
 import type { Channel } from './types.js';
 
-export function createDemoEnv(opts: { now?: () => Date; webUrl?: string } = {}): Env & { outbox: { channel: Channel; to: string; subject: string; text: string }[] } {
+export type DemoOutboxItem = { channel: Channel | 'push'; to: string; subject: string; text: string };
+
+export function createDemoEnv(opts: { now?: () => Date; webUrl?: string } = {}): Env & { outbox: DemoOutboxItem[] } {
   let seq = 0;
-  const outbox: { channel: Channel; to: string; subject: string; text: string }[] = [];
+  const outbox: DemoOutboxItem[] = [];
   const rand = () => {
     const c = (globalThis as { crypto?: { getRandomValues?: (a: Uint32Array) => Uint32Array } }).crypto;
     if (c?.getRandomValues) return c.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
@@ -45,6 +47,16 @@ export function createDemoEnv(opts: { now?: () => Date; webUrl?: string } = {}):
     ai: demoAi,
     seal: (v) => `demo:${v}`,
     unseal: (v) => v.replace(/^demo:/, ''),
+    // The demo "sends" through the church mailbox by noting the From address; a host containing "bad" fails.
+    smtp: async (account, batch) => {
+      if (account.host.includes('bad')) return batch.map(() => ({ ok: false, error: 'Could not sign in to the mailbox. Check the address and password.' }));
+      for (const m of batch) outbox.push({ channel: 'email', to: m.to, subject: `${m.subject} (from ${account.from})`, text: m.text });
+      return batch.map(() => ({ ok: true }));
+    },
+    push: async (batch) => {
+      for (const m of batch) outbox.push({ channel: 'push', to: m.token, subject: m.title, text: m.body });
+      return batch.map(() => ({ ok: true }));
+    },
   };
 }
 

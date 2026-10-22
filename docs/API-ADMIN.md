@@ -628,3 +628,27 @@ A leader opens the door code on their phone at the entrance (Check-in › Door Q
 ## Plans (22 Oct 2026)
 
 Priced at half of Elvanto for the same number of people, with no setup fee. Seed free up to 50 people; Grow ₹7,999 / $99 (500 people); Thrive ₹13,999 / $169 (2,500); Cathedral ₹16,999 / $199 (unlimited). Yearly is ten months. Source of truth: `src/core/plans.ts`.
+
+## The church's own mailbox
+
+Settings › Integrations › Email. The office connects a mailbox (Gmail or Google Workspace with an app password, Outlook, Hostinger mail, or any SMTP server). From then on every email for that church, sign-in codes included, leaves from that address. The password is sealed and never returned. Connecting sends one test email to the person connecting it, and fails if the mailbox refuses.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/admin/integrations` | Now also returns `email: {connected, host, port, user, from, fromName, connectedAt, lastError, lastSentAt}`. |
+| POST | `/admin/integrations/email` | `{host, port (465 or 587), user, password, from, fromName?}`. 422 `smtp_failed` when the test send fails. Omit `password` to keep the saved one. |
+| POST | `/admin/integrations/email/test` | `{to?}` → `{ok: true}`. |
+| DELETE | `/admin/integrations/email` | Back to the server's shared sender. |
+
+## Automatic notifications and push
+
+Settings › Notifications. For each kind the office picks email, push (the member and team apps) and WhatsApp (through Chitthi). Kinds: `rota.assigned` (the volunteer), `event.changed` (people who RSVPed or are serving, only when the time or place changes), `announcement.published` (everyone, push only by default), `prayer.new` and `visitor.new` (pastors and care team), `care.assigned` (the assigned team member), `door.scanned` (other adults in the household). The person whose action caused it is not told. Failures never break the action.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/admin/notifications` | Perm `settings`. `{rules: [{kind, label, description, audience, rule: {email, push, whatsapp}, sentCount}], devices: {member, team}, emailFrom}`. |
+| PUT | `/admin/notifications/:kind` | `{email, push, whatsapp}` → the same view. |
+| POST | `/me/devices` | From the apps: `{token, platform: 'android'|'ios'|'web', app: 'member'|'team'}`. A token belongs to one person; registering again refreshes it. |
+| DELETE | `/me/devices?token=` | On sign-out. Without `token`, all of the person's phones. |
+
+Push goes through Expo (`https://exp.host/--/api/v2/push/send`; `EXPO_ACCESS_TOKEN` env is optional). A `DeviceNotRegistered` answer removes the phone. Each message carries `data: {kind, link?}` for deep links.

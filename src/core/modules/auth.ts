@@ -7,6 +7,7 @@ import type { Ctx, Router } from '../engine.js';
 import { PERMISSIONS } from '../perms.js';
 import type { Collections, Session } from '../types.js';
 import { church, DAY, memberProfile, newPerson, normEmail, settings } from '../util.js';
+import { notify, pastorIds } from './notify.js';
 
 const OTP_TTL_MIN = 10;
 const MAX_ATTEMPTS = 5;
@@ -121,6 +122,7 @@ export function registerAuth(r: Router) {
       const local = otp.email.split('@')[0].replace(/[._-]+/g, ' ').trim();
       const firstName = local ? local[0].toUpperCase() + local.slice(1) : 'Friend';
       person = ctx.db.put('people', newPerson(ctx, { firstName, lastName: '', email: otp.email, status: 'visitor', tags: ['Signed up in app'] }));
+      void notify(ctx, 'visitor.new', { personIds: pastorIds(ctx), title: `New visitor: ${firstName}`, body: `${otp.email} just signed up in the app. Say hello and add them to a follow-up.`, link: `/admin/people/${person.id}` });
     }
     return issueSession(ctx, person, null, 'member');
   });

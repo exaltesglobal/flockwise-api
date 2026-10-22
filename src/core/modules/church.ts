@@ -23,6 +23,7 @@ import {
   touchAttendance,
   upcoming,
 } from '../util.js';
+import { notify } from './notify.js';
 
 const EVENT_FIELDS: (keyof EventInput)[] = ['kind', 'title', 'description', 'startsAt', 'endsAt', 'location', 'imageUrl', 'capacity', 'published', 'campusId', 'checkinEnabled', 'price'];
 const GROUP_FIELDS: (keyof GroupInput)[] = ['name', 'description', 'meetingSchedule', 'location', 'leaderName', 'isOpen', 'type', 'zone', 'leaderId'];
@@ -43,6 +44,12 @@ const visibleUpcoming = (ctx: Ctx) => ctx.db.all('events').filter((e) => e.publi
 /** Paid ticket for an event, if any. */
 export const paidTicket = (ctx: Ctx, eventId: string, personId: string) =>
   ctx.db.all('donations').some((d) => d.eventId === eventId && d.donorId === personId && d.status === 'succeeded');
+
+/** Tells everyone in the church about a new announcement (push by default; the office may add email). */
+function announce(ctx: Ctx, a: Collections['announcements']) {
+  const people = ctx.db.all('people').filter((p) => p.status !== 'inactive').map((p) => p.id);
+  void notify(ctx, 'announcement.published', { personIds: people, title: a.title, body: a.body.slice(0, 180), link: '/app' });
+}
 
 export function registerChurch(r: Router) {
   // ----- member -----
@@ -176,6 +183,12 @@ export function registerChurch(r: Router) {
     const ev = find(ctx, 'events', ctx.params[0], 'Event');
     const next = ctx.db.put('events', { ...ev, ...cleanEvent(ctx.body) });
     ctx.audit('updated', 'event', ev.id, `Updated event ${next.title}`);
+    const moved = next.startsAt !== ev.startsAt || next.endsAt !== ev.endsAt || next.location !== ev.location;
+    if (moved && new Date(next.endsAt).getTime() > ctx.now.getTime()) {
+      const people = [...rsvpsFor(ctx, ev.id).map((x) => x.personId), ...ctx.db.all('assignments').filter((a) => a.eventId === ev.id && a.status !== 'declined').map((a) => a.personId)];
+      const when = new Date(next.startsAt).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: settings(ctx).timezone || 'Asia/Kolkata' });
+      void notify(ctx, 'event.changed', { personIds: people, title: `${next.title} has changed`, body: `${next.title} is now on ${when}${next.location ? ` at ${next.location}` : ''}.`, link: `/app/events/${next.id}` });
+    }
     return eventView(ctx, next);
   });
   r.del('/admin/events/:id', { perm: 'events' }, (ctx) => {
@@ -281,6 +294,7 @@ export function registerChurch(r: Router) {
   r.post('/admin/announcements', { perm: 'comms' }, (ctx) => {
     requireFields(ctx.body, ['title', 'body']);
     const a = ctx.db.put('announcements', { imageUrl: null, status: ctx.body.status === 'draft' ? 'draft' : 'published', title: String(ctx.body.title), body: String(ctx.body.body), id: ctx.id('an'), publishedAt: ctx.now.toISOString() });
+    if (a.status === 'published') announce(ctx, a);
     ctx.audit('created', 'announcement', a.id, `Posted announcement ${a.title}`);
     return a;
   });
@@ -288,7 +302,10 @@ export function registerChurch(r: Router) {
     const a = find(ctx, 'announcements', ctx.params[0], 'Announcement');
     const patch = pick<Collections['announcements']>(ctx.body, ['title', 'body', 'status', 'imageUrl']);
     const next = { ...a, ...patch };
-    if (patch.status === 'published' && a.status === 'draft') next.publishedAt = ctx.now.toISOString();
+    if (patch.status === 'published' && a.status === 'draft') {
+      next.publishedAt = ctx.now.toISOString();
+      announce(ctx, next);
+    }
     ctx.audit('updated', 'announcement', a.id, `Updated announcement ${next.title}`);
     return ctx.db.put('announcements', next);
   });

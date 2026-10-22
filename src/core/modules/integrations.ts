@@ -1,8 +1,9 @@
 // Connections to other apps: Chitthi for WhatsApp, and API keys for the public API and MCP.
 import type { Ctx, DeliveryResult, Outgoing, Router } from '../engine.js';
 import { ApiError } from '../errors.js';
-import type { ApiKeyRecord, ApiKeyView, Channel, ChannelStatus, ChitthiConfig, ChitthiStatus, ChitthiTemplate, PaymentsStatus, RazorpayConfig } from '../types.js';
-import { churchId, settings } from '../util.js';
+import { emailAccount, unsealAccount } from '../mail.js';
+import type { ApiKeyRecord, ApiKeyView, Channel, ChannelStatus, ChitthiConfig, ChitthiStatus, ChitthiTemplate, EmailAccountConfig, EmailAccountStatus, PaymentsStatus, RazorpayConfig } from '../types.js';
+import { churchId, requireFields, settings } from '../util.js';
 
 export const CHITTHI_SIGNUP = 'https://app.chitthi.live/signup?ref=flockwise';
 
@@ -16,6 +17,13 @@ function chitthiStatus(ctx: Ctx): ChitthiStatus {
     connectedAt: c?.connectedAt ?? null, lastError: c?.lastError ?? null, lastSentAt: c?.lastSentAt ?? null, signupUrl: CHITTHI_SIGNUP,
   };
 }
+
+function emailStatus(ctx: Ctx): EmailAccountStatus {
+  const c = emailAccount(ctx.db);
+  return { connected: !!c && !!ctx.env.smtp, host: c?.host ?? '', port: c?.port ?? 465, user: c?.user ?? '', from: c?.from ?? '', fromName: c?.fromName ?? '', connectedAt: c?.connectedAt ?? null, lastError: c?.lastError ?? null, lastSentAt: c?.lastSentAt ?? null };
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Channel status with WhatsApp marked as going through Chitthi when the church connected it. */
 export function channelStatus(ctx: Ctx): ChannelStatus {
@@ -64,7 +72,49 @@ const cleanTemplate = (body: Record<string, unknown>) => ({
 });
 
 export function registerIntegrations(r: Router) {
-  r.get('/admin/integrations', { perm: 'settings' }, (ctx) => ({ chitthi: chitthiStatus(ctx) }));
+  r.get('/admin/integrations', { perm: 'settings' }, (ctx) => ({ chitthi: chitthiStatus(ctx), email: emailStatus(ctx) }));
+
+  // ----- the church's own mailbox -----
+  r.post('/admin/integrations/email', { perm: 'settings' }, async (ctx) => {
+    if (!ctx.env.smtp) throw new ApiError(422, 'not_available', 'This server cannot send through your own mailbox yet.');
+    requireFields(ctx.body, ['host', 'user', 'from']);
+    const host = String(ctx.body.host).trim().toLowerCase().slice(0, 120);
+    const port = Math.floor(Number(ctx.body.port)) || 465;
+    const user = String(ctx.body.user).trim().slice(0, 200);
+    const from = String(ctx.body.from).trim().toLowerCase().slice(0, 200);
+    const fromName = String(ctx.body.fromName ?? settings(ctx).name).trim().slice(0, 80);
+    if (!EMAIL_RE.test(from)) throw new ApiError(422, 'invalid', 'Enter the email address messages should come from.', { from: 'Not a valid email address' });
+    if (![25, 465, 587, 2525].includes(port)) throw new ApiError(422, 'invalid', 'Use port 465 (SSL) or 587 (STARTTLS).', { port: '465 or 587' });
+    const existing = emailAccount(ctx.db);
+    const password = String(ctx.body.password ?? '');
+    if (!password && !existing) throw new ApiError(422, 'invalid', 'Enter the mailbox password or app password.', { password: 'Required' });
+    const pass = password || ctx.env.unseal(existing!.passSealed);
+    // Prove it works before saving: one email to the person connecting it.
+    const to = ctx.staff?.email || from;
+    const [r] = await ctx.env.smtp({ host, port, user, pass, from, fromName }, [{ to, name: ctx.staff?.name ?? '', subject: `${settings(ctx).name} now sends from ${from}`, text: `This is a test from Flockwise. Emails to your members (sign-in codes, rota requests, receipts, announcements) will now come from ${from}.
+
+If you did not do this, change the mailbox password.` }]).catch((e: Error) => [{ ok: false, error: e.message }]);
+    if (!r?.ok) throw new ApiError(422, 'smtp_failed', r?.error ? `The mailbox refused: ${r.error}` : 'Could not send through this mailbox. Check the server, port, address and password.', { password: 'Check this' });
+    const c: EmailAccountConfig = { id: 'email', host, port, user, passSealed: ctx.env.seal(pass), from, fromName, connectedAt: ctx.now.toISOString(), connectedBy: ctx.staff?.name ?? '', lastError: null, lastSentAt: ctx.now.toISOString() };
+    ctx.db.put('integrations', c);
+    ctx.audit('updated', 'settings', null, `Connected the church mailbox ${from}`);
+    return emailStatus(ctx);
+  });
+  r.post('/admin/integrations/email/test', { perm: 'settings' }, async (ctx) => {
+    const c = emailAccount(ctx.db);
+    if (!c || !ctx.env.smtp) throw new ApiError(404, 'not_found', 'No mailbox is connected.');
+    const to = String(ctx.body.to ?? ctx.staff?.email ?? '').trim();
+    if (!EMAIL_RE.test(to)) throw new ApiError(422, 'invalid', 'Enter an email address.', { to: 'Not a valid email address' });
+    const [r] = await ctx.env.smtp(unsealAccount(ctx.env, c), [{ to, name: '', subject: `Test from ${settings(ctx).name}`, text: `This test email was sent from ${c.from} through Flockwise.` }]).catch((e: Error) => [{ ok: false, error: e.message }]);
+    ctx.db.put('integrations', { ...c, lastError: r?.ok ? null : r?.error ?? 'Sending failed', lastSentAt: r?.ok ? ctx.now.toISOString() : c.lastSentAt });
+    if (!r?.ok) throw new ApiError(422, 'smtp_failed', `The mailbox refused: ${r?.error ?? 'unknown error'}`);
+    return { ok: true };
+  });
+  r.del('/admin/integrations/email', { perm: 'settings' }, (ctx) => {
+    ctx.db.del('integrations', 'email');
+    ctx.audit('updated', 'settings', null, 'Disconnected the church mailbox');
+    return emailStatus(ctx);
+  });
 
   r.post('/admin/integrations/chitthi', { perm: 'settings' }, async (ctx) => {
     const apiKey = String(ctx.body.apiKey ?? '').trim();

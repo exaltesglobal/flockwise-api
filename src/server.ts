@@ -9,7 +9,7 @@ import { config } from './config.js';
 import { bootstrapChurch, createChurchEngine, createPlatform, Db, type Env } from './core/index.js';
 import type { Currency } from './core/types.js';
 import { razorpayCheckout, razorpaySubscriptions } from './giving.js';
-import { channelStatus, deliver, sendOtpEmail } from './providers.js';
+import { channelStatus, deliver, expoPush, sendOtpEmail, sendViaMailbox } from './providers.js';
 import { cancelSubscription, checkKeys, createPaymentLink, createPlan, createSubscription, getPaymentLink } from './razorpay.js';
 import { coreStore } from './store/core-store.js';
 import type { Store } from './store/types.js';
@@ -24,6 +24,8 @@ export function createHub() {
   const hooks = {
     sendOtpEmail,
     deliver,
+    smtp: sendViaMailbox,
+    push: expoPush,
     /** Starts saving a new church's database (MySQL or file); set by index.ts. */
     persist: null as null | ((id: string, db: Db) => Promise<unknown>),
   };
@@ -65,6 +67,8 @@ export function createHub() {
       },
       seal,
       unseal,
+      smtp: (account, batch) => hooks.smtp(account, batch),
+      push: (batch) => hooks.push(batch),
       verifyRazorpay: checkKeys,
       serverPaymentKeys: isDefault && !!config.razorpay.main,
       razorpayPartnerUrl: config.razorpayPartnerUrl,

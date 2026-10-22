@@ -463,6 +463,10 @@ export type ChurchSettings = Church & {
   livestream?: Partial<LiveSettings>;
   /** Parents may check their family in from the member app (default on). */
   phoneCheckin?: boolean;
+  /** Which channels each automatic notification uses; missing kinds use the defaults. */
+  notifications?: Partial<Record<NotificationKind, NotificationRule>>;
+  /** How many automatic notifications went out, by kind. */
+  notificationCounts?: Partial<Record<NotificationKind, number>>;
 };
 
 export type Permission =
@@ -812,6 +816,32 @@ export type ChitthiStatus = {
 };
 export type ChitthiTemplate = { name: string; language: string; category: string; body: string; params: number };
 
+/** The church's own mailbox (Gmail, Google Workspace, Outlook, Hostinger or any SMTP). Every email leaves from it. */
+export type EmailAccountConfig = {
+  id: 'email';
+  host: string;
+  port: number;
+  user: string;
+  /** The mailbox or app password, sealed by the host; never sent to the browser. */
+  passSealed: string;
+  from: string;
+  fromName: string;
+  connectedAt: string;
+  connectedBy: string;
+  lastError: string | null;
+  lastSentAt: string | null;
+};
+export type EmailAccountStatus = { connected: boolean; host: string; port: number; user: string; from: string; fromName: string; connectedAt: string | null; lastError: string | null; lastSentAt: string | null };
+
+/** A phone that can receive push notifications, registered by the member app or the team app. */
+export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
+
+/** Things Flockwise can tell people about on its own. The office picks the channels for each. */
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'care.assigned' | 'visitor.new' | 'door.scanned';
+export type NotificationRule = { email: boolean; push: boolean; whatsapp: boolean };
+export type NotificationCatalogEntry = { kind: NotificationKind; label: string; description: string; audience: string; rule: NotificationRule; sentCount: number };
+export type NotificationsView = { rules: NotificationCatalogEntry[]; devices: { member: number; team: number }; emailFrom: string | null };
+
 /** A key for the public API and the MCP server. It acts as the staff member who made it. */
 export type ApiKeyRecord = { id: string; name: string; prefix: string; hash: string; staffId: string; access: 'read' | 'full'; createdAt: string; lastUsedAt: string | null; revokedAt: string | null };
 export type ApiKeyView = Omit<ApiKeyRecord, 'hash'> & { createdByName: string };
@@ -975,7 +1005,7 @@ export type AccountsSummary = {
 
 export type Collections = {
   settings: ChurchSettings & { id: string };
-  integrations: ChitthiConfig | RazorpayConfig | RazorpaySetup | WaBotConfig;
+  integrations: ChitthiConfig | RazorpayConfig | RazorpaySetup | WaBotConfig | EmailAccountConfig;
   kycFiles: KycFile;
   recurring: RecurringGift;
   botMessages: BotMessage;
@@ -1030,6 +1060,7 @@ export type Collections = {
   otps: OtpRecord;
   refreshTokens: RefreshRecord;
   teamLogins: TeamLogin;
+  devices: Device;
   attendanceHistory: AttendancePoint;
   meta: MetaRecord;
   forms: Form;
@@ -1062,7 +1093,7 @@ export const KINDS = [
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
   'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
-  'streams', 'streamViews', 'teamLogins',
+  'streams', 'streamViews', 'teamLogins', 'devices',
 ] as const satisfies readonly Kind[];
 
 // ----- assisted Razorpay setup: Flockwise's team opens the church's Razorpay account and does its KYC -----
