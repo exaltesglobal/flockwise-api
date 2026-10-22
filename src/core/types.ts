@@ -969,6 +969,10 @@ export type Collections = {
   ssAttendance: SsAttendance;
   ssExams: SsExam;
   ssMarks: SsMark;
+  missionaries: Missionary;
+  missionSupport: MissionSupport;
+  missionReports: MissionReport;
+  missionPayouts: MissionPayout;
   apiKeys: ApiKeyRecord;
   automations: Automations & { id: string };
   greetings: Greeting;
@@ -1031,6 +1035,7 @@ export const KINDS = [
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
   'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks',
+  'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
 ] as const satisfies readonly Kind[];
 
 // ----- assisted Razorpay setup: Flockwise's team opens the church's Razorpay account and does its KYC -----
@@ -1402,4 +1407,111 @@ export type MemberSundaySchool = {
     lesson: SsLesson | null;
     results: { exam: string; date: string; marks: number | null; maxMarks: number; grade: SsGrade | null; rank: number | null }[];
   }[];
+};
+
+// ---------- missions support ----------
+
+export type Missionary = {
+  id: string;
+  /** A person, a couple ("Rev. & Mrs. John") or a mission organisation's project. */
+  name: string;
+  photoUrl: string | null;
+  /** Where they serve: a district, state or country. */
+  field: string;
+  organisation: string;
+  work: string;
+  since: string | null;
+  status: 'active' | 'ended';
+  /** Gifts for this missionary go to their own fund, so receipts and totals stay separate. */
+  fundId: string;
+  /** What they need each month, in paise. */
+  monthlyNeed: number | null;
+  email: string | null;
+  phone: string | null;
+  prayerPoints: string;
+  /** Shown to members in the app. */
+  showPublic: boolean;
+  createdAt: string;
+};
+/** A monthly commitment: a member, a family, a group or the church budget itself. */
+export type MissionSupport = {
+  id: string;
+  missionaryId: string;
+  kind: 'member' | 'church';
+  personId: string | null;
+  name: string;
+  /** Per month, in paise. */
+  amount: number;
+  startedOn: string;
+  endedOn: string | null;
+  createdAt: string;
+};
+export type MissionReport = {
+  id: string;
+  missionaryId: string;
+  date: string;
+  title: string;
+  body: string;
+  prayerPoints: string;
+  /** Shown to members in the app. */
+  published: boolean;
+  sentAt: string | null;
+  sentCount: number;
+  createdAt: string;
+};
+/** Money the church sent on to the missionary. */
+export type MissionPayout = {
+  id: string;
+  missionaryId: string;
+  date: string;
+  amount: number;
+  method: 'bank_transfer' | 'upi' | 'cheque' | 'cash';
+  reference: string;
+  note: string;
+  by: string;
+  createdAt: string;
+};
+export type SupportStatus = 'autopay' | 'on_track' | 'behind' | 'church' | 'ended';
+export type MissionaryView = Missionary & {
+  fundName: string;
+  /** Active monthly commitments, in paise. */
+  committed: number;
+  supporters: number;
+  /** monthlyNeed minus committed, when a need is set. */
+  gap: number | null;
+  receivedFy: number;
+  sentFy: number;
+  /** Everything received to the fund minus everything sent on. */
+  balance: number;
+  lastReportAt: string | null;
+  lastPayoutAt: string | null;
+};
+export type MissionSupportView = MissionSupport & { status: SupportStatus; given3m: number; expected3m: number };
+export type MissionaryDetail = MissionaryView & {
+  support: MissionSupportView[];
+  reports: MissionReport[];
+  payouts: MissionPayout[];
+  months: { month: string; received: number; sent: number }[];
+};
+export type MissionsOverview = {
+  missionaries: MissionaryView[];
+  committed: number;
+  needed: number;
+  receivedFy: number;
+  sentFy: number;
+  behind: { missionaryId: string; missionaryName: string; supportId: string; name: string }[];
+};
+export type MemberMission = {
+  id: string;
+  name: string;
+  photoUrl: string | null;
+  field: string;
+  organisation: string;
+  work: string;
+  prayerPoints: string;
+  fundId: string;
+  monthlyNeed: number | null;
+  committed: number;
+  reports: { id: string; date: string; title: string; body: string; prayerPoints: string }[];
+  mine: { amount: number; status: SupportStatus } | null;
 };

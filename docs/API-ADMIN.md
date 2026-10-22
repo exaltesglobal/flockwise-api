@@ -502,3 +502,23 @@ Classes by age, the weekly register, lessons, exams and the annual day prize lis
 | GET | `/admin/sunday-school/prizes?from=&to=` | Per class: top 3 in each published exam, best attendance (at least 75% of Sundays) and most memory verses. Defaults to this calendar year. |
 
 Members: `GET /me/sunday-school` lists the children in the member's household who are in a class, with attendance, memory verses, this week's lesson and published results.
+
+## Missions
+
+Missionaries the church supports, monthly commitments, money received and sent on, and field reports. Read: `giving.view`. Write: `giving.edit` (reports also `comms`). Plan: Grow.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/admin/missions` | `MissionsOverview`: each missionary with committed, gap, received and sent this financial year, balance; totals; supporters who are behind. |
+| POST | `/admin/missions` | `{name, field?, organisation?, work?, prayerPoints?, monthlyNeed?, since?, email?, phone?, photoUrl?, showPublic?, fundId?}`. Without `fundId`, makes a fund "Missions · name". |
+| GET/PATCH/DELETE | `/admin/missions/:id` | `MissionaryDetail` with support, reports, payouts and 12 months of money in and out. PATCH `status: 'ended'` closes the fund it made. DELETE only when nothing was received or sent (409 otherwise). |
+| POST | `/admin/missions/:id/support` | `{personId? or name, amount (monthly, paise), kind?: 'member'|'church', startedOn?}`. One active commitment per person. |
+| PATCH/DELETE | `/admin/missions/:id/support/:sid` | PATCH `{amount?, endedOn?, name?}`. `endedOn` is the day it stopped. |
+| POST/DELETE | `/admin/missions/:id/payouts[/:pid]` | `{amount, date, method: bank_transfer|upi|cheque|cash, reference?, note?}`. No future dates. |
+| POST | `/admin/missions/:id/reports` | `{title, body, prayerPoints, date?, published, send}`. `send` emails supporters who allow email and WhatsApps (or SMSes) the rest; returns `delivery: {sent, failed, unreachable}`. |
+| PATCH/DELETE | `/admin/missions/:id/reports/:rid` | |
+| POST | `/admin/missions/:id/reports/:rid/send` | Sends (again) to active supporters. |
+
+Support status: `autopay` (an active AutoPay to the fund), `on_track` (gifts to the fund over the last three full months are at least 90% of the commitment), `behind`, `church`, `ended`.
+
+Members: `GET /missions` (active missionaries shown to members, with published news and `mine`), `PUT /missions/:id/support {amount}` to commit or change, `DELETE /missions/:id/support` to stop. Give to a missionary with `/app/give?fund=<fundId>&amount=<rupees>&monthly=1`.

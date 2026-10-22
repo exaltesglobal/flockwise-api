@@ -228,7 +228,7 @@ export function seedDemo(db: Db, env: Env) {
     const fund = funds.find((f) => f.id === g.fundId)!;
     const status = g.status ?? 'succeeded';
     return {
-      id: id('dn'),
+      id: g.id ?? id('dn'),
       donorId: null,
       donorEmail: null,
       donorPhone: null,
@@ -323,6 +323,46 @@ export function seedDemo(db: Db, env: Env) {
     db.put('auctionLots', { id: `al_${i + 1}`, campaignId: 'cp_harvest', inKindId: `ik_${n}`, title: `${item[1]} ${item[0].toLowerCase()}`, bidderId: p.id, bidderName: `${p.firstName} ${p.lastName}`, amount, paid, method: d?.method ?? null, paidAt: d?.paidAt ?? null, donationId: d?.id ?? null, createdAt: at(-7, 12, i) });
   });
   db.put('donations', gift({ donorId: DEMO_MEMBER, donorName: 'Priya Thomas', fundId: 'fd_harvest', amount: 500000, createdAt: at(-3, 20), method: 'upi' }));
+  // ----- missionaries the church supports -----
+  {
+    const rm = rng(4242); // own stream so the rest of the demo data stays the same
+    let n = 0;
+    const defs: [string, string, string, string, string, number, number, string][] = [
+      ['ms_kujur', 'Rev. Joseph & Mary Kujur', 'Gumla, Jharkhand', 'Gossner Evangelical Lutheran Church', 'Village churches and an evening tuition centre for 60 Oraon children.', 2_500_000, 1_000_000, 'Rains washed out the road to Basia: pray for safe travel. Two new house churches in Palkot. The tuition centre needs a second teacher.'],
+      ['ms_ashadeep', 'Asha Deep Children\'s Home', 'Kandhamal, Odisha', 'India Mission Trust', 'A home for 24 girls, with schooling, meals and care.', 4_000_000, 1_500_000, 'Board exam results in May. A new roof before the monsoon. Health for the house mother, Anita.'],
+      ['ms_lalrem', 'Samuel & Ruth Lalremruata', 'Lower Subansiri, Arunachal Pradesh', 'Bible translation partnership', 'Translating the New Testament into Nyishi with a local team.', 3_000_000, 0, 'The team is checking Mark with village readers. Visa and permit renewals for the inner-line area.'],
+    ];
+    const pool = adults.filter((p) => p.status === 'member').slice(4);
+    // A day in a past month (mo months back), at 10:00 IST.
+    const monthDay = (mo: number, d: number) => { const t = new Date(now); return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() - mo, d, 4, 30)).toISOString(); };
+    const sentIn = new Map<string, number>();
+    for (const [mid, name, field, organisation, work, need, church, prayer] of defs) {
+      const fundId = `fd_${mid.slice(3)}`;
+      funds.push(db.put('funds', { id: fundId, name: `Missions · ${name}`, description: `Support for ${name} in ${field}.`, taxDeductible: true, active: true, goal: null }));
+      db.put('missionaries', { id: mid, name, photoUrl: null, field, organisation, work, since: at(-900 - defs.findIndex((x) => x[0] === mid) * 400, 0).slice(0, 10), status: 'active', fundId, monthlyNeed: need, email: null, phone: null, prayerPoints: prayer, showPublic: true, createdAt: at(-900, 10) });
+      if (church) db.put('missionSupport', { id: `mss_${mid}_church`, missionaryId: mid, kind: 'church', personId: null, name: 'Church budget', amount: church, startedOn: at(-400, 0).slice(0, 10), endedOn: null, createdAt: at(-400, 10) });
+      const supporters = pool.splice(0, 5 + Math.floor(rm() * 4));
+      if (mid === 'ms_kujur') supporters.push(db.get('people', DEMO_MEMBER)!);
+      supporters.forEach((p, i) => {
+        const amount = [50000, 100000, 100000, 200000, 250000, 500000][Math.floor(rm() * 6)];
+        const behind = i === 1 && mid !== 'ms_lalrem';
+        db.put('missionSupport', { id: `mss_${mid}_${i}`, missionaryId: mid, kind: 'member', personId: p.id, name: `${p.firstName} ${p.lastName}`, amount, startedOn: at(-200, 0).slice(0, 10), endedOn: null, createdAt: at(-200, 10) });
+        for (let mo = 1; mo <= 6; mo++) {
+          if (behind && mo <= 3) continue;
+          db.put('donations', gift({ id: `dn_ms_${++n}`, donorId: p.id, donorName: `${p.firstName} ${p.lastName}`, fundId, amount, createdAt: monthDay(mo, 3 + Math.floor(rm() * 12)), method: rm() < 0.7 ? 'upi' : 'bank_transfer' }));
+          sentIn.set(`${mid}:${mo}`, (sentIn.get(`${mid}:${mo}`) ?? 0) + amount);
+        }
+      });
+      // The church budget share is booked as a monthly transfer into the fund, then everything is sent on.
+      for (let mo = 1; mo <= 6; mo++) {
+        if (church) db.put('donations', gift({ id: `dn_ms_${++n}`, donorId: null, donorName: 'Church budget', fundId, amount: church, createdAt: monthDay(mo, 1), method: 'bank_transfer' }));
+        const due = (sentIn.get(`${mid}:${mo}`) ?? 0) + church;
+        db.put('missionPayouts', { id: `msp_${mid}_${mo}`, missionaryId: mid, date: monthDay(mo - 1, 2).slice(0, 10), amount: due, method: 'bank_transfer', reference: `NEFT${String(Math.floor(rm() * 1e8)).padStart(8, '0')}`, note: '', by: 'Vinod Mathew', createdAt: monthDay(mo - 1, 2) });
+      }
+    }
+    db.put('missionReports', { id: 'msr_1', missionaryId: 'ms_kujur', date: at(-12, 0).slice(0, 10), title: 'Baptisms at Palkot', body: 'Eleven people were baptised in the river at Palkot last Sunday, most of them from two families who started coming to the house church in March. The tuition centre reopened after the harvest and 64 children came on the first evening.', prayerPoints: 'A second teacher for the tuition centre\nSafe travel on the Basia road', published: true, sentAt: at(-12, 18), sentCount: 7, createdAt: at(-12, 17) });
+    db.put('missionReports', { id: 'msr_2', missionaryId: 'ms_ashadeep', date: at(-40, 0).slice(0, 10), title: 'New roof is on', body: 'Thanks to your gifts the new roof went on two weeks before the rains. The girls moved back into the big dormitory and the study room is dry again.', prayerPoints: 'Board exams in March\nHealth for Anita', published: true, sentAt: at(-40, 18), sentCount: 6, createdAt: at(-40, 17) });
+  }
   db.put('meta', { id: `receipt:${fy(now)}`, value: String(receipt) });
 
   // ----- this Sunday's bulletin -----
