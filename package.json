@@ -1,9 +1,9 @@
 {
   "name": "flockwise-api",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Flockwise backend API. v0.1 covers giving with Razorpay; auth, people and the rest of docs/API.md follow.",
+  "description": "Flockwise backend API: email sign-in, people, events, check-in, volunteers, service planning, groups, giving with Razorpay, messaging and care.",
   "engines": {
     "node": ">=20"
   },
@@ -12,16 +12,17 @@
     "build": "tsc -p .",
     "start": "node dist/index.js",
     "test": "tsx --test test/*.test.ts",
-    "typecheck": "tsc -p . --noEmit",
-    "token": "tsx src/token.ts"
+    "typecheck": "tsc -p . --noEmit"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
     "hono": "^4.13.13",
-    "mysql2": "^3.24.6"
+    "mysql2": "^3.24.6",
+    "nodemailer": "^6.10.1"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
+    "@types/nodemailer": "^8.0.2",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   }

@@ -1,62 +1,44 @@
-// Bearer-token auth. Tokens are HS256 JWTs signed with JWT_SECRET. The OTP sign-in endpoints
-// (docs/API.md, /auth/*) will issue them; until then use `npm run token` to mint one for testing.
-import { createHmac, timingSafeEqual } from 'node:crypto';
-
-import type { MiddlewareHandler } from 'hono';
+// Access tokens are HS256 JWTs signed with JWT_SECRET and valid for an hour. Refresh
+// tokens are random, stored hashed by the engine, and rotated on every refresh.
+import { createHash, createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 
 import { config } from './config.js';
-import { ApiError } from './errors.js';
-
-export type Claims = {
-  sub: string; // member id
-  church: string;
-  name: string;
-  email?: string | null;
-  phone?: string | null;
-  staffRole?: 'owner' | 'admin' | 'pastor' | 'finance' | 'leader' | null;
-  exp: number; // seconds since epoch
-};
-
-export type AuthEnv = { Variables: { user: Claims } };
+import type { AuthClaims } from './core/index.js';
 
 const b64 = (b: Buffer | string) => Buffer.from(b).toString('base64url');
+const ACCESS_TTL = 3600;
 
-export function signToken(claims: Omit<Claims, 'exp'>, ttlSeconds = 3600) {
+type Jwt = AuthClaims & { church: string; exp: number };
+
+export function signAccess(claims: AuthClaims) {
+  const exp = Math.floor(Date.now() / 1000) + ACCESS_TTL;
   const header = b64(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const body = b64(JSON.stringify({ ...claims, exp: Math.floor(Date.now() / 1000) + ttlSeconds }));
+  const body = b64(JSON.stringify({ ...claims, church: config.church.id, exp } satisfies Jwt));
   const sig = b64(createHmac('sha256', config.jwtSecret).update(`${header}.${body}`).digest());
-  return `${header}.${body}.${sig}`;
+  return { token: `${header}.${body}.${sig}`, expiresAt: new Date(exp * 1000).toISOString() };
 }
 
-export function verifyToken(token: string): Claims | null {
+export function verifyAccess(token: string | undefined): AuthClaims | null {
+  if (!token) return null;
   const [header, body, sig] = token.split('.');
-  if (!header || !body || !sig || !config.jwtSecret) return null;
+  if (!header || !body || !sig) return null;
   const expected = createHmac('sha256', config.jwtSecret).update(`${header}.${body}`).digest();
   const given = Buffer.from(sig, 'base64url');
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
   try {
-    const claims = JSON.parse(Buffer.from(body, 'base64url').toString()) as Claims;
-    return claims.exp * 1000 > Date.now() ? claims : null;
+    const c = JSON.parse(Buffer.from(body, 'base64url').toString()) as Jwt;
+    if (c.exp * 1000 <= Date.now() || c.church !== config.church.id) return null;
+    return { sub: c.sub, staffId: c.staffId ?? null, scope: c.scope === 'admin' ? 'admin' : 'member' };
   } catch {
     return null;
   }
 }
 
-const DEV_USER: Claims = { sub: 'p_priya', church: config.church.id, name: 'Priya Thomas', email: 'priya@example.com', phone: '+919876543210', staffRole: 'owner', exp: 0 };
+/** Keyed hash for OTP codes and refresh tokens, so a database leak does not reveal them. */
+export const hashSecret = (value: string) => createHash('sha256').update(`${config.jwtSecret}:${value}`).digest('hex');
 
-export const requireMember: MiddlewareHandler<AuthEnv> = async (c, next) => {
-  const token = c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
-  const claims = token ? verifyToken(token) : config.devAuth ? DEV_USER : null;
-  if (!claims) throw new ApiError(401, 'unauthorized', 'Please sign in again.');
-  if (claims.church !== config.church.id) throw new ApiError(403, 'wrong_church', 'This account belongs to a different church.');
-  c.set('user', claims);
-  await next();
-};
-
-export function requireStaff(...roles: NonNullable<Claims['staffRole']>[]): MiddlewareHandler<AuthEnv> {
-  return async (c, next) => {
-    const role = c.get('user').staffRole;
-    if (!role || (roles.length && !roles.includes(role) && role !== 'owner' && role !== 'admin')) throw new ApiError(403, 'forbidden', 'You do not have access to this.');
-    await next();
-  };
+export function randomString(length: number, alphabet: string) {
+  let out = '';
+  for (let i = 0; i < length; i++) out += alphabet[randomInt(alphabet.length)];
+  return out;
 }

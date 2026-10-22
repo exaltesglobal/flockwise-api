@@ -32,7 +32,7 @@ export function devRoutes(store: Store) {
     const paid = form.result === 'paid';
     if (d.status === 'pending')
       await store.updateDonation(d.id, paid ? { status: 'succeeded', method: 'upi', providerPaymentId: `fake_${d.id}`, paidAt: new Date().toISOString() } : { status: 'failed' });
-    return c.redirect(`${config.webUrl}/app/give?payment=${paid ? 'success' : 'cancelled'}`);
+    return c.redirect(`${config.webUrl}${d.eventId ? `/app/events/${d.eventId}` : '/app/give'}?payment=${paid ? 'success' : 'cancelled'}`);
   });
 
   return app;

@@ -2,12 +2,37 @@ import { serve } from '@hono/node-server';
 
 import { createApp } from './app.js';
 import { assertConfig, config } from './config.js';
-import { memoryStore } from './store/memory.js';
-import { mysqlStore } from './store/mysql.js';
+import { seedDemo } from './core/seed.js';
+import { filePersistence, mysqlPersistence } from './persist.js';
+import { channelStatus } from './providers.js';
+import { bootstrap, buildServer } from './server.js';
 
 assertConfig();
-const store = config.db ? mysqlStore(config.db) : memoryStore(config.church.id);
+const server = buildServer();
+const persistence = config.db ? await mysqlPersistence(config.db, config.church.id, server.db) : config.dataFile ? filePersistence(config.dataFile, server.db) : null;
 
-serve({ fetch: createApp(store).fetch, port: config.port }, (info) => {
-  console.log(`Flockwise API on :${info.port} · payments: ${config.razorpay.main ? 'Razorpay' : 'test checkout'} · store: ${config.db ? 'MySQL' : 'memory'}`);
+if (config.seedDemo && !server.db.count('people')) {
+  seedDemo(server.db, server.env);
+  console.log('Loaded the sample church (SEED_DEMO=true).');
+}
+bootstrap(server);
+if (!server.db.count('staff')) console.warn('No church office login yet. Set OWNER_EMAIL and restart, then sign in at /admin with that email.');
+
+// Scheduled messages and daily automations.
+const tick = () => server.engine.tick().catch((e) => console.error('Automations failed', e));
+setInterval(tick, 60_000).unref();
+setTimeout(tick, 5_000).unref();
+
+serve({ fetch: createApp(server.engine, server.store).fetch, port: config.port }, (info) => {
+  const ch = channelStatus();
+  console.log(
+    `Flockwise API on :${info.port} · data: ${config.db ? 'MySQL' : config.dataFile ? config.dataFile : 'memory (lost on restart)'} · payments: ${config.razorpay.main ? 'Razorpay' : 'test checkout'} · email: ${ch.email.provider} · SMS: ${ch.sms.provider} · WhatsApp: ${ch.whatsapp.provider}`,
+  );
 });
+
+for (const sig of ['SIGTERM', 'SIGINT'] as const)
+  process.on(sig, async () => {
+    await persistence?.settle().catch(() => undefined);
+    await persistence?.close().catch(() => undefined);
+    process.exit(0);
+  });
