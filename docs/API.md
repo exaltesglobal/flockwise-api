@@ -145,3 +145,8 @@ Only works when the church turns on its public page (forms only need `isPublic`)
 `invalid`, `email_required`, `not_staff`, `too_many_codes`, `too_many_attempts`, `invalid_code`, `code_expired`,
 `unauthorized`, `forbidden`, `not_found`, `payment_required`, `already_paid`, `ticket_paid`, `fcra_not_registered`,
 `directory_opt_in`, `not_open`, `child`, `full`.
+
+## Celebrations
+
+- `GET /celebrations` → `{ upcoming: MemberCelebration[], myWishes }`. Birthdays and wedding anniversaries in the next 7 days among the member's groups, household, and (when both opted in) the directory. `myWishes` are wishes the member received in the last week.
+- `POST /celebrations/:personId/wish` `{ kind, message? }` → one wish per person per occasion; sending again updates it.

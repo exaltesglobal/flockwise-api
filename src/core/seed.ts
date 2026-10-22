@@ -439,4 +439,11 @@ export function seedDemo(db: Db, env: Env) {
   audit(2, 'David Samuel', 'updated', 'plan', 'Updated the order of service for Sunday Worship (English)');
   audit(3, 'Leena George', 'imported', 'person', 'Imported people from excel: 12 added, 3 updated');
   void kids;
+
+  // Celebrations this week, so the demo always has someone to greet.
+  const md = (days: number) => new Date(now + days * DAY).toISOString().slice(5, 10);
+  const celebrate = db.all('people').filter((p) => p.id !== DEMO_MEMBER && p.status === 'member' && p.consent.directory && !!p.birthDate && Number(p.birthDate.slice(0, 4)) < new Date(now).getUTCFullYear() - 25).slice(0, 3);
+  if (celebrate[0]) db.put('people', { ...celebrate[0], birthDate: `${celebrate[0].birthDate?.slice(0, 4) ?? '1985'}-${md(0)}` });
+  if (celebrate[1]) db.put('people', { ...celebrate[1], birthDate: `${celebrate[1].birthDate?.slice(0, 4) ?? '1990'}-${md(2)}` });
+  if (celebrate[2]) db.put('people', { ...celebrate[2], anniversary: `2010-${md(4)}` });
 }

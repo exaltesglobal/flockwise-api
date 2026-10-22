@@ -5,6 +5,7 @@ import { ApiError } from '../errors.js';
 import type { Ctx, Router } from '../engine.js';
 import type { Audience, AudiencePreview, Automations, Channel, Collections, Message, MessageInput } from '../types.js';
 import { checkinsFor, DAY, find, fullName, localDate, localHour, pick, requireFields, rsvpsFor, settings } from '../util.js';
+import { sendStaffDigest } from './celebrations.js';
 import { listMembers, runListWorkflows } from './workflows.js';
 
 const CHANNELS: Channel[] = ['email', 'sms', 'whatsapp'];
@@ -144,9 +145,11 @@ export const DEFAULT_AUTOMATIONS: Automations = {
   welcome: { enabled: true, channel: 'email', subject: 'Welcome to {{church}}', body: 'Hi {{firstName}},\n\nIt was wonderful to have you with us! You can see what is on, join a group and more in our app: {{appLink}}\n\nSee you soon,\n{{church}}', createFollowUp: true },
   missing: { enabled: true, channel: 'whatsapp', subject: 'We miss you', body: 'Hi {{firstName}}, we have missed you at {{church}}! Is there anything we can pray about with you?', weeks: 3, createFollowUp: true },
   volunteerReminder: { enabled: true, channel: 'email', subject: 'Reminder: you are serving soon', body: 'Hi {{firstName}}, a reminder that you are serving this week. Check the details in the app: {{appLink}}', daysBefore: 2 },
+  staffDigest: { enabled: true, daysAhead: 7 },
 };
 
-export const automations = (ctx: Ctx) => ctx.db.get('automations', 'church') ?? { id: 'church', ...DEFAULT_AUTOMATIONS };
+// Older saved settings may predate newer automations, so defaults fill the gaps.
+export const automations = (ctx: Ctx) => ({ id: 'church', ...DEFAULT_AUTOMATIONS, ...(ctx.db.get('automations', 'church') ?? {}) });
 
 
 /**
@@ -179,6 +182,7 @@ export async function runDue(ctx: Ctx) {
     const ids = people.filter((p) => p.anniversary?.slice(5) === mmdd).map((p) => p.id);
     if (ids.length) await sendDirect(ctx, a.anniversary.channel, ids, a.anniversary.subject, a.anniversary.body, 'automation');
   }
+  if (a.staffDigest.enabled) await sendStaffDigest(ctx, a.staffDigest.daysAhead);
   if (a.welcome.enabled) {
     const welcomed = new Set((ctx.db.get('meta', 'automations:welcomed')?.value ?? '').split(',').filter(Boolean));
     const fresh = people.filter((p) => p.status === 'visitor' && !welcomed.has(p.id) && ctx.now.getTime() - new Date(p.joinedAt).getTime() < 7 * DAY);
@@ -315,6 +319,10 @@ export function registerComms(r: Router) {
       const patch = pick(ctx.body[k], ['enabled', 'channel', 'subject', 'body', 'createFollowUp', 'weeks', 'daysBefore']) as Record<string, unknown>;
       if (patch.channel && !CHANNELS.includes(patch.channel as Channel)) delete patch.channel;
       (next as Record<string, unknown>)[k] = { ...cur[k], ...patch };
+    }
+    if (ctx.body.staffDigest) {
+      const d = ctx.body.staffDigest;
+      next.staffDigest = { enabled: typeof d.enabled === 'boolean' ? d.enabled : cur.staffDigest.enabled, daysAhead: d.daysAhead ? Math.min(31, Math.max(1, Math.round(Number(d.daysAhead)))) : cur.staffDigest.daysAhead };
     }
     ctx.audit('updated', 'automations', null, 'Updated message automations');
     return ctx.db.put('automations', next);

@@ -331,3 +331,9 @@ Songs also take `chordChart` (ChordPro text) and `attachments: [{ name, url, kin
 | GET, POST | `/admin/sermons` | `comms` or `services` |
 | PATCH, DELETE | `/admin/sermons/:id` | `comms` or `services` |
 | GET, PUT | `/admin/public-page` | `settings` |
+
+## Celebrations
+
+- `GET /admin/celebrations?days=30&kind=birthday|anniversary|baptism` (people.view) → `Celebration[]`, soonest first, with `years`, `isChild`, `greeted` (office greeting sent this year) and `wishes` (member wishes).
+- `POST /admin/celebrations/greet` (comms) `{ personId, kind, channel, subject?, body }` → sends the greeting and records it.
+- Automation `staffDigest: { enabled, daysAhead }` in `/admin/messages/automations`: emails staff with the `care` permission each morning someone celebrates, and a full list on Mondays.

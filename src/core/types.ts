@@ -345,6 +345,8 @@ export type Automations = {
   welcome: Automation & { createFollowUp: boolean };
   missing: Automation & { weeks: number; createFollowUp: boolean };
   volunteerReminder: Automation & { daysBefore: number };
+  /** Email to pastors and care staff listing upcoming birthdays and anniversaries. */
+  staffDigest: { enabled: boolean; daysAhead: number };
 };
 export type ChannelStatus = Record<Channel, { configured: boolean; provider: string }>;
 
@@ -650,9 +652,33 @@ export type PublicChurch = {
   forms: { id: string; title: string; description: string }[];
 };
 
+// ---------- celebrations ----------
+
+export type CelebrationKind = 'birthday' | 'anniversary' | 'baptism';
+export type Celebration = {
+  personId: string;
+  name: string;
+  kind: CelebrationKind;
+  /** This year's date (or next year's, when it has passed). */
+  date: string;
+  daysAway: number;
+  /** Age turning, or years married / since baptism. */
+  years: number | null;
+  isChild: boolean;
+  phone: string | null;
+  email: string | null;
+  householdName: string | null;
+  greeted: boolean;
+  wishes: number;
+};
+export type Greeting = { id: string; personId: string; kind: CelebrationKind; year: number; fromId: string | null; fromName: string; message: string; channel: Channel | 'wall'; at: string };
+export type MemberCelebration = { personId: string; name: string; kind: CelebrationKind; date: string; daysAway: number; isMe: boolean; wishedByMe: boolean; wishes: number };
+export type MemberCelebrations = { upcoming: MemberCelebration[]; myWishes: { kind: CelebrationKind; fromName: string; message: string; at: string }[] };
+
 export type Collections = {
   settings: ChurchSettings & { id: string };
   automations: Automations & { id: string };
+  greetings: Greeting;
   people: Omit<Person, 'groups'>;
   campuses: Campus;
   events: Omit<AdminEvent, 'goingCount' | 'checkinCount' | 'campusName'>;
@@ -703,5 +729,5 @@ export const KINDS = [
   'funds', 'donations', 'pledges', 'plans', 'announcements', 'staff', 'rooms', 'checkins', 'teams', 'assignments', 'blockouts',
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
-  'batches', 'groupPosts', 'groupResources', 'sermons',
+  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings',
 ] as const satisfies readonly Kind[];
