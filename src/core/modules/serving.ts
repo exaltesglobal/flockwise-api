@@ -194,7 +194,7 @@ export function registerServing(r: Router) {
   });
 
   // ----- admin: teams -----
-  r.get('/admin/volunteers/teams', { perm: ['volunteers', 'services'] }, (ctx) => ctx.db.all('teams').sort((x, y) => x.name.localeCompare(y.name)).map((t) => teamView(ctx, t)));
+  r.get('/admin/volunteers/teams', { perm: ['volunteers', 'services'] }, (ctx) => ctx.db.all('teams').filter((t) => !ctx.scope || ctx.scope.kind !== 'team' || ctx.scope.ids.includes(t.id)).sort((x, y) => x.name.localeCompare(y.name)).map((t) => teamView(ctx, t)));
   r.post('/admin/volunteers/teams', { perm: 'volunteers' }, (ctx) => {
     requireFields(ctx.body, ['name']);
     const positions = (Array.isArray(ctx.body.positions) ? ctx.body.positions : [{ name: 'Member', needed: 1 }]).map((p: { id?: string; name: string; needed?: number }) => ({ id: p.id || ctx.id('pos'), name: String(p.name), needed: Math.max(0, Number(p.needed ?? 1)) }));

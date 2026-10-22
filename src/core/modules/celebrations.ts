@@ -2,7 +2,7 @@
 // greetings, the daily digest for pastors, and the member app's "celebrations this week" wall.
 import { ApiError } from '../errors.js';
 import type { Ctx, Router } from '../engine.js';
-import { PERMISSIONS } from '../perms.js';
+import { permsOf } from '../perms.js';
 import type { Celebration, CelebrationKind, Channel, Collections, MemberCelebrations } from '../types.js';
 import { DAY, find, fullName, isChild, localDate, requireFields } from '../util.js';
 import { sendDirect } from './comms.js';
@@ -73,7 +73,7 @@ export async function sendStaffDigest(ctx: Ctx, daysAhead: number) {
   const today = list.filter((c) => c.daysAway === 0);
   const monday = new Date(`${localDate(ctx, ctx.now)}T00:00:00Z`).getUTCDay() === 1;
   if (!today.length && !(monday && list.length)) return;
-  const staff = ctx.db.all('staff').filter((s) => s.status === 'active' && s.email && PERMISSIONS[s.role].includes('care'));
+  const staff = ctx.db.all('staff').filter((s) => s.status === 'active' && s.email && permsOf(ctx.db, s).includes('care'));
   if (!staff.length) return;
   const later = monday ? list.filter((c) => c.daysAway > 0) : [];
   const lines = [
@@ -98,7 +98,7 @@ export function registerCelebrations(r: Router) {
   r.get('/admin/celebrations', { perm: 'people.view' }, (ctx) => {
     const days = Math.min(366, Math.max(0, Number(ctx.query.days ?? 30) || 30));
     const kinds = KINDS.includes(ctx.query.kind as CelebrationKind) ? [ctx.query.kind as CelebrationKind] : KINDS;
-    return upcomingCelebrations(ctx, days, kinds);
+    return upcomingCelebrations(ctx, days, kinds).filter((c) => ctx.inScope(c.personId));
   });
 
   r.post('/admin/celebrations/greet', { perm: 'comms' }, async (ctx) => {

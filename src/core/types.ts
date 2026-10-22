@@ -45,7 +45,34 @@ export type Member = {
   householdName?: string | null;
 };
 
-export type StaffRole = 'owner' | 'admin' | 'pastor' | 'finance' | 'leader' | 'coordinator' | 'checkin';
+export type StaffRole = 'owner' | 'admin' | 'pastor' | 'finance' | 'leader' | 'coordinator' | 'checkin' | 'custom';
+export type BuiltInRole = Exclude<StaffRole, 'custom'>;
+/** What part of the church a custom role is limited to. */
+export type RoleScope = 'church' | 'zone' | 'group' | 'team';
+export const ROLE_SCOPES: { id: RoleScope; label: string; hint: string }[] = [
+  { id: 'church', label: 'Whole church', hint: 'Sees everyone the permissions allow' },
+  { id: 'zone', label: 'Their zone(s)', hint: 'Only people in the zones they lead' },
+  { id: 'group', label: 'Their group(s)', hint: 'Only members of the groups they lead' },
+  { id: 'team', label: 'Their serving team(s)', hint: 'Only volunteers on the teams they lead' },
+];
+/** A role the church made itself: a name, a list of permissions and how far it reaches. */
+export type CustomRole = { id: string; name: string; description: string; permissions: Permission[]; scope: RoleScope; createdAt: string };
+export const PERMISSION_INFO: { id: Permission; label: string; hint: string }[] = [
+  { id: 'people.view', label: 'See people', hint: 'Directory, families, attendance, celebrations' },
+  { id: 'people.edit', label: 'Edit people', hint: 'Add and change people, tags, notes' },
+  { id: 'giving.view', label: 'See giving', hint: 'Gifts, pledges and statements' },
+  { id: 'giving.edit', label: 'Record giving', hint: 'Enter offerings and expenses' },
+  { id: 'events', label: 'Events', hint: 'Create events, registrations, invitations' },
+  { id: 'groups', label: 'Groups', hint: 'Small groups, meetings, join requests' },
+  { id: 'comms', label: 'Messages', hint: 'WhatsApp, SMS, email, announcements, media library' },
+  { id: 'care', label: 'Pastoral care', hint: 'Care cases, prayer requests, visits' },
+  { id: 'checkin', label: 'Check-in', hint: 'Kids check-in desk and rooms' },
+  { id: 'volunteers', label: 'Volunteers', hint: 'Serving teams and rotas' },
+  { id: 'services', label: 'Services', hint: 'Service plans, songs, presentation' },
+  { id: 'insights', label: 'Insights', hint: 'Reports and dashboards' },
+  { id: 'settings', label: 'Settings', hint: 'Church settings, integrations, billing' },
+  { id: 'staff', label: 'Team and roles', hint: 'Invite staff, make roles, give access' },
+];
 
 export type Session = {
   accessToken: string;
@@ -53,7 +80,7 @@ export type Session = {
   expiresAt: string;
   member: Member;
   church: Church;
-  staff?: { role: StaffRole; permissions: Permission[] } | null;
+  staff?: { role: StaffRole; permissions: Permission[]; roleName?: string; scope?: { kind: RoleScope; ids: string[] } | null } | null;
 };
 
 export type OtpRequest = { requestId: string; channel: 'email'; expiresInSeconds: number };
@@ -522,7 +549,16 @@ export type Permission =
   | 'staff'
   | 'insights';
 
-export type StaffMember = { id: string; personId: string | null; name: string; email: string; phone: string | null; role: StaffRole; status: 'active' | 'invited'; lastActiveAt: string | null };
+export type StaffMember = {
+  id: string; personId: string | null; name: string; email: string; phone: string | null; role: StaffRole; status: 'active' | 'invited'; lastActiveAt: string | null;
+  /** The custom role, when role is 'custom'. */
+  roleId?: string | null;
+  /** Zones, groups or teams this login is limited to (by the role's scope). Empty = whole church. */
+  scopeIds?: string[];
+};
+export type StaffView = StaffMember & { roleName: string; scopeKind: RoleScope; scopeNames: string[]; permissions: Permission[] };
+/** A person's office access, as shown on their record. */
+export type PersonAccess = { staffId: string | null; role: StaffRole | null; roleId: string | null; roleName: string | null; scopeKind: RoleScope; scopeIds: string[]; status: 'active' | 'invited' | null; email: string | null };
 
 export type AuditEntry = { id: string; at: string; actorId: string | null; actorName: string; action: string; entity: string; entityId: string | null; summary: string };
 
@@ -1165,6 +1201,7 @@ export type Collections = {
   plans: Plan;
   announcements: AdminAnnouncement;
   staff: StaffMember;
+  roles: CustomRole;
   rooms: Room;
   checkins: Checkin;
   teams: Team;
@@ -1208,7 +1245,7 @@ export const KINDS = [
   'funds', 'donations', 'pledges', 'plans', 'announcements', 'staff', 'rooms', 'checkins', 'teams', 'assignments', 'blockouts',
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
-  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys',
+  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
   'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',

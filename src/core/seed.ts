@@ -149,6 +149,8 @@ export function seedDemo(db: Db, env: Env) {
   db.put('staff', { id: 'st_1', personId: 'p_samuel', name: 'Pastor Samuel Raj', email: 'pastor@gracechurch.in', phone: '+91 98480 12345', role: 'owner', status: 'active', lastActiveAt: iso(now) });
   db.put('staff', { id: 'st_2', personId: null, name: 'Leena George', email: 'office@gracechurch.in', phone: '+91 98480 22222', role: 'admin', status: 'active', lastActiveAt: at(-1, 17) });
   db.put('staff', { id: 'st_3', personId: null, name: 'Vinod Mathew', email: 'accounts@gracechurch.in', phone: null, role: 'finance', status: 'active', lastActiveAt: at(-4, 11) });
+  // A role the church made itself: zone leaders see and care for their own zone only.
+  db.put('roles', { id: 'role_zone', name: 'Zone leader', description: 'Visits families, follows up absentees and logs prayer needs in their own zone.', permissions: ['people.view', 'care', 'groups'], scope: 'zone', createdAt: at(-30, 10) });
   db.put('staff', { id: 'st_4', personId: null, name: 'Mercy Daniel', email: 'mercy@gracechurch.in', phone: null, role: 'pastor', status: 'active', lastActiveAt: at(-2, 10) });
   db.put('staff', { id: 'st_5', personId: null, name: 'David Samuel', email: 'worship@gracechurch.in', phone: null, role: 'coordinator', status: 'active', lastActiveAt: at(-1, 20) });
   db.put('staff', { id: 'st_6', personId: null, name: 'Rahul Varghese', email: 'rahul@example.com', phone: null, role: 'leader', status: 'invited', lastActiveAt: null });

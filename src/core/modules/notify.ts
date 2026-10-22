@@ -3,7 +3,7 @@
 // the member or team app, and optionally on WhatsApp. The office chooses the channels per kind.
 import type { Ctx, Router } from '../engine.js';
 import { ApiError } from '../errors.js';
-import { PERMISSIONS } from '../perms.js';
+import { permsOf } from '../perms.js';
 import type { Collections, NotificationCatalogEntry, NotificationKind, NotificationRule, NotificationsView } from '../types.js';
 import { normEmail, requireFields, settings } from '../util.js';
 import { deliverAll } from './integrations.js';
@@ -27,7 +27,7 @@ export const ruleFor = (ctx: Ctx, kind: NotificationKind): NotificationRule => (
 export function pastorIds(ctx: Ctx): string[] {
   const out = new Set<string>();
   for (const s of ctx.db.all('staff')) {
-    if (s.status !== 'active' || !PERMISSIONS[s.role].includes('care')) continue;
+    if (s.status !== 'active' || !permsOf(ctx.db, s).includes('care')) continue;
     const p = ctx.db.get('people', s.personId) ?? ctx.db.all('people').find((x) => normEmail(x.email) === normEmail(s.email));
     if (p) out.add(p.id);
   }

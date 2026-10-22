@@ -4,7 +4,7 @@
 // with the email on their church record, and newcomers are added as visitors.
 import { ApiError } from '../errors.js';
 import type { Ctx, Router } from '../engine.js';
-import { PERMISSIONS } from '../perms.js';
+import { permsOf, ROLE_LABELS, scopeOf } from '../perms.js';
 import type { Collections, Session } from '../types.js';
 import { church, DAY, memberProfile, newPerson, normEmail, settings } from '../util.js';
 import { notify, pastorIds } from './notify.js';
@@ -36,7 +36,7 @@ export function issueSession(ctx: Ctx, person: Collections['people'], staff: Col
     expiresAt: access.expiresAt,
     member: memberProfile(person),
     church: church(ctx),
-    staff: scope === 'admin' && staff ? { role: staff.role, permissions: PERMISSIONS[staff.role] } : null,
+    staff: scope === 'admin' && staff ? { role: staff.role, permissions: permsOf(ctx.db, staff), roleName: staff.role === 'custom' ? ctx.db.get('roles', staff.roleId ?? '')?.name ?? 'Custom role' : ROLE_LABELS[staff.role], scope: (() => { const sc = scopeOf(ctx.db, staff); return sc ? { kind: sc.kind, ids: sc.ids } : null; })() } : null,
   };
 }
 

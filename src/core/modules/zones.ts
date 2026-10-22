@@ -144,7 +144,7 @@ function report(ctx: Ctx, since: string): ZoneReportRow[] {
 }
 
 export function registerZones(r: Router) {
-  r.get('/admin/zones', { perm: 'people.view' }, (ctx) => ctx.db.all('zones').sort((a, b) => a.name.localeCompare(b.name)).map((z) => zoneView(ctx, z)));
+  r.get('/admin/zones', { perm: 'people.view' }, (ctx) => ctx.db.all('zones').filter((z) => !ctx.scope || ctx.scope.kind !== 'zone' || ctx.scope.ids.includes(z.id) || (z.parentId && ctx.scope.ids.includes(z.parentId))).sort((a, b) => a.name.localeCompare(b.name)).map((z) => zoneView(ctx, z)));
 
   r.get('/admin/zones/report', { perm: 'people.view' }, (ctx) => {
     const since = DATE_RE.test(String(ctx.query.since)) ? String(ctx.query.since) : yearStart(ctx);

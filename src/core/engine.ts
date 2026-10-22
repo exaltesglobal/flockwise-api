@@ -3,7 +3,7 @@
 import type { Db } from './db.js';
 import { ApiError } from './errors.js';
 import { withChurchMail } from './mail.js';
-import { PERMISSIONS } from './perms.js';
+import { permsOf, scopeOf, type Scope } from './perms.js';
 import { atLeast, checkPlan, effectivePlan, getSubscription, type BillingInterval, type PlanId } from './plans.js';
 import type { CatalogSong, Channel, ChannelStatus, ChurchNetworkHost, Collections, DonationRecord, Kind, Permission, StaffRole } from './types.js';
 
@@ -153,6 +153,10 @@ export type Ctx = {
   role: StaffRole | null;
   can(p: Permission): boolean;
   require(p: Permission): void;
+  /** Set when the login is limited to some zones, groups or teams; null sees the whole church. */
+  scope: Scope | null;
+  /** May this login see this person? Always true for unscoped logins. */
+  inScope(personId: string | null | undefined): boolean;
   id(prefix: string): string;
   audit(action: string, entity: string, entityId: string | null, summary: string): void;
 };
@@ -178,7 +182,8 @@ export function makeCtx(db: Db, env: Env, req: Pick<Request, 'auth' | 'body' | '
   const staffRec = auth?.scope === 'admin' && auth.staffId ? db.get('staff', auth.staffId) : undefined;
   const staff = staffRec && staffRec.status === 'active' ? staffRec : null;
   const role = staff?.role ?? null;
-  const perms = new Set(role ? PERMISSIONS[role] : []);
+  const perms = new Set(staff ? permsOf(db, staff) : []);
+  const scope = staff ? scopeOf(db, staff) : null;
   const now = env.now();
   const ctx: Ctx = {
     db,
@@ -196,6 +201,8 @@ export function makeCtx(db: Db, env: Env, req: Pick<Request, 'auth' | 'body' | '
       return auth.sub;
     },
     can: (p) => perms.has(p),
+    scope,
+    inScope: (personId) => !scope || (!!personId && scope.people.has(personId)),
     require(p) {
       if (!perms.has(p)) throw new ApiError(403, 'forbidden', 'Your role does not have access to this. Ask the church owner or an admin.');
     },

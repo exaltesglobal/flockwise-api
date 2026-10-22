@@ -28,6 +28,7 @@ const AT_RISK_WEEKS = 3;
 
 /** Confidential cases are visible to owners, pastors, admins and whoever they are assigned to. */
 function canSee(ctx: Ctx, c: CareCase) {
+  if (!ctx.inScope(c.personId)) return false;
   return !c.confidential || ['owner', 'admin', 'pastor'].includes(ctx.role ?? '') || c.assignedTo === ctx.staff?.id;
 }
 

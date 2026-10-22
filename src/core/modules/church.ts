@@ -1,9 +1,10 @@
 // Events, groups, announcements, home feed, settings, staff and the audit log.
 import { ApiError } from '../errors.js';
 import type { Ctx, Router } from '../engine.js';
-import { PERMISSIONS, ROLE_LABELS } from '../perms.js';
+import { isBuiltIn, PERMISSIONS, permsOf, ROLE_LABELS } from '../perms.js';
 import { checkLimit } from '../plans.js';
-import type { BrandFont, BrandKit, Collections, EventAttendee, EventInput, GroupDetail, GroupInput, StaffRole } from '../types.js';
+import type { BrandFont, BrandKit, Collections, CustomRole, EventAttendee, EventInput, GroupDetail, GroupInput, Permission, PersonAccess, RoleScope, StaffRole, StaffView } from '../types.js';
+import { PERMISSION_INFO, ROLE_SCOPES } from '../types.js';
 import {
   bySoonest,
   checkinsFor,
@@ -55,6 +56,44 @@ function brandKit(body: Record<string, unknown> | null, prev: BrandKit | undefin
 const EVENT_FIELDS: (keyof EventInput)[] = ['kind', 'title', 'description', 'startsAt', 'endsAt', 'location', 'imageUrl', 'meetingUrl', 'capacity', 'published', 'campusId', 'checkinEnabled', 'price'];
 const GROUP_FIELDS: (keyof GroupInput)[] = ['name', 'description', 'meetingSchedule', 'location', 'leaderName', 'isOpen', 'type', 'zone', 'leaderId'];
 const ROLES = Object.keys(PERMISSIONS) as StaffRole[];
+const ROLE_ORDER: StaffRole[] = [...ROLES, 'custom'];
+const KNOWN_PERMS = new Set<string>(PERMISSION_INFO.map((p) => p.id));
+
+/** Names of the zones, groups or teams a scoped login covers. */
+function scopeNames(ctx: Ctx, kind: RoleScope, ids: string[]) {
+  const coll = kind === 'zone' ? 'zones' : kind === 'group' ? 'groups' : kind === 'team' ? 'teams' : null;
+  return coll ? ids.map((id) => ctx.db.get(coll, id)?.name).filter((n): n is string => !!n) : [];
+}
+function staffView(ctx: Ctx, s: Collections['staff']): StaffView {
+  const role = s.role === 'custom' && s.roleId ? ctx.db.get('roles', s.roleId) : undefined;
+  const scopeKind: RoleScope = role?.scope ?? 'church';
+  return { ...s, roleName: role?.name ?? (s.role === 'custom' ? 'Custom role (deleted)' : ROLE_LABELS[s.role]), scopeKind, scopeNames: scopeNames(ctx, scopeKind, s.scopeIds ?? []), permissions: permsOf(ctx.db, s) };
+}
+/** Reads the role fields of a staff body: a built-in role, or a custom role with the zones/groups/teams it covers. */
+function roleFields(ctx: Ctx, body: Record<string, unknown>): { role: StaffRole; roleId: string | null; scopeIds: string[] } {
+  const roleId = body.roleId ? String(body.roleId) : null;
+  if (roleId) {
+    const role = ctx.db.get('roles', roleId);
+    if (!role) throw new ApiError(422, 'invalid', 'That role no longer exists.', { role: 'Choose a role' });
+    const ids = Array.isArray(body.scopeIds) ? (body.scopeIds as unknown[]).map(String) : [];
+    const coll = role.scope === 'zone' ? 'zones' : role.scope === 'group' ? 'groups' : role.scope === 'team' ? 'teams' : null;
+    const scopeIds = coll ? ids.filter((id) => ctx.db.get(coll, id)) : [];
+    if (coll && scopeIds.length === 0) throw new ApiError(422, 'invalid', `Pick at least one ${ROLE_SCOPES.find((x) => x.id === role.scope)!.label.toLowerCase().replace('their ', '').replace('(s)', '')} for this role.`, { scopeIds: 'Pick at least one' });
+    return { role: 'custom', roleId, scopeIds };
+  }
+  const role = String(body.role ?? '') as StaffRole;
+  if (!isBuiltIn(role) || role === 'owner') throw new ApiError(422, 'invalid', 'Choose a role.', { role: 'Choose a role' });
+  return { role, roleId: null, scopeIds: [] };
+}
+function cleanRole(body: Record<string, unknown>, cur?: CustomRole): Omit<CustomRole, 'id' | 'createdAt'> {
+  const name = String(body.name ?? cur?.name ?? '').trim().slice(0, 60);
+  if (!name) throw new ApiError(422, 'invalid', 'Give the role a name.', { name: 'Required' });
+  const permissions = (Array.isArray(body.permissions) ? (body.permissions as unknown[]).map(String) : cur?.permissions ?? []).filter((p): p is Permission => KNOWN_PERMS.has(p));
+  if (permissions.length === 0) throw new ApiError(422, 'invalid', 'Tick at least one thing this role can do.', { permissions: 'Pick at least one' });
+  const scope = String(body.scope ?? cur?.scope ?? 'church') as RoleScope;
+  if (!ROLE_SCOPES.some((x) => x.id === scope)) throw new ApiError(422, 'invalid', 'Choose how far the role reaches.', { scope: 'Choose one' });
+  return { name, description: String(body.description ?? cur?.description ?? '').trim().slice(0, 300), permissions, scope };
+}
 
 function cleanEvent(body: Record<string, unknown>) {
   const e = pick<EventInput>(body, EVENT_FIELDS);
@@ -260,7 +299,7 @@ export function registerChurch(r: Router) {
     ctx.audit(ctx.params[1] === 'approve' ? 'approved' : 'declined', 'group', jr.groupId, `${ctx.params[1] === 'approve' ? 'Approved' : 'Declined'} ${jr.person.name} for ${ctx.db.get('groups', jr.groupId)?.name ?? 'a group'}`);
     return undefined;
   });
-  r.get('/admin/groups', { perm: ['groups', 'people.view'] }, (ctx) => ({ data: ctx.db.all('groups').sort((x, y) => x.name.localeCompare(y.name)).map((g) => groupView(ctx, g)), nextCursor: null }));
+  r.get('/admin/groups', { perm: ['groups', 'people.view'] }, (ctx) => ({ data: ctx.db.all('groups').filter((g) => !ctx.scope || ctx.scope.kind !== 'group' || ctx.scope.ids.includes(g.id)).sort((x, y) => x.name.localeCompare(y.name)).map((g) => groupView(ctx, g)), nextCursor: null }));
   r.post('/admin/groups', { perm: 'groups' }, (ctx) => {
     requireFields(ctx.body, ['name']);
     const g = ctx.db.put('groups', { description: '', meetingSchedule: '', location: '', leaderName: '', isOpen: true, type: 'cell', zone: '', leaderId: null, ...pick<GroupInput>(ctx.body, GROUP_FIELDS), name: String(ctx.body.name), id: ctx.id('gr') });
@@ -364,29 +403,98 @@ export function registerChurch(r: Router) {
     if (ctx.env.demo) ctx.db.put('settings', { ...s, payments: { ...s.payments, connected: true, accountId: s.payments.accountId ?? 'acc_Demo12345' } });
     return { onboardingUrl: '' };
   });
-  r.get('/admin/me', { staff: true }, (ctx) => ({ staff: ctx.staff, permissions: PERMISSIONS[ctx.role!], roles: ROLES.map((r) => ({ role: r, label: ROLE_LABELS[r], permissions: PERMISSIONS[r] })) }));
-  r.get('/admin/staff', { perm: 'staff' }, (ctx) => ctx.db.all('staff').sort((x, y) => ROLES.indexOf(x.role) - ROLES.indexOf(y.role) || x.name.localeCompare(y.name)));
+  r.get('/admin/me', { staff: true }, (ctx) => ({ staff: ctx.staff && staffView(ctx, ctx.staff), permissions: permsOf(ctx.db, ctx.staff!), scope: ctx.scope ? { kind: ctx.scope.kind, ids: ctx.scope.ids } : null, roles: ROLES.map((r) => ({ role: r, label: ROLE_LABELS[r], permissions: isBuiltIn(r) ? PERMISSIONS[r] : [] })), customRoles: ctx.db.all('roles') }));
+  r.get('/admin/staff', { perm: 'staff' }, (ctx) => ctx.db.all('staff').sort((x, y) => ROLE_ORDER.indexOf(x.role) - ROLE_ORDER.indexOf(y.role) || x.name.localeCompare(y.name)).map((s) => staffView(ctx, s)));
+
+  // Roles the church makes itself: a name, what it can do, and how far it reaches (whole church, zones, groups or teams).
+  r.get('/admin/roles', { perm: ['staff', 'people.view'] }, (ctx) => ctx.db.all('roles').sort((a, b) => a.name.localeCompare(b.name)).map((role) => ({ ...role, holders: ctx.db.all('staff').filter((s) => s.roleId === role.id).length })));
+  r.post('/admin/roles', { perm: 'staff' }, (ctx) => {
+    const fields = cleanRole(ctx.body);
+    if (ctx.db.all('roles').some((x) => x.name.toLowerCase() === fields.name.toLowerCase())) throw new ApiError(409, 'exists', 'There is already a role with that name.', { name: 'Already used' });
+    const role = ctx.db.put('roles', { id: ctx.id('role'), ...fields, createdAt: ctx.now.toISOString() });
+    ctx.audit('created', 'role', role.id, `Made the ${role.name} role`);
+    return { ...role, holders: 0 };
+  });
+  r.patch('/admin/roles/:id', { perm: 'staff' }, (ctx) => {
+    const cur = find(ctx, 'roles', ctx.params[0], 'Role');
+    const fields = cleanRole(ctx.body, cur);
+    const next = ctx.db.put('roles', { ...cur, ...fields });
+    // A role that no longer reaches the whole church keeps its holders' scopes; one that now does drops them.
+    if (next.scope !== cur.scope) for (const s of ctx.db.all('staff')) if (s.roleId === next.id) ctx.db.put('staff', { ...s, scopeIds: next.scope === 'church' ? [] : s.scopeIds ?? [] });
+    ctx.audit('updated', 'role', next.id, `Changed the ${next.name} role`);
+    return { ...next, holders: ctx.db.all('staff').filter((s) => s.roleId === next.id).length };
+  });
+  r.del('/admin/roles/:id', { perm: 'staff' }, (ctx) => {
+    const role = find(ctx, 'roles', ctx.params[0], 'Role');
+    const holders = ctx.db.all('staff').filter((s) => s.roleId === role.id);
+    if (holders.length) throw new ApiError(409, 'in_use', `${holders.length === 1 ? `${holders[0].name} has` : `${holders.length} people have`} this role. Give them another role first.`);
+    ctx.db.del('roles', role.id);
+    ctx.audit('removed', 'role', role.id, `Removed the ${role.name} role`);
+    return undefined;
+  });
+
+  // Office access from a person's record: pick a role (and the zones, groups or teams it covers), or take access away.
+  const accessOf = (ctx: Ctx, personId: string): PersonAccess => {
+    const s = ctx.db.all('staff').find((x) => x.personId === personId);
+    if (!s) return { staffId: null, role: null, roleId: null, roleName: null, scopeKind: 'church', scopeIds: [], status: null, email: null };
+    const v = staffView(ctx, s);
+    return { staffId: s.id, role: s.role, roleId: s.roleId ?? null, roleName: v.roleName, scopeKind: v.scopeKind, scopeIds: s.scopeIds ?? [], status: s.status, email: s.email };
+  };
+  r.get('/admin/people/:id/access', { perm: 'staff' }, (ctx) => accessOf(ctx, find(ctx, 'people', ctx.params[0], 'Person').id));
+  r.put('/admin/people/:id/access', { perm: 'staff' }, (ctx) => {
+    const person = find(ctx, 'people', ctx.params[0], 'Person');
+    const existing = ctx.db.all('staff').find((x) => x.personId === person.id);
+    if (existing?.role === 'owner') throw new ApiError(422, 'owner', 'The church owner’s access cannot be changed here.');
+    const name = fullName(person);
+    if (!ctx.body.role && !ctx.body.roleId) {
+      if (existing) {
+        ctx.db.del('staff', existing.id);
+        for (const t of ctx.db.all('refreshTokens')) if (t.staffId === existing.id && !t.revoked) ctx.db.put('refreshTokens', { ...t, revoked: true });
+        ctx.audit('removed', 'staff', existing.id, `Took office access from ${name}`);
+      }
+      return accessOf(ctx, person.id);
+    }
+    if (!person.email) throw new ApiError(422, 'invalid', 'Add an email to this person first; they sign in to the office with it.', { email: 'Required for office access' });
+    const fields = roleFields(ctx, ctx.body);
+    const email = normEmail(person.email);
+    const clash = ctx.db.all('staff').find((x) => normEmail(x.email) === email && x.personId !== person.id);
+    if (clash) throw new ApiError(409, 'exists', `${clash.name} already signs in to the office with ${person.email}.`);
+    const roleName = fields.role === 'custom' ? ctx.db.get('roles', fields.roleId!)!.name : ROLE_LABELS[fields.role];
+    if (existing) {
+      const s = ctx.db.put('staff', { ...existing, name, email, phone: person.phone ?? existing.phone, ...fields });
+      ctx.audit('updated', 'staff', s.id, `Changed ${name} to ${roleName}${fields.scopeIds.length ? ` (${scopeNames(ctx, ctx.db.get('roles', fields.roleId!)!.scope, fields.scopeIds).join(', ')})` : ''}`);
+    } else {
+      checkLimit(ctx.db, ctx.now, 'staff', ctx.db.count('staff'));
+      const s = ctx.db.put('staff', { id: ctx.id('st'), personId: person.id, name, email, phone: person.phone ?? null, ...fields, status: 'invited', lastActiveAt: null });
+      ctx.audit('invited', 'staff', s.id, `Gave ${name} office access as ${roleName}`);
+      void ctx.env
+        .deliver('email', [{ to: email, name, subject: `You're invited to ${settings(ctx).name} on Flockwise`, text: `Hi ${person.firstName},\n\nYou've been given access to the ${settings(ctx).name} church office as ${roleName}.\nSign in with this email at ${ctx.env.webUrl}/admin\n\nFlockwise` }])
+        .catch(() => undefined);
+    }
+    return accessOf(ctx, person.id);
+  });
   r.post('/admin/staff', { perm: 'staff' }, (ctx) => {
-    requireFields(ctx.body, ['name', 'email', 'role']);
+    requireFields(ctx.body, ['name', 'email']);
     const email = normEmail(ctx.body.email);
-    if (!ROLES.includes(ctx.body.role) || ctx.body.role === 'owner') throw new ApiError(422, 'invalid', 'Choose a role.', { role: 'Choose a role' });
+    const fields = roleFields(ctx, ctx.body);
     if (ctx.db.all('staff').some((s) => normEmail(s.email) === email)) throw new ApiError(409, 'exists', 'This email is already on the team.');
     checkLimit(ctx.db, ctx.now, 'staff', ctx.db.count('staff'));
     const person = ctx.db.all('people').find((p) => normEmail(p.email) === email);
-    const s = ctx.db.put('staff', { id: ctx.id('st'), personId: person?.id ?? null, name: String(ctx.body.name), email, phone: ctx.body.phone ?? person?.phone ?? null, role: ctx.body.role, status: 'invited', lastActiveAt: null });
-    ctx.audit('invited', 'staff', s.id, `Invited ${s.name} as ${ROLE_LABELS[s.role]}`);
+    const s = ctx.db.put('staff', { id: ctx.id('st'), personId: person?.id ?? null, name: String(ctx.body.name), email, phone: ctx.body.phone ?? person?.phone ?? null, ...fields, status: 'invited', lastActiveAt: null });
+    const roleName = staffView(ctx, s).roleName;
+    ctx.audit('invited', 'staff', s.id, `Invited ${s.name} as ${roleName}`);
     void ctx.env
-      .deliver('email', [{ to: email, name: s.name, subject: `You're invited to ${settings(ctx).name} on Flockwise`, text: `Hi ${s.name},\n\nYou've been added to the ${settings(ctx).name} church office as ${ROLE_LABELS[s.role]}.\nSign in with this email at ${ctx.env.webUrl}/admin\n\nFlockwise` }])
+      .deliver('email', [{ to: email, name: s.name, subject: `You're invited to ${settings(ctx).name} on Flockwise`, text: `Hi ${s.name},\n\nYou've been added to the ${settings(ctx).name} church office as ${roleName}.\nSign in with this email at ${ctx.env.webUrl}/admin\n\nFlockwise` }])
       .catch(() => undefined);
-    return s;
+    return staffView(ctx, s);
   });
   r.patch('/admin/staff/:id', { perm: 'staff' }, (ctx) => {
     const s = find(ctx, 'staff', ctx.params[0], 'Team member');
-    const role = ctx.body.role as StaffRole;
-    if (!ROLES.includes(role)) throw new ApiError(422, 'invalid', 'Choose a role.');
-    if (s.role === 'owner' || role === 'owner') throw new ApiError(422, 'owner', 'Ownership cannot be changed here.');
-    ctx.audit('updated', 'staff', s.id, `Changed ${s.name} to ${ROLE_LABELS[role]}`);
-    return ctx.db.put('staff', { ...s, role });
+    if (s.role === 'owner') throw new ApiError(422, 'owner', 'Ownership cannot be changed here.');
+    const fields = roleFields(ctx, ctx.body);
+    const next = staffView(ctx, ctx.db.put('staff', { ...s, ...fields }));
+    ctx.audit('updated', 'staff', s.id, `Changed ${s.name} to ${next.roleName}${next.scopeNames.length ? ` (${next.scopeNames.join(', ')})` : ''}`);
+    return next;
   });
   r.del('/admin/staff/:id', { perm: 'staff' }, (ctx) => {
     const s = find(ctx, 'staff', ctx.params[0], 'Team member');

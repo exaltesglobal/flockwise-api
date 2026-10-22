@@ -4,6 +4,12 @@ import type { Db } from '../db.js';
 import type { Ctx, Router } from '../engine.js';
 import { checkLimit } from '../plans.js';
 import type { Collections, Consent, DirectoryEntry, ImportResult, PersonInput, PersonTimeline } from '../types.js';
+
+/** A scoped login (zone, group or team leader) only opens people in its scope. */
+export function inScope<T extends { id: string }>(ctx: Ctx, p: T): T {
+  if (!ctx.inScope(p.id)) throw new ApiError(403, 'forbidden', 'This person is outside the zones, groups or teams you lead.');
+  return p;
+}
 import {
   age,
   dateOnly,
@@ -207,6 +213,7 @@ export function registerPeople(r: Router) {
     const tag = ctx.query.tag;
     const campusId = ctx.query.campusId;
     const list = searchPeople(ctx, String(ctx.query.q ?? ''))
+      .filter((p) => ctx.inScope(p.id))
       .filter((p) => !status || p.status === status)
       .filter((p) => !tag || p.tags.includes(tag))
       .filter((p) => !campusId || p.campusId === campusId)
@@ -237,9 +244,10 @@ export function registerPeople(r: Router) {
     ctx.audit('imported', 'person', null, `Imported people from ${ctx.body.source ?? 'a file'}: ${result.created} added, ${result.updated} updated`);
     return result;
   });
-  r.get('/admin/people/:id', { perm: 'people.view' }, (ctx) => personView(ctx, find(ctx, 'people', ctx.params[0], 'Person')));
+  r.get('/admin/people/:id', { perm: 'people.view' }, (ctx) => personView(ctx, inScope(ctx, find(ctx, 'people', ctx.params[0], 'Person'))));
   r.get('/admin/people/:id/timeline', { perm: 'people.view' }, (ctx) => timeline(ctx, find(ctx, 'people', ctx.params[0], 'Person')));
   r.patch('/admin/people/:id', { perm: 'people.edit' }, (ctx) => {
+    inScope(ctx, find(ctx, 'people', ctx.params[0], 'Person'));
     const p = find(ctx, 'people', ctx.params[0], 'Person');
     const next = ctx.db.put('people', { ...p, ...cleanInput(ctx.body), ...withCustom(ctx, ctx.body, p) });
     if (ctx.body.consent) logConsent(ctx, p.id, p.consent, next.consent, 'staff');
