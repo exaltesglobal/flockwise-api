@@ -1092,6 +1092,10 @@ export type CarolSeasonView = CarolSeason & {
   waiting: { familyKey: string; familyName: string; address: string | null; zoneName: string | null; preferredDates: string[] }[];
   totals: { nights: number; homes: number; visited: number; offering: number; requests: number };
 };
+export type CalendarFeedKind = 'church' | 'team' | 'person';
+/** A subscribe link's secret; the feed is rebuilt from the data each time it is fetched. */
+export type CalendarFeed = { id: string; kind: CalendarFeedKind; refId: string; token: string; createdAt: string };
+export type CalendarFeedLink = { id: string; kind: CalendarFeedKind; name: string; url: string; webcal: string; google: string };
 export type MyCarols = {
   season: { id: string; name: string; from: string; to: string; message: string } | null;
   visit: { date: string; eta: string; teamName: string; status: CarolStopStatus } | null;
@@ -1268,6 +1272,7 @@ export type Collections = {
   integrations: ChitthiConfig | RazorpayConfig | RazorpaySetup | ChitthiSetup | WaBotConfig | EmailAccountConfig | ZoomConfig | GcsConfig | CanvaConfig | SongLicenceConfig;
   media: MediaItem;
   canvaDesigns: CanvaDesign;
+  calendarFeeds: CalendarFeed;
   kycFiles: KycFile;
   recurring: RecurringGift;
   botMessages: BotMessage;
@@ -1361,7 +1366,7 @@ export const KINDS = [
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
   'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
-  'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns',
+  'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns', 'calendarFeeds',
 ] as const satisfies readonly Kind[];
 
 // ----- assisted Razorpay setup: Flockwise's team opens the church's Razorpay account and does its KYC -----

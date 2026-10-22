@@ -38,6 +38,9 @@ export type AiRequest = {
   effort?: 'low' | 'medium' | 'high';
 };
 export type AiResponse = { content: AiBlock[]; stopReason: string };
+/** A handler result the server sends as-is instead of JSON (an .ics feed, a CSV). */
+export type RawResult = { __raw: true; contentType: string; body: string; filename?: string };
+export const isRaw = (v: unknown): v is RawResult => !!v && typeof v === 'object' && (v as RawResult).__raw === true;
 
 /** Everything the engine needs from its host. */
 export type Env = {
@@ -60,6 +63,8 @@ export type Env = {
   checkout(donation: DonationRecord, opts: { description: string; fundTaxDeductible: boolean; totalCount?: number; pledgeId?: string }): Promise<{ checkoutUrl: string; providerRef: string | null; provider: DonationRecord['provider']; status?: DonationRecord['status'] }>;
   /** Where the member portal lives, for links in messages. */
   webUrl: string;
+  /** This API's public address with /v1, for links that calendar apps and other services fetch. */
+  apiUrl?: string;
   /** Calls the Chitthi API (WhatsApp) with a church's key. */
   chitthi(apiKey: string, req: { method: 'GET' | 'POST' | 'DELETE'; path: string; body?: unknown }): Promise<{ status: number; data: any }>; // eslint-disable-line @typescript-eslint/no-explicit-any
   /** Claude, when the server has an API key. Absent means AI features are switched off. */

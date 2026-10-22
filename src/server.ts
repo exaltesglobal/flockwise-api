@@ -59,6 +59,7 @@ export function createHub() {
         cancel: (ref, fcra) => razorpaySubscriptions(getTenant()!).cancel(ref, fcra),
       },
       webUrl: config.webUrl,
+      apiUrl: `${config.apiPublicUrl}/v1`,
       chitthi: async (apiKey, req) => {
         const res = await fetch(`${config.chitthiUrl}${req.path}`, {
           method: req.method,
