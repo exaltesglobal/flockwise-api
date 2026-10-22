@@ -32,10 +32,11 @@ import { registerBulletin } from './modules/bulletin.js';
 import { registerSundaySchool } from './modules/sunday-school.js';
 import { registerMissions } from './modules/missions.js';
 import { registerLivestream } from './modules/livestream.js';
+import { registerFamily } from './modules/family.js';
 import { ApiError } from './errors.js';
 import { atLeast, effectivePlan, getSubscription } from './plans.js';
 
-export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry, registerCelebrations, registerPresent, registerIntegrations, registerAi, registerBilling, registerPayments, registerRegisters, registerZones, registerAccounts, registerRazorpaySetup, registerRecurring, registerWhatsAppBot, registerOfferings, registerPrivacy, registerPager, registerBulletin, registerSundaySchool, registerMissions, registerLivestream];
+export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry, registerCelebrations, registerPresent, registerIntegrations, registerAi, registerBilling, registerPayments, registerRegisters, registerZones, registerAccounts, registerRazorpaySetup, registerRecurring, registerWhatsAppBot, registerOfferings, registerPrivacy, registerPager, registerBulletin, registerSundaySchool, registerMissions, registerLivestream, registerFamily];
 
 export function createChurchEngine(db: Db, env: Env) {
   const engine = createEngine(db, env, MODULES);

@@ -247,7 +247,7 @@ export type AnnouncementInput = Pick<AdminAnnouncement, 'title' | 'body' | 'stat
 // ---------- check-in ----------
 
 export type Room = { id: string; name: string; minAge: number; maxAge: number; capacity: number | null };
-export type CheckinMethod = 'staff' | 'kiosk' | 'qr' | 'self';
+export type CheckinMethod = 'staff' | 'kiosk' | 'qr' | 'self' | 'app';
 export type Checkin = {
   id: string;
   eventId: string;
@@ -461,6 +461,8 @@ export type ChurchSettings = Church & {
   tally?: Partial<TallySettings>;
   privacy?: Partial<PrivacySettings>;
   livestream?: Partial<LiveSettings>;
+  /** Parents may check their family in from the member app (default on). */
+  phoneCheckin?: boolean;
 };
 
 export type Permission =
@@ -1617,3 +1619,37 @@ export type LiveNow = {
   channelId: string | null;
   church: string;
 };
+
+// ----- family accounts: one adult's login manages the household and checks the children in -----
+export type FamilyMember = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  name: string;
+  age: number | null;
+  birthDate: string | null;
+  gender: 'male' | 'female' | null;
+  isChild: boolean;
+  isMe: boolean;
+  /** Has an email of their own, so they sign in themselves. */
+  hasLogin: boolean;
+  phone: string | null;
+  allergies: string | null;
+  medicalNotes: string | null;
+  roomName: string | null;
+  /** The parent can change this person's details: children, and adults without their own login. */
+  editable: boolean;
+};
+export type FamilyView = { householdName: string | null; members: FamilyMember[] };
+export type FamilyCheckinEvent = {
+  id: string;
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  location: string;
+  /** Phone check-in is open from an hour before the start until the end. */
+  open: boolean;
+  opensAt: string;
+  members: { id: string; name: string; isChild: boolean; roomName: string | null; allergies: string | null; checkedIn: boolean; securityCode: string | null }[];
+};
+export type FamilyCheckinResult = { securityCode: string | null; checkedIn: string[]; event: FamilyCheckinEvent };

@@ -7,7 +7,7 @@ import type { Checkin, CheckinCandidate, CheckinFamily, CheckinMethod, CheckinRe
 import { age, checkinsFor, DAY, eventView, find, fullName, isChild, memberEvent, pick, requireFields, settings, touchAttendance } from '../util.js';
 import { searchPeople } from './people.js';
 
-function roomFor(ctx: Ctx, p: Collections['people']) {
+export function roomFor(ctx: Ctx, p: Collections['people']) {
   const a = age(p.birthDate, ctx.now);
   if (a === null || !isChild(ctx, p)) return null;
   return ctx.db

@@ -553,3 +553,16 @@ Viewers (no staff permission):
 | --- | --- | --- |
 | GET | `/public/live` | `LiveNow`: the live stream, else the next one within 7 days, plus the channel id. Signed-in members always see it; guests only when `publicWatch` is on. |
 | POST | `/public/live/:id/ping` | `{viewer}`: sent once a minute while the video is on screen. Signed-in members are counted by person; guests by the random `viewer` id their browser keeps (8 to 64 letters, digits, `-`, `_`). Returns `{ok, status, watching}`; `ok` is false when the stream is not live. |
+
+## Family accounts
+
+One adult's login looks after the household (everyone with the same household name). Children (under the church's child age limit) cannot use these routes.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/me/family` | `FamilyView`: the household with ages, kids' church room, allergies and medical notes. `editable` is true for children and adults without their own email. |
+| POST | `/me/family/members` | `{firstName, lastName?, birthDate, gender?, allergies?, medicalNotes?}` adds a child to the household (surname defaults to the parent's). A family of one becomes "<surname> family". Tagged `added-by-family`. |
+| PATCH | `/me/family/members/:id` | Same fields (adults without a login also `phone`). 403 for adults who sign in themselves. |
+| GET | `/me/family/checkin` | Services with check-in on that start within a day, at the family's campus: who is in, their codes, and whether phone check-in is `open` (an hour before the start until the end). |
+| POST | `/me/family/checkin/:eventId` | `{personIds}` (household only). Checks in with method `app`; children share a new security code, or the code they already have is returned. `{securityCode, checkedIn, event}`. The desk prints labels with `POST /admin/checkin/:eventId/reprint {securityCode}`. |
+| GET/PUT | `/admin/checkin-settings` | `{phoneCheckin}` (perm `checkin`, default true). When off, families check in at the desk. |
