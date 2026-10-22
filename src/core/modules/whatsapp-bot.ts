@@ -4,9 +4,11 @@
 import type { Ctx, Router } from '../engine.js';
 import { ApiError } from '../errors.js';
 import { atLeast, effectivePlan, getSubscription } from '../plans.js';
-import type { BotIntent, BotMessage, ChitthiConfig, WaBotConfig, WaBotStatus } from '../types.js';
+import type { BotIntent, BotMessage, ChitthiConfig, Collections, WaBotConfig, WaBotStatus } from '../types.js';
 import { bySoonest, churchId, DAY, fullName, newPerson, normPhone, settings, upcoming } from '../util.js';
+import { latestChainRequest, staffPerson } from './care.js';
 import { publicPageOf } from './ministry.js';
+import { notify, pastorIds } from './notify.js';
 import { logConsent } from './privacy.js';
 
 const KEEP = 500;
@@ -17,10 +19,15 @@ const chitthi = (ctx: Ctx) => ctx.db.get('integrations', 'chitthi') as ChitthiCo
 
 const defaultWelcome = (ctx: Ctx) => `Welcome to ${settings(ctx).name}! 🙏`;
 
+const norm = (text: string) => text.trim().toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+
 /** What a message asks for. Numbers match the menu; a few words in English and Hindi work too. */
 export function intentOf(text: string): BotIntent {
-  const t = text.trim().toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
-  if (!t) return 'menu';
+  const t = norm(text);
+  if (!t) return /🙏/.test(text) ? 'prayed' : 'menu';
+  if (/^(join|start|add me to) (the )?prayer chain$|^prayer chain( please)?$/.test(t)) return 'chain_join';
+  if (/^(leave|stop|exit|remove me from) (the )?prayer chain$/.test(t)) return 'chain_leave';
+  if (/^(prayed|amen|praying|i prayed|i have prayed|done praying|prayed for (him|her|them)|prarthana ki)$/.test(t)) return 'prayed';
   if (/^(stop|unsubscribe|band karo)$/.test(t)) return 'stop';
   if (/^(start|subscribe)$/.test(t)) return 'start';
   if (/^(hi|hello|hey|menu|help|namaste|namaskar|praise the lord|ptl|0)$/.test(t)) return 'menu';
@@ -57,14 +64,23 @@ function menu(welcome: string) {
   ].join('\n');
 }
 
+// A prayer-chain or "how are you" prompt waits a week for its reply; menu steps time out in minutes.
+const ttlFor = (what: string) => (what === 'checkin' || what.startsWith('chain:') ? 7 * DAY : STATE_TTL);
 function state(ctx: Ctx, phone: string): string | null {
   const m = ctx.db.get('meta', `bot:${phone}`);
   if (!m) return null;
   const [what, at] = String(m.value).split('|');
-  return ctx.now.getTime() - Number(at) < STATE_TTL ? what : null;
+  return ctx.now.getTime() - Number(at) < ttlFor(what) ? what : null;
 }
 const setState = (ctx: Ctx, phone: string, what: string | null) =>
   what ? ctx.db.put('meta', { id: `bot:${phone}`, value: `${what}|${ctx.now.getTime()}` }) : ctx.db.del('meta', `bot:${phone}`);
+/** Tells the assistant what a phone's next message is about (a prayer-chain request, a "how are you"). */
+export const setBotState = (ctx: Ctx, phone: string, what: string | null) => setState(ctx, normPhone(phone), what);
+
+/** The open "has not been in" case for someone, so a WhatsApp reply lands on it. */
+const absentCase = (ctx: Ctx, personId: string) => ctx.db.all('care').filter((c) => c.personId === personId && c.status !== 'closed').sort((x, y) => (x.type === 'absent' ? 0 : 1) - (y.type === 'absent' ? 0 : 1) || y.createdAt.localeCompare(x.createdAt))[0] ?? null;
+const withNote = (ctx: Ctx, c: Collections['care'], text: string, patch: Partial<Collections['care']> = {}) =>
+  ctx.db.put('care', { ...c, ...patch, notes: [...c.notes, { id: ctx.id('cn'), at: ctx.now.toISOString(), by: 'WhatsApp assistant', text }] });
 
 function careCase(ctx: Ctx, personId: string | null, personName: string, title: string, note: string) {
   ctx.db.put('care', {
@@ -87,6 +103,13 @@ export function answer(ctx: Ctx, msg: { phone: string; name: string; text: strin
 
   // A prayer request is the message after "3", unless they typed a menu word instead.
   if (waiting === 'prayer' && !['menu', 'stop'].includes(intent) && msg.text.trim().length > 3) intent = 'prayer';
+  // After "we have missed you", 1/2/3 (or plain words) say how they are.
+  if (waiting === 'checkin') {
+    const t = norm(msg.text);
+    if (/^1$|^(all )?(fine|good|well|ok|okay|alright)\b|theek|all is well|doing well|i am fine/.test(t)) intent = 'checkin_ok';
+    else if (/^2$|travel|out of (town|station|city)|away|village|native|abroad|out of india/.test(t)) intent = 'checkin_away';
+    else if (/^3$|call/.test(t)) intent = 'checkin_call';
+  }
   if (intent !== 'prayer_ask' && !dry) setState(ctx, phone, null);
 
   switch (intent) {
@@ -104,6 +127,48 @@ export function answer(ctx: Ctx, msg: { phone: string; name: string; text: strin
       const soon = ctx.db.all('events').filter((e) => e.published && upcoming(ctx, e) && new Date(e.startsAt).getTime() < ctx.now.getTime() + 8 * DAY).sort(bySoonest).slice(0, 6);
       if (!soon.length) return { intent, personId: person?.id ?? null, reply: `Nothing else is planned for the next week. See everything coming up: ${web}/app/events` };
       return { intent, personId: person?.id ?? null, reply: ['📅 This week:', ...soon.map((e) => `• ${when(ctx, e.startsAt)} · ${e.title}${e.location ? ` (${e.location})` : ''}`), '', `RSVP and more: ${web}/app/events`].join('\n') };
+    }
+    case 'prayed': {
+      const target = (waiting?.startsWith('chain:') ? ctx.db.get('prayer', waiting.slice(6)) : null) ?? latestChainRequest(ctx);
+      if (!target) return { intent, personId: person?.id ?? null, reply: `Thank you for praying, ${name}. 🙏` };
+      const already = !!person && target.prayedBy.includes(person.id);
+      if (!dry && person && !already) ctx.db.put('prayer', { ...target, prayedBy: [...target.prayedBy, person.id] });
+      const n = target.prayedBy.length + (person && !already ? 1 : 0);
+      return { intent, personId: person?.id ?? null, reply: `Thank you for praying for ${target.name.split(' ')[0]}, ${name}. ${n} ${n === 1 ? 'person has' : 'people have'} prayed so far. 🙏` };
+    }
+    case 'chain_join': {
+      if (!person) return { intent, personId: null, reply: `To join the prayer chain, first sign in to our app with this number: ${web}/app — then reply JOIN PRAYER CHAIN here.` };
+      if (!dry && !person.prayerChain) {
+        ctx.db.put('people', { ...person, prayerChain: true, consent: { ...person.consent, whatsapp: true } });
+        ctx.audit('joined', 'person', person.id, `${fullName(person)} joined the prayer chain on WhatsApp`);
+      }
+      return { intent, personId: person.id, reply: `You’re on the prayer chain, ${name}. 🙏 When someone asks ${s.name} for prayer, you’ll get it here. Reply PRAYED after you pray, or LEAVE PRAYER CHAIN any time.` };
+    }
+    case 'chain_leave': {
+      if (person && !dry && person.prayerChain) ctx.db.put('people', { ...person, prayerChain: false });
+      return { intent, personId: person?.id ?? null, reply: `You’ve left the prayer chain, ${name}. Thank you for praying with us. Reply JOIN PRAYER CHAIN to come back.` };
+    }
+    case 'checkin_ok': {
+      const c = person && absentCase(ctx, person.id);
+      if (c && !dry) withNote(ctx, c, `${fullName(person!)} replied on WhatsApp: all is well.`, { status: 'closed', closedAt: ctx.now.toISOString() });
+      return { intent, personId: person?.id ?? null, reply: `So glad to hear it, ${name}! We look forward to seeing you on Sunday. 🙏` };
+    }
+    case 'checkin_away': {
+      const c = person && absentCase(ctx, person.id);
+      if (c && !dry) withNote(ctx, c, `${fullName(person!)} replied on WhatsApp: travelling / away for now.`, { dueAt: new Date(ctx.now.getTime() + 21 * DAY).toISOString() });
+      return { intent, personId: person?.id ?? null, reply: `Safe travels, ${name}. We’ll look out for you when you’re back. 🙏` };
+    }
+    case 'checkin_call': {
+      const who = person ? fullName(person) : msg.name || msg.phone;
+      if (!dry) {
+        const c = person && absentCase(ctx, person.id);
+        const next = c ? withNote(ctx, c, `${who} asked for a call on WhatsApp (${msg.phone}).`, { priority: 'urgent' }) : null;
+        if (!next) careCase(ctx, person?.id ?? null, who, 'Asked for a call (WhatsApp)', `${who} replied to "we miss you" asking for a call. Phone ${msg.phone}.`);
+        const assignee = next?.assignedTo ? ctx.db.get('staff', next.assignedTo) : null;
+        const to = assignee ? [staffPerson(ctx, assignee)].filter((x): x is string => !!x) : pastorIds(ctx);
+        void notify(ctx, 'care.assigned', { personIds: to, title: `${who} would like a call`, body: `They replied to the "we miss you" message asking for a call. Phone ${msg.phone}.`, link: '/admin/care' });
+      }
+      return { intent, personId: person?.id ?? null, reply: `Of course, ${name}. Someone from ${s.name} will call you soon.${s.phone ? ` If it’s urgent, call ${s.phone}.` : ''}` };
     }
     case 'prayer_ask':
       if (!dry) setState(ctx, phone, 'prayer');

@@ -37,7 +37,7 @@ function countExisting(ctx: Ctx, rows: Record<string, unknown>[]) {
 
 const EDITABLE: (keyof PersonInput)[] = [
   'firstName', 'lastName', 'phone', 'email', 'gender', 'birthDate', 'status', 'householdName', 'address', 'language', 'tags', 'notes',
-  'campusId', 'baptismDate', 'anniversary', 'allergies', 'medicalNotes', 'consent', 'zoneId',
+  'campusId', 'baptismDate', 'anniversary', 'allergies', 'medicalNotes', 'consent', 'zoneId', 'prayerChain',
 ];
 
 function cleanInput(body: Record<string, unknown>) {
@@ -172,16 +172,18 @@ export function registerPeople(r: Router) {
   });
   r.get('/me/preferences', {}, (ctx) => {
     const p = find(ctx, 'people', ctx.me(), 'Profile');
-    return { consent: p.consent, checkinCode: p.checkinCode, campusId: p.campusId };
+    return { consent: p.consent, checkinCode: p.checkinCode, campusId: p.campusId, prayerChain: !!p.prayerChain };
   });
   r.patch('/me/preferences', {}, (ctx) => {
     const p = find(ctx, 'people', ctx.me(), 'Profile');
     const consent: Consent = { ...p.consent };
     for (const k of ['email', 'sms', 'whatsapp', 'directory'] as const) if (typeof ctx.body.consent?.[k] === 'boolean') consent[k] = ctx.body.consent[k];
     const campusId = ctx.body.campusId !== undefined && (ctx.body.campusId === null || ctx.db.get('campuses', ctx.body.campusId)) ? ctx.body.campusId : p.campusId;
-    const next = ctx.db.put('people', { ...p, consent, campusId });
+    const prayerChain = typeof ctx.body.prayerChain === 'boolean' ? ctx.body.prayerChain : !!p.prayerChain;
+    const next = ctx.db.put('people', { ...p, consent, campusId, prayerChain });
     logConsent(ctx, p.id, p.consent, next.consent, 'member');
-    return { consent: next.consent, checkinCode: next.checkinCode, campusId: next.campusId };
+    if (prayerChain !== !!p.prayerChain) ctx.audit(prayerChain ? 'joined' : 'left', 'person', p.id, `${fullName(p)} ${prayerChain ? 'joined' : 'left'} the prayer chain`);
+    return { consent: next.consent, checkinCode: next.checkinCode, campusId: next.campusId, prayerChain };
   });
   r.get('/campuses', {}, (ctx) => ctx.db.all('campuses'));
   r.get('/directory', {}, (ctx) => {

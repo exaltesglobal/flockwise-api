@@ -7,6 +7,8 @@ import type { Audience, AudiencePreview, Automations, Channel, Collections, Mess
 import { checkinsFor, DAY, find, fullName, localDate, localHour, pick, requireFields, rsvpsFor, settings } from '../util.js';
 import { sendStaffDigest } from './celebrations.js';
 import { channelStatus, deliverAll } from './integrations.js';
+import { notify } from './notify.js';
+import { setBotState } from './whatsapp-bot.js';
 import { listMembers, runListWorkflows } from './workflows.js';
 
 const CHANNELS: Channel[] = ['email', 'sms', 'whatsapp'];
@@ -201,11 +203,19 @@ export async function runDue(ctx: Ctx) {
     const flagged = new Set((ctx.db.get('meta', 'automations:missing')?.value ?? '').split(',').filter(Boolean));
     const missing = people.filter((p) => (p.status === 'member' || p.status === 'regular') && p.lastAttendedAt && new Date(p.lastAttendedAt).getTime() < cutoff && !flagged.has(`${p.id}@${p.lastAttendedAt.slice(0, 10)}`));
     if (missing.length) {
-      await sendDirect(ctx, a.missing.channel, missing.map((p) => p.id), a.missing.subject, a.missing.body, 'automation');
+      // On WhatsApp the message asks how they are; the reply lands on the care case (see the assistant).
+      const ask = a.missing.channel === 'whatsapp' && a.missing.askReply !== false;
+      const body = ask ? `${a.missing.body}\n\nReply 1 if all is well, 2 if you are travelling, or 3 if you would like someone to call you.` : a.missing.body;
+      await sendDirect(ctx, a.missing.channel, missing.map((p) => p.id), a.missing.subject, body, 'automation');
+      if (ask) for (const p of missing) if (p.phone && p.consent?.whatsapp !== false) setBotState(ctx, p.phone, 'checkin');
       if (a.missing.createFollowUp)
         for (const p of missing)
-          if (!ctx.db.all('care').some((c) => c.personId === p.id && c.status !== 'closed'))
-            ctx.db.put('care', newCase(ctx, p, 'absent', `${p.firstName} has not been in for ${a.missing.weeks}+ weeks`, 5));
+          if (!ctx.db.all('care').some((c) => c.personId === p.id && c.status !== 'closed')) {
+            const c = newCase(ctx, p, 'absent', `${p.firstName} has not been in for ${a.missing.weeks}+ weeks`, 5);
+            const leader = a.missing.assignLeader !== false ? zoneLeaderStaff(ctx, p) : null;
+            ctx.db.put('care', leader ? { ...c, assignedTo: leader.id, assignedName: leader.name } : c);
+            if (leader?.personId) void notify(ctx, 'care.assigned', { personIds: [leader.personId], title: `Care: ${c.title}`, body: `${fullName(p)} is in your zone and has not been in for ${a.missing.weeks} weeks. Could you check in on them?`, link: '/admin/care' });
+          }
       ctx.db.put('meta', { id: 'automations:missing', value: [...flagged, ...missing.map((p) => `${p.id}@${p.lastAttendedAt!.slice(0, 10)}`)].slice(-5000).join(',') });
     }
   }
@@ -219,6 +229,18 @@ export async function runDue(ctx: Ctx) {
   const old = new Date(ctx.now.getTime() - 2 * DAY).toISOString();
   for (const o of ctx.db.all('otps')) if (o.expiresAt < old) ctx.db.del('otps', o.id);
   for (const t of ctx.db.all('refreshTokens')) if (t.expiresAt < ctx.now.toISOString() || (t.revoked && t.createdAt < old)) ctx.db.del('refreshTokens', t.id);
+}
+
+/** A zone leader who can hold a care case: the first of the person's zone leaders with an active office login. */
+function zoneLeaderStaff(ctx: Ctx, p: Collections['people']) {
+  const zone = p.zoneId ? ctx.db.get('zones', p.zoneId) : null;
+  if (!zone) return null;
+  const staff = ctx.db.all('staff').filter((s) => s.status === 'active' && ['owner', 'admin', 'pastor', 'leader'].includes(s.role));
+  for (const id of zone.leaderIds) {
+    const s = staff.find((x) => x.personId === id);
+    if (s) return s;
+  }
+  return null;
 }
 
 export function newCase(ctx: Ctx, p: Collections['people'], type: Collections['care']['type'], title: string, dueDays: number): Collections['care'] {
@@ -317,7 +339,7 @@ export function registerComms(r: Router) {
     const next = { ...cur };
     for (const k of ['birthday', 'anniversary', 'welcome', 'missing', 'volunteerReminder'] as const) {
       if (!ctx.body[k]) continue;
-      const patch = pick(ctx.body[k], ['enabled', 'channel', 'subject', 'body', 'createFollowUp', 'weeks', 'daysBefore']) as Record<string, unknown>;
+      const patch = pick(ctx.body[k], ['enabled', 'channel', 'subject', 'body', 'createFollowUp', 'weeks', 'daysBefore', 'askReply', 'assignLeader']) as Record<string, unknown>;
       if (patch.channel && !CHANNELS.includes(patch.channel as Channel)) delete patch.channel;
       (next as Record<string, unknown>)[k] = { ...cur[k], ...patch };
     }

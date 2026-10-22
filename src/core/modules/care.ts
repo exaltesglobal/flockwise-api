@@ -1,9 +1,10 @@
 // Pastoral care (follow-ups, visits, counselling), prayer requests, people at risk of
 // drifting away, plus the dashboard and insights numbers.
 import { ApiError } from '../errors.js';
-import { notify, pastorIds } from './notify.js';
+import { notify, pastorIds, ruleFor } from './notify.js';
+import { setBotState } from './whatsapp-bot.js';
 import type { Ctx, Router } from '../engine.js';
-import type { AtRiskPerson, CareCase, CareInput, Collections, Dashboard, Insights, PrayerView } from '../types.js';
+import type { AtRiskPerson, CareCase, CareInput, Collections, Dashboard, Insights, PrayerChain, PrayerView } from '../types.js';
 import {
   adminDonation,
   bySoonest,
@@ -183,8 +184,22 @@ function insights(ctx: Ctx): Insights {
 }
 
 /** The person record behind a staff login, for notifications. */
-function staffPerson(ctx: Ctx, s: Collections['staff']) {
+export function staffPerson(ctx: Ctx, s: Collections['staff']) {
   return (ctx.db.get('people', s.personId) ?? ctx.db.all('people').find((p) => (p.email ?? '').toLowerCase() === s.email.toLowerCase()))?.id ?? null;
+}
+
+/** Everyone who joined the prayer chain (from the app, on WhatsApp, or ticked by the office). */
+export const chainMembers = (ctx: Ctx) => ctx.db.all('people').filter((p) => p.prayerChain && p.status !== 'inactive');
+
+function prayerChain(ctx: Ctx): PrayerChain {
+  const people = chainMembers(ctx).sort((x, y) => fullName(x).localeCompare(fullName(y)));
+  return { members: people.length, people: people.slice(0, 500).map((p) => ({ id: p.id, name: fullName(p), phone: p.phone })) };
+}
+
+/** The most recent request the office sent to the chain in the last week, for a WhatsApp "PRAYED" with no context. */
+export function latestChainRequest(ctx: Ctx) {
+  const since = ctx.now.getTime() - 7 * DAY;
+  return ctx.db.all('prayer').filter((p) => p.chainSentAt && new Date(p.chainSentAt).getTime() > since).sort((x, y) => y.chainSentAt!.localeCompare(x.chainSentAt!))[0] ?? null;
 }
 
 export function registerCare(r: Router) {
@@ -323,6 +338,22 @@ export function registerCare(r: Router) {
   r.del('/admin/prayer/:id', { perm: 'care' }, (ctx) => {
     ctx.db.del('prayer', ctx.params[0]);
     return undefined;
+  });
+
+  // ----- prayer chain: intercessors who get requests on WhatsApp or by push and reply PRAYED -----
+  r.get('/admin/prayer/chain', { perm: 'care' }, (ctx) => prayerChain(ctx));
+  r.post('/admin/prayer/:id/chain', { perm: 'care' }, async (ctx) => {
+    const p = find(ctx, 'prayer', ctx.params[0], 'Prayer request');
+    const members = chainMembers(ctx).filter((m) => m.id !== p.personId);
+    if (!members.length) throw new ApiError(422, 'empty_chain', 'Nobody has joined the prayer chain yet. Members join from Prayer in the app, or reply JOIN PRAYER CHAIN on WhatsApp.');
+    const first = p.name.split(' ')[0];
+    const who = p.visibility === 'church' ? p.name : first;
+    await notify(ctx, 'prayer.chain', { personIds: members.map((m) => m.id), title: `🙏 Prayer chain: ${who}`, body: `${p.text}\n\nReply PRAYED once you have prayed, so ${first} knows.`, link: '/app/prayer' });
+    // A bare "PRAYED" from these phones in the next week counts for this request.
+    if (ruleFor(ctx, 'prayer.chain').whatsapp) for (const m of members) if (m.phone && m.consent?.whatsapp !== false) setBotState(ctx, m.phone, `chain:${p.id}`);
+    const next = ctx.db.put('prayer', { ...p, chainSentAt: ctx.now.toISOString(), chainCount: members.length });
+    ctx.audit('sent', 'prayer', p.id, `Sent ${first}'s prayer request to ${members.length} people on the prayer chain`);
+    return { ...prayerView(ctx, next, ''), name: next.name };
   });
 
   // ----- dashboards -----

@@ -14,6 +14,7 @@ export const CATALOG: Record<NotificationKind, Entry> = {
   'event.changed': { label: 'Service or event moved', description: 'The time or place of an event changed.', audience: 'People who RSVPed or are serving', rule: { email: true, push: true, whatsapp: false } },
   'announcement.published': { label: 'New announcement', description: 'An announcement is published in the app.', audience: 'Everyone in the church', rule: { email: false, push: true, whatsapp: false } },
   'prayer.new': { label: 'New prayer request', description: 'Someone asks for prayer in the app.', audience: 'Pastors and care team', rule: { email: true, push: true, whatsapp: false } },
+  'prayer.chain': { label: 'Prayer chain', description: 'The office sends a request to everyone on the prayer chain. On WhatsApp they reply PRAYED.', audience: 'People who joined the prayer chain', rule: { email: false, push: true, whatsapp: true } },
   'care.assigned': { label: 'Care case assigned', description: 'A follow-up or visit is given to a team member.', audience: 'The assigned team member', rule: { email: true, push: true, whatsapp: false } },
   'visitor.new': { label: 'New visitor', description: 'A newcomer signs up in the app or is added as a visitor.', audience: 'Pastors and care team', rule: { email: true, push: true, whatsapp: false } },
   'door.scanned': { label: 'Family arrived', description: 'Someone in the family scanned the door QR.', audience: 'Other adults in the household', rule: { email: false, push: true, whatsapp: false } },

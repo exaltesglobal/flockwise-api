@@ -142,6 +142,8 @@ export type Person = {
   checkinCode: string;
   /** The zone, prayer cell or family unit the household belongs to. */
   zoneId?: string | null;
+  /** Joined the prayer chain: gets prayer requests the office sends out, and replies PRAYED. */
+  prayerChain?: boolean;
 };
 
 export type PersonInput = Partial<Omit<Person, 'id' | 'joinedAt' | 'lastAttendedAt' | 'groups' | 'checkinCode'>> & { firstName: string; lastName: string };
@@ -380,7 +382,8 @@ export type Automations = {
   birthday: Automation;
   anniversary: Automation;
   welcome: Automation & { createFollowUp: boolean };
-  missing: Automation & { weeks: number; createFollowUp: boolean };
+  /** askReply: the WhatsApp asks for a 1/2/3 reply that lands on the care case. assignLeader: the case goes to the person's zone leader. */
+  missing: Automation & { weeks: number; createFollowUp: boolean; askReply?: boolean; assignLeader?: boolean };
   volunteerReminder: Automation & { daysBefore: number };
   /** Email to pastors and care staff listing upcoming birthdays and anniversaries. */
   staffDigest: { enabled: boolean; daysAhead: number };
@@ -421,13 +424,17 @@ export type PrayerRequest = {
   prayedBy: string[];
   createdAt: string;
   answeredNote: string | null;
+  /** When the office sent it to the prayer chain, and to how many people. */
+  chainSentAt?: string | null;
+  chainCount?: number;
 };
+export type PrayerChain = { members: number; people: { id: string; name: string; phone: string | null }[] };
 export type PrayerView = Omit<PrayerRequest, 'prayedBy'> & { prayedCount: number; iPrayed: boolean; mine: boolean };
 
 // ---------- directory ----------
 
 export type DirectoryEntry = { householdName: string; area: string | null; people: { id: string; name: string; phone: string | null; email: string | null }[] };
-export type MemberPreferences = { consent: Consent; checkinCode: string; campusId: string | null };
+export type MemberPreferences = { consent: Consent; checkinCode: string; campusId: string | null; prayerChain: boolean };
 
 // ---------- dashboards ----------
 
@@ -891,7 +898,7 @@ export type CanvaDesign = { id: string; title: string; editUrl: string; viewUrl:
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
 /** Things Flockwise can tell people about on its own. The office picks the channels for each. */
-export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'care.assigned' | 'visitor.new' | 'door.scanned';
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned';
 export type NotificationRule = { email: boolean; push: boolean; whatsapp: boolean };
 export type NotificationCatalogEntry = { kind: NotificationKind; label: string; description: string; audience: string; rule: NotificationRule; sentCount: number };
 export type NotificationsView = { rules: NotificationCatalogEntry[]; devices: { member: number; team: number }; emailFrom: string | null };
@@ -1221,7 +1228,7 @@ export type RecurringGift = {
 export type RecurringSummary = { active: number; monthly: number; failing: number; pending: number; currency: Currency };
 
 // ----- WhatsApp assistant: answers members and visitors on the church's WhatsApp number (through Chitthi) -----
-export type BotIntent = 'menu' | 'services' | 'events' | 'prayer_ask' | 'prayer' | 'give' | 'sermon' | 'new' | 'talk' | 'stop' | 'start' | 'unknown';
+export type BotIntent = 'menu' | 'services' | 'events' | 'prayer_ask' | 'prayer' | 'prayed' | 'chain_join' | 'chain_leave' | 'checkin_ok' | 'checkin_away' | 'checkin_call' | 'give' | 'sermon' | 'new' | 'talk' | 'stop' | 'start' | 'unknown';
 export type WaBotConfig = {
   id: 'waBot';
   enabled: boolean;
