@@ -288,6 +288,8 @@ export function registerConnections(r: Router) {
     ctx.db.put('meta', { id: `canva:state:${nonce}`, value: JSON.stringify({ verifier, staffId: ctx.staff?.id ?? null, at: ctx.now.toISOString(), returnTo: String(ctx.body?.returnTo ?? ctx.query.returnTo ?? '') }) });
     const state = `${churchId(ctx)}.${nonce}`;
     const url = `${CANVA_AUTH}?${new URLSearchParams({ code_challenge: challenge, code_challenge_method: 's256', scope: CANVA_SCOPES, response_type: 'code', client_id: app.clientId, state, redirect_uri: app.redirectUrl }).toString()}`;
+    // The demo has no Canva: the portal finishes the sign-in itself with this stand-in link.
+    if (app.redirectUrl.startsWith('demo:')) return { url: `demo:canva?state=${encodeURIComponent(state)}`, state };
     return { url, state };
   });
   /** Canva sends the browser back to the host, which calls this with the code. */
