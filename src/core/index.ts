@@ -73,7 +73,7 @@ export { onDonationSucceeded } from './modules/giving.js';
 export { DEMO_CODE } from './modules/auth.js';
 export { PERMISSIONS, ROLE_LABELS } from './perms.js';
 export { bootstrapChurch } from './bootstrap.js';
-export { applyBillingEvent, billingView } from './modules/billing.js';
+export { applyBillingEvent, billingView, markAiPackPaid } from './modules/billing.js';
 export { applyRecurringEvent } from './modules/recurring.js';
 export { botConfig, handleBotMessage } from './modules/whatsapp-bot.js';
 export { DOC_KINDS, markSetupPaid, ORG_TYPES, SETUP_FEE, SETUP_KIND } from './modules/razorpay-setup.js';

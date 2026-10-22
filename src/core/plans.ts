@@ -21,6 +21,61 @@ export type Plan = {
 };
 
 export const PLAN_ORDER: PlanId[] = ['seed', 'grow', 'thrive', 'cathedral'];
+
+/** Everything in Flockwise and the lowest plan that has it. Shown in full on the plans page so a church can compare before moving up or down. */
+export const FEATURES: { group: string; items: { label: string; from: PlanId; note?: string }[] }[] = [
+  { group: 'People and care', items: [
+    { label: 'People, households and member directory', from: 'seed' },
+    { label: 'Member app in English, Hindi, Tamil, Telugu, Malayalam and Kannada', from: 'seed' },
+    { label: 'Celebrations: birthdays, anniversaries, greetings', from: 'seed' },
+    { label: 'Custom roles and office access by zone, group or team', from: 'seed' },
+    { label: 'Zones, home visits and family cards', from: 'grow' },
+    { label: 'Pastoral care cases, prayer requests and prayer chain', from: 'grow' },
+    { label: 'Registers (baptisms, marriages, burials, dedications)', from: 'grow' },
+    { label: 'Follow-up workflows and custom fields', from: 'thrive' },
+  ] },
+  { group: 'Sundays and events', items: [
+    { label: 'Events, RSVPs and invitations', from: 'seed' },
+    { label: 'Kids check-in, kiosk, labels and pager', from: 'grow' },
+    { label: 'Volunteer teams, rotas and reminders', from: 'grow' },
+    { label: 'Small groups, meetings and join requests', from: 'grow' },
+    { label: 'Forms, registrations and paid tickets', from: 'grow' },
+    { label: 'Sunday school classes, lessons and exams', from: 'grow' },
+    { label: 'YouTube livestream with online attendance', from: 'grow' },
+    { label: 'Service planning, song library, chord charts and CCLI report', from: 'thrive' },
+    { label: 'Projector, stage display, musician view and OBS scene plan', from: 'thrive' },
+    { label: 'Built-in studio (cameras, scenes, recording, go live)', from: 'thrive' },
+    { label: 'Calendar with room and resource booking', from: 'thrive' },
+  ] },
+  { group: 'Giving and money', items: [
+    { label: 'Online giving with UPI, cards and netbanking, no platform fee', from: 'seed' },
+    { label: 'Recurring gifts by UPI AutoPay', from: 'seed' },
+    { label: '80G receipts, pledges, statements and Form 10BD', from: 'grow' },
+    { label: 'Offering counts, bank batches, accounts and expenses', from: 'grow' },
+    { label: 'Missions, campaigns and in-kind gifts', from: 'grow' },
+    { label: 'Tally export', from: 'grow' },
+  ] },
+  { group: 'Messages', items: [
+    { label: 'Email messages, announcements and public church page', from: 'seed' },
+    { label: 'SMS and WhatsApp (at cost) with automations', from: 'grow' },
+    { label: 'WhatsApp assistant with Chitthi, two-way check-ins', from: 'grow' },
+    { label: 'Media library, Zoom meetings and Canva designs', from: 'grow' },
+    { label: 'Bulletins and sermons library', from: 'grow' },
+  ] },
+  { group: 'Insight and AI', items: [
+    { label: 'Dashboard and attendance', from: 'seed' },
+    { label: 'Insights, reports and smart lists', from: 'thrive' },
+    { label: 'AI assistant, writer, translator, sermon and setlist help', from: 'thrive' },
+    { label: 'Weekly AI pastor briefing', from: 'cathedral' },
+    { label: 'API access, MCP and integrations', from: 'cathedral' },
+    { label: 'Priority support and data migration from Planning Center, Elvanto or Excel', from: 'cathedral' },
+  ] },
+];
+
+/** Add-ons a church can buy on top of its plan. */
+export const AI_PACK = { kind: 'ai_pack', credits: 500, price: { INR: 49_900, USD: 900 } } as const;
+/** Extra AI credits bought this month. */
+export const aiExtra = (db: Db, month: string) => Number(db.get('meta', `ai-extra:${month}`)?.value ?? 0);
 export const TRIAL_DAYS = 30;
 const UNLIMITED = 1_000_000;
 

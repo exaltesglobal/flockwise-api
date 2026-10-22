@@ -5,7 +5,7 @@
 import type { AiBlock, AiMessage, AiRequest, Ctx, Request, Router } from '../engine.js';
 import type { Db } from '../db.js';
 import { ApiError } from '../errors.js';
-import { limitsFor } from '../plans.js';
+import { limitsFor, aiExtra } from '../plans.js';
 import { TOOLS, trim } from '../mcp.js';
 import type { AiAnswer, AiDraft, AiPurpose, AiSermonKind, AiSetlist, AiStatus } from '../types.js';
 import { settings } from '../util.js';
@@ -23,7 +23,7 @@ const month = (ctx: Ctx) => ctx.now.toISOString().slice(0, 7);
 function status(ctx: Ctx): AiStatus {
   const m = month(ctx);
   const used = Number(ctx.db.get('meta', `ai:${m}`)?.value ?? 0);
-  return { enabled: !!ctx.env.ai, used, limit: settings(ctx).aiMonthlyLimit ?? limitsFor(ctx.db, ctx.now).aiCredits, month: m };
+  return { enabled: !!ctx.env.ai, used, limit: (settings(ctx).aiMonthlyLimit ?? limitsFor(ctx.db, ctx.now).aiCredits) + aiExtra(ctx.db, m), month: m };
 }
 
 function churchContext(ctx: Ctx) {

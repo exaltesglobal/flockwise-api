@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 
 import { config } from '../config.js';
-import { applyBillingEvent, applyRecurringEvent, botConfig, handleBotMessage, markSetupPaid, SETUP_KIND, type BillingInterval, type PlanId } from '../core/index.js';
+import { AI_PACK, applyBillingEvent, applyRecurringEvent, botConfig, handleBotMessage, markAiPackPaid, markSetupPaid, SETUP_KIND, type BillingInterval, type PlanId } from '../core/index.js';
 import { applyWebhook, churchAccounts } from '../giving.js';
 import { verifyChitthi, verifyWebhook } from '../razorpay.js';
 import type { Hub, Tenant } from '../server.js';
@@ -88,8 +88,8 @@ export function webhookRoutes(hub: Hub) {
     // One-time payments to Flockwise, e.g. assisted Razorpay setup.
     const link = evt.payload.payment_link?.entity;
     if (evt.event === 'payment_link.paid' && link) {
-      const lt = link.notes?.kind === SETUP_KIND ? hub.tenants.get(link.notes.church_id ?? '') : undefined;
-      if (lt) markSetupPaid(lt.engine.systemCtx(), link.id);
+      const lt = link.notes?.kind === SETUP_KIND || link.notes?.kind === AI_PACK.kind ? hub.tenants.get(link.notes.church_id ?? '') : undefined;
+      if (lt) (link.notes?.kind === AI_PACK.kind ? markAiPackPaid : markSetupPaid)(lt.engine.systemCtx(), link.id);
       return c.json({ ok: true, ...(lt ? {} : { ignored: true }) });
     }
     const sub = evt.payload.subscription?.entity;
