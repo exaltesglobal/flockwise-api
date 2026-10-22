@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "main": "dist/index.js",
   "description": "Flockwise backend API: email sign-in, people, events, check-in, volunteers, service planning, groups, giving with Razorpay, messaging and care.",
   "engines": {
     "node": ">=20"
