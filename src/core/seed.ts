@@ -92,6 +92,9 @@ export function seedDemo(db: Db, env: Env) {
       ...p,
       status,
     };
+    // Children carry no phone or email of their own; their parents' details are on the parents' records.
+    const yrs = person.birthDate ? new Date(now).getUTCFullYear() - Number(person.birthDate.slice(0, 4)) : 99;
+    if (yrs < 16 && !p.phone) Object.assign(person, { phone: null, email: p.email ?? null });
     people.push(person);
     return person;
   };

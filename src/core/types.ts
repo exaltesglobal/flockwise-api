@@ -457,6 +457,7 @@ export type ChurchSettings = Church & {
   /** The church's own word for a zone: Zone, Prayer cell, Kudumba unit, Ward, Area. */
   zoneLabel?: string;
   tally?: Partial<TallySettings>;
+  privacy?: Partial<PrivacySettings>;
 };
 
 export type Permission =
@@ -959,6 +960,8 @@ export type Collections = {
   envelopes: OfferingEnvelope;
   inKind: InKindGift;
   auctionLots: AuctionLot;
+  consentLog: ConsentEvent;
+  dataRequests: DataRequest;
   apiKeys: ApiKeyRecord;
   automations: Automations & { id: string };
   greetings: Greeting;
@@ -1019,7 +1022,7 @@ export const KINDS = [
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys',
-  'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots',
+  'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests',
 ] as const satisfies readonly Kind[];
 
 // ----- assisted Razorpay setup: Flockwise's team opens the church's Razorpay account and does its KYC -----
@@ -1182,3 +1185,47 @@ export type CampaignView = Campaign & { fundName: string; progress: CampaignProg
 export type CampaignDetail = CampaignView & { envelopes: OfferingEnvelope[]; inKind: InKindGift[]; lots: AuctionLot[]; topGivers: { name: string; amount: number }[] };
 export type PublicCampaign = { id: string; name: string; kind: CampaignKind; description: string; fundId: string; goal: number | null; raised: number; percent: number | null; givers: number; endsOn: string | null };
 export type MemberCampaign = PublicCampaign & { envelope: { number: number; promised: number | null; amount: number | null } | null };
+
+// ---------- privacy: India's Digital Personal Data Protection Act, 2023 ----------
+
+export type ConsentPurpose = 'email' | 'sms' | 'whatsapp' | 'directory';
+export type ConsentSource = 'member' | 'staff' | 'whatsapp' | 'import' | 'form';
+/** One change to a person's consent, kept as proof of what they agreed to and when. */
+export type ConsentEvent = { id: string; personId: string; at: string; purpose: ConsentPurpose; granted: boolean; source: ConsentSource; by: string };
+export type DataRequestKind = 'access' | 'correction' | 'erasure' | 'grievance';
+export type DataRequestStatus = 'open' | 'done' | 'declined';
+export type DataRequest = {
+  id: string;
+  personId: string | null;
+  personName: string;
+  contact: string;
+  kind: DataRequestKind;
+  details: string;
+  status: DataRequestStatus;
+  createdAt: string;
+  dueAt: string;
+  closedAt: string | null;
+  closedBy: string | null;
+  response: string;
+};
+export type PrivacySettings = {
+  /** The person members contact about their data (the Act's grievance officer). */
+  officerName: string;
+  officerEmail: string;
+  officerPhone: string;
+  /** Shown to members next to their consent choices. */
+  notice: string;
+  /** Flag people who have not attended for this many months, so the office can review their data. */
+  reviewAfterMonths: number;
+};
+export type PrivacyOverview = {
+  settings: PrivacySettings;
+  requests: DataRequest[];
+  open: number;
+  overdue: number;
+  optedOut: Record<ConsentPurpose, number>;
+  people: number;
+  toReview: number;
+  minorsWithContact: number;
+};
+export type MemberPrivacy = { consent: Consent; log: ConsentEvent[]; requests: DataRequest[]; officer: { name: string; email: string; phone: string }; notice: string; church: string };

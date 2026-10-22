@@ -7,6 +7,7 @@ import { atLeast, effectivePlan, getSubscription } from '../plans.js';
 import type { BotIntent, BotMessage, ChitthiConfig, WaBotConfig, WaBotStatus } from '../types.js';
 import { bySoonest, churchId, DAY, fullName, newPerson, normPhone, settings, upcoming } from '../util.js';
 import { publicPageOf } from './ministry.js';
+import { logConsent } from './privacy.js';
 
 const KEEP = 500;
 const STATE_TTL = 30 * 60_000;
@@ -135,10 +136,10 @@ export function answer(ctx: Ctx, msg: { phone: string; name: string; text: strin
       if (!dry) careCase(ctx, person?.id ?? null, person ? fullName(person) : msg.name || msg.phone, 'Wants to talk (WhatsApp)', `Phone ${msg.phone}. Message: ${msg.text.trim().slice(0, 300)}`);
       return { intent, personId: person?.id ?? null, reply: `Thank you, ${name}. Someone from the church will message you soon.${s.phone ? ` If it’s urgent, call ${s.phone}.` : ''}` };
     case 'stop':
-      if (person && !dry) ctx.db.put('people', { ...person, consent: { ...person.consent, whatsapp: false } });
+      if (person && !dry) logConsent(ctx, person.id, person.consent, ctx.db.put('people', { ...person, consent: { ...person.consent, whatsapp: false } }).consent, 'whatsapp');
       return { intent, personId: person?.id ?? null, reply: 'You won’t get WhatsApp updates from us any more. Reply START to turn them back on.' };
     case 'start':
-      if (person && !dry) ctx.db.put('people', { ...person, consent: { ...person.consent, whatsapp: true } });
+      if (person && !dry) logConsent(ctx, person.id, person.consent, ctx.db.put('people', { ...person, consent: { ...person.consent, whatsapp: true } }).consent, 'whatsapp');
       return { intent, personId: person?.id ?? null, reply: 'Welcome back! You’ll get WhatsApp updates from us again. Reply MENU any time.' };
     default:
       return { intent: 'unknown', personId: person?.id ?? null, reply: `Sorry, I didn’t understand that.\n\n${menu('').trim()}` };

@@ -445,3 +445,12 @@ A campaign (harvest festival, building fund, thanksgiving, mission appeal or oth
 - `POST /admin/offerings/:id/in-kind { donorId? | donorName, item, quantity?, value?, forAuction? }` records produce, gold or livestock. Its value counts in the total until it is sold.
 - `POST /admin/offerings/:id/lots { inKindId? | title, bidderId? | bidderName, amount, paidNow?, method? }` records a winning bid. `POST .../lots/:lotId/pay { method }` records the payment.
 - Members: `GET /giving/campaigns` returns live public campaigns with progress and the family's envelope. `GET /public/church` includes `campaigns`.
+
+## Privacy and the DPDP Act (every plan)
+
+India's Digital Personal Data Protection Act, 2023 gives people the right to know what the church holds, to correct it, to withdraw consent and to have it erased.
+
+- Every consent change (email, SMS, WhatsApp, directory) is recorded in `consentLog` with who made it: the member, the office, or a STOP/START reply on WhatsApp. `GET /admin/people/:id/consent` lists one person's history.
+- Members: `GET /me/privacy` returns their consent, history, requests, the church's notice and its grievance officer. `GET /me/privacy/export` returns everything held about them as JSON (confidential pastoral notes stay out). `POST /me/privacy/requests { kind: 'access' | 'correction' | 'erasure' | 'grievance', details }` opens a request due in 30 days.
+- Office: `GET /admin/privacy` returns the settings, requests, counts of people who said no to each channel, people inactive for longer than `reviewAfterMonths`, and children under 18 with their own phone or email. `PUT /admin/privacy/settings { officerName, officerEmail, officerPhone, notice, reviewAfterMonths }`. `POST /admin/privacy/requests` records a request made by phone or letter. `PATCH /admin/privacy/requests/:id { status, response }`; declining needs a reason. `GET /admin/people/:id/export` downloads a person's data.
+- `POST /admin/privacy/requests/:id/erase` (owner or admin) erases the person: profile, attendance, RSVPs, serving, groups, prayer requests, form answers, WhatsApp messages and consent history. Gift records stay with the donor's name and PAN only, as the Income Tax Act requires (section 8(7) of the DPDP Act allows this). Church registers stay as permanent records.

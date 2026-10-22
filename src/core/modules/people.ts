@@ -22,6 +22,7 @@ import {
   requireFields,
 } from '../util.js';
 import { cleanCustom, triggerWorkflows } from './workflows.js';
+import { logConsent } from './privacy.js';
 
 /** People counted towards the plan: everyone except those marked inactive. */
 export const activePeople = (db: Db) => db.all('people').filter((p) => p.status !== 'inactive').length;
@@ -107,7 +108,7 @@ function importPeople(ctx: Ctx, rows: PersonInput[], dedupeBy: 'phone' | 'email'
   return result;
 }
 
-function removePerson(ctx: Ctx, id: string) {
+export function removePerson(ctx: Ctx, id: string) {
   ctx.db.del('people', id);
   for (const kind of ['groupMembers', 'rsvps', 'joinRequests', 'blockouts', 'assignments', 'pledges'] as const)
     for (const r of ctx.db.all(kind)) if (('personId' in r && r.personId === id) || ('person' in r && r.person.id === id)) ctx.db.del(kind, r.id);
@@ -179,6 +180,7 @@ export function registerPeople(r: Router) {
     for (const k of ['email', 'sms', 'whatsapp', 'directory'] as const) if (typeof ctx.body.consent?.[k] === 'boolean') consent[k] = ctx.body.consent[k];
     const campusId = ctx.body.campusId !== undefined && (ctx.body.campusId === null || ctx.db.get('campuses', ctx.body.campusId)) ? ctx.body.campusId : p.campusId;
     const next = ctx.db.put('people', { ...p, consent, campusId });
+    logConsent(ctx, p.id, p.consent, next.consent, 'member');
     return { consent: next.consent, checkinCode: next.checkinCode, campusId: next.campusId };
   });
   r.get('/campuses', {}, (ctx) => ctx.db.all('campuses'));
@@ -235,6 +237,7 @@ export function registerPeople(r: Router) {
   r.patch('/admin/people/:id', { perm: 'people.edit' }, (ctx) => {
     const p = find(ctx, 'people', ctx.params[0], 'Person');
     const next = ctx.db.put('people', { ...p, ...cleanInput(ctx.body), ...withCustom(ctx, ctx.body, p) });
+    if (ctx.body.consent) logConsent(ctx, p.id, p.consent, next.consent, 'staff');
     ctx.audit('updated', 'person', p.id, `Updated ${fullName(next)}`);
     return personView(ctx, next);
   });
