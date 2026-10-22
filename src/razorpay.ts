@@ -52,6 +52,10 @@ export function createPlan(acct: RazorpayAccount, input: { amount: number; curre
   return call<{ id: string }>(acct, 'POST', '/plans', { period: input.period ?? 'monthly', interval: 1, item: { name: input.name, amount: input.amount, currency: input.currency } });
 }
 
+export function getPaymentLink(acct: RazorpayAccount, id: string) {
+  return call<PaymentLink>(acct, 'GET', `/payment_links/${encodeURIComponent(id)}`);
+}
+
 export function cancelSubscription(acct: RazorpayAccount, id: string) {
   return call<Subscription>(acct, 'POST', `/subscriptions/${encodeURIComponent(id)}/cancel`, { cancel_at_cycle_end: 1 });
 }

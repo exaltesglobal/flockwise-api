@@ -230,3 +230,51 @@ test('API keys name their church and reach only it', async () => {
   const mcp = await ok(await app.request(`/mcp/${key.secret}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }) }));
   assert.match(mcp.result.instructions, /Grace Fellowship/);
 });
+
+test('assisted Razorpay setup: fee on Flockwise account, documents, team queue', async () => {
+  const tok = grace.session.accessToken;
+  const before = await ok(await req('GET', '/v1/admin/settings/payments/setup', undefined, { token: tok }));
+  assert.equal(before.price, 199_900);
+  assert.equal(before.online, true);
+  assert.equal(before.setup, null);
+  const pdf = Buffer.from('%PDF-1.4 test').toString('base64');
+  assert.equal((await req('POST', '/v1/admin/settings/payments/setup/docs', { kind: 'pan', data: pdf }, { token: tok })).status, 409, 'uploads wait for payment');
+
+  calls.length = 0;
+  const start = await ok(await req('POST', '/v1/admin/settings/payments/setup', {}, { token: tok }));
+  assert.equal(start.checkoutUrl, 'https://rzp.io/i/gift');
+  const link = calls.find((c) => c.url === '/v1/payment_links')!;
+  assert.equal(link.body.amount, 199_900);
+  assert.deepEqual(link.body.notes, { kind: 'razorpay_setup', church_id: grace.church.id });
+
+  const raw = JSON.stringify({ event: 'payment_link.paid', payload: { payment_link: { entity: { id: 'plink_9', notes: link.body.notes } } } });
+  await ok(await app.request('/v1/webhooks/billing', { method: 'POST', body: raw, headers: { 'x-razorpay-signature': createHmac('sha256', 'billing-wh').update(raw).digest('hex') } }));
+  let v = await ok(await req('GET', '/v1/admin/settings/payments/setup', undefined, { token: tok }));
+  assert.equal(v.setup.status, 'paid');
+  assert.equal((await req('POST', '/v1/admin/settings/payments/setup', {}, { token: tok })).status, 409, 'cannot pay twice');
+
+  assert.equal((await req('POST', '/v1/admin/settings/payments/setup/docs', { kind: 'pan', data: Buffer.from('hello').toString('base64') }, { token: tok })).status, 422, 'only PDF, JPG, PNG');
+  for (const kind of ['pan', 'registration', 'bank_proof']) v = await ok(await req('POST', '/v1/admin/settings/payments/setup/docs', { kind, fileName: `${kind}.pdf`, data: pdf }, { token: tok }));
+  assert.equal((await req('POST', '/v1/admin/settings/payments/setup/submit', {}, { token: tok })).status, 422, 'needs org type');
+  await ok(await req('PATCH', '/v1/admin/settings/payments/setup', { orgType: 'trust', contactPhone: '+91 98480 12345' }, { token: tok }));
+  const short = await req('POST', '/v1/admin/settings/payments/setup/submit', {}, { token: tok });
+  assert.equal(short.status, 422);
+  assert.match((await short.json()).error.message, /signs for the church/);
+  v = await ok(await req('POST', '/v1/admin/settings/payments/setup/docs', { kind: 'signatory_id', fileName: 'id.pdf', data: pdf }, { token: tok }));
+  v = await ok(await req('POST', '/v1/admin/settings/payments/setup/submit', {}, { token: tok }));
+  assert.ok(v.setup.docsSubmittedAt);
+
+  const q = await ok(await req('GET', '/v1/platform/razorpay-setups', undefined, { token: team }));
+  assert.equal(q.open, 1);
+  assert.equal(q.earned, 199_900);
+  const row = q.rows.find((r: any) => r.churchId === grace.church.id);
+  assert.equal(row.docs.length, 4);
+  const doc = await ok(await req('GET', `/v1/platform/razorpay-setups/${grace.church.id}/docs/${row.docs[0].id}`, undefined, { token: team }));
+  assert.equal(doc.data, pdf);
+  assert.equal(doc.mime, 'application/pdf');
+  await ok(await req('PATCH', `/v1/platform/razorpay-setups/${grace.church.id}`, { status: 'done', teamNote: 'Activated' }, { token: team }));
+  assert.equal((await req('GET', `/v1/platform/razorpay-setups/${grace.church.id}/docs/${row.docs[0].id}`, undefined, { token: team })).status, 404, 'files are deleted once done');
+  v = await ok(await req('GET', '/v1/admin/settings/payments/setup', undefined, { token: tok }));
+  assert.equal(v.setup.status, 'done');
+  assert.equal(v.setup.teamNote, 'Activated');
+});

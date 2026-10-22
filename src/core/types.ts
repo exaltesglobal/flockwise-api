@@ -950,7 +950,8 @@ export type AccountsSummary = {
 
 export type Collections = {
   settings: ChurchSettings & { id: string };
-  integrations: ChitthiConfig | RazorpayConfig;
+  integrations: ChitthiConfig | RazorpayConfig | RazorpaySetup;
+  kycFiles: KycFile;
   apiKeys: ApiKeyRecord;
   automations: Automations & { id: string };
   greetings: Greeting;
@@ -1011,5 +1012,43 @@ export const KINDS = [
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys',
-  'registers', 'zones', 'visits', 'accountHeads', 'expenses',
+  'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles',
 ] as const satisfies readonly Kind[];
+
+// ----- assisted Razorpay setup: Flockwise's team opens the church's Razorpay account and does its KYC -----
+export type RazorpaySetupStatus = 'pending_payment' | 'paid' | 'in_progress' | 'done' | 'refunded';
+export type ChurchOrgType = 'trust' | 'society' | 'section8' | 'parent';
+export type KycDocKind = 'pan' | 'registration' | 'bank_proof' | 'signatory_id' | 'authorisation' | 'reg_12a_80g' | 'fcra' | 'address_proof' | 'other';
+export type KycDoc = { id: string; kind: KycDocKind; fileName: string; mime: string; size: number; uploadedAt: string; uploadedBy: string };
+export type RazorpaySetup = {
+  id: 'razorpaySetup';
+  status: RazorpaySetupStatus;
+  /** In paise. */
+  amount: number;
+  paymentRef: string | null;
+  paymentUrl: string | null;
+  requestedBy: string;
+  requestedByEmail: string;
+  createdAt: string;
+  paidAt: string | null;
+  doneAt: string | null;
+  orgType: ChurchOrgType | null;
+  /** WhatsApp number our team uses to reach the church about missing papers. */
+  contactPhone: string;
+  docs: KycDoc[];
+  docsSubmittedAt: string | null;
+  /** From the Flockwise team, shown to the church (e.g. "Please send a clearer cheque photo"). */
+  teamNote: string;
+};
+/** The bytes of one KYC document, sealed. Removed once setup is done or refunded. */
+export type KycFile = { id: string; sealed: string };
+export type RazorpaySetupView = {
+  price: number;
+  currency: 'INR';
+  /** False when the server cannot take the fee online yet. */
+  online: boolean;
+  partnerUrl: string;
+  setup: RazorpaySetup | null;
+  /** Documents still needed before the church can send them to us. */
+  missing: KycDocKind[];
+};

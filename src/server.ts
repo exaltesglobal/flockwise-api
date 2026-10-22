@@ -10,7 +10,7 @@ import { bootstrapChurch, createChurchEngine, createPlatform, Db, type Env } fro
 import type { Currency } from './core/types.js';
 import { razorpayCheckout } from './giving.js';
 import { channelStatus, deliver, sendOtpEmail } from './providers.js';
-import { cancelSubscription, checkKeys, createPlan, createSubscription } from './razorpay.js';
+import { cancelSubscription, checkKeys, createPaymentLink, createPlan, createSubscription, getPaymentLink } from './razorpay.js';
 import { coreStore } from './store/core-store.js';
 import type { Store } from './store/types.js';
 
@@ -59,6 +59,7 @@ export function createHub() {
       unseal,
       verifyRazorpay: checkKeys,
       serverPaymentKeys: isDefault && !!config.razorpay.main,
+      razorpayPartnerUrl: config.razorpayPartnerUrl,
       ...(config.billing ? { billing: billingHooks() } : {}),
       ...(aiConfigured() ? { ai: claude } : {}),
     };
@@ -85,6 +86,21 @@ export function createHub() {
       async cancel(ref) {
         if (!ref.startsWith('sub_')) return;
         await cancelSubscription(acct, ref);
+      },
+      async oneTime(input) {
+        const link = await createPaymentLink(acct, {
+          amount: input.amount,
+          currency: 'INR',
+          description: input.description,
+          referenceId: `${input.kind}-${input.churchId}-${Date.now().toString(36)}`.slice(0, 40),
+          callbackUrl: input.returnUrl,
+          customer: { name: input.name, email: input.email },
+          notes: { kind: input.kind, church_id: input.churchId },
+        });
+        return { url: link.short_url, providerRef: link.id };
+      },
+      async linkPaid(ref) {
+        return (await getPaymentLink(acct, ref)).status === 'paid';
       },
     };
   }

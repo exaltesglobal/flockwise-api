@@ -58,11 +58,17 @@ export type Env = {
   billing?: {
     checkout(input: BillingCheckout): Promise<{ url: string; providerRef: string | null }>;
     cancel(providerRef: string): Promise<void>;
+    /** A one-time payment to Flockwise (assisted Razorpay setup). */
+    oneTime?(input: { churchId: string; kind: string; amount: number; description: string; email: string; name: string; returnUrl: string }): Promise<{ url: string; providerRef: string }>;
+    /** Asks Razorpay whether a one-time payment link was paid, in case the webhook is late. */
+    linkPaid?(providerRef: string): Promise<boolean>;
   };
   /** Checks a church's Razorpay keys with Razorpay. Absent in the demo. */
   verifyRazorpay?: (keyId: string, keySecret: string) => Promise<boolean>;
   /** True when the host has its own Razorpay keys for this church (the server's original church). */
   serverPaymentKeys?: boolean;
+  /** Our Razorpay partner sign-up link for assisted setup. */
+  razorpayPartnerUrl?: string;
   /** Encrypts a stored credential (e.g. a partner API key) and reads it back. */
   seal(value: string): string;
   unseal(sealed: string): string;

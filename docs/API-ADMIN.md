@@ -394,3 +394,18 @@ Zones are areas, prayer cells or family units (the church picks its own word in 
 - `DELETE /admin/expenses/:id` withdraws an unpaid request (the person who asked or the treasurer).
 - `GET`, `PATCH /admin/accounts/tally` (giving.view / giving.edit): company name, bank, cash and FCRA bank ledger names, ledger name per fund, income group.
 - `GET /admin/accounts/tally-export?from=&to=&gifts=0|1&expenses=0|1&ledgers=0|1&daily=0|1` (giving.view) → `{ filename, xml, receipts, payments, incomeTotal, expenseTotal }`. Tally Prime import file: a Receipt voucher per gift (or per day, fund and account with `daily=1`; cash gifts to the cash ledger, FCRA gifts to the FCRA bank) and a Payment voucher per paid expense, with ledger masters for the funds and heads used.
+
+## Assisted Razorpay setup
+
+A one-time ₹1,999 service, paid to Flockwise (Agape Labs) on the platform's Razorpay account. Our team opens the church's Razorpay account through our partner link and does the KYC. All routes need the `settings` permission.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/admin/settings/payments/setup` | `{price, currency, online, partnerUrl, setup, missing}`. Checks Razorpay if a payment is still pending. |
+| POST | `/admin/settings/payments/setup` | Starts the fee payment: `{checkoutUrl}`. Razorpay returns the payer to `/admin/razorpay-setup`. 409 once paid. |
+| PATCH | `/admin/settings/payments/setup` | `{orgType?: 'trust'\|'society'\|'section8'\|'parent', contactPhone?}` |
+| POST | `/admin/settings/payments/setup/docs` | `{kind, fileName, data}` with base64 `data`. PDF, JPG or PNG, up to 3 MB, 12 files at most. Open after payment until done. |
+| DELETE | `/admin/settings/payments/setup/docs/:id` | |
+| POST | `/admin/settings/payments/setup/submit` | Needs `orgType` and the required documents (PAN, registration, bank proof, signatory ID, plus the parent body's letter for `parent`). |
+
+The Flockwise team works the queue at `/platform/razorpay-setups` (list), `GET /platform/razorpay-setups/:churchId/docs/:docId` (file, logged) and `PATCH /platform/razorpay-setups/:churchId` `{status, teamNote}`. Marking a setup `done` or `refunded` deletes the stored files. The fee is confirmed by the `payment_link.paid` event on `/v1/webhooks/billing`.

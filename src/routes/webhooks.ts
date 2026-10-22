@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 
 import { config } from '../config.js';
-import { applyBillingEvent, type BillingInterval, type PlanId } from '../core/index.js';
+import { applyBillingEvent, markSetupPaid, SETUP_KIND, type BillingInterval, type PlanId } from '../core/index.js';
 import { applyWebhook, churchAccounts } from '../giving.js';
 import { verifyWebhook } from '../razorpay.js';
 import type { Hub, Tenant } from '../server.js';
@@ -46,7 +46,14 @@ export function webhookRoutes(hub: Hub) {
   app.post('/webhooks/billing', async (c) => {
     const raw = await c.req.text();
     if (!config.billing || !verifyWebhook(raw, c.req.header('x-razorpay-signature'), config.billing.webhookSecret)) return c.json({ error: { code: 'bad_signature', message: 'Invalid signature' } }, 400);
-    const evt = JSON.parse(raw) as { event: string; payload: { subscription?: { entity: { id: string; current_end?: number | null; notes?: RzpNotes } } } };
+    const evt = JSON.parse(raw) as { event: string; payload: { subscription?: { entity: { id: string; current_end?: number | null; notes?: RzpNotes } }; payment_link?: { entity: { id: string; notes?: RzpNotes } } } };
+    // One-time payments to Flockwise, e.g. assisted Razorpay setup.
+    const link = evt.payload.payment_link?.entity;
+    if (evt.event === 'payment_link.paid' && link) {
+      const lt = link.notes?.kind === SETUP_KIND ? hub.tenants.get(link.notes.church_id ?? '') : undefined;
+      if (lt) markSetupPaid(lt.engine.systemCtx(), link.id);
+      return c.json({ ok: true, ...(lt ? {} : { ignored: true }) });
+    }
     const sub = evt.payload.subscription?.entity;
     const notes = sub?.notes ?? {};
     const t = sub && notes.kind === 'flockwise_plan' ? hub.tenants.get(notes.church_id ?? '') : undefined;
