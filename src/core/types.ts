@@ -779,8 +779,22 @@ export type Headcount = { id: string; eventId: string; area: string; count: numb
 // ---------- giving: batches ----------
 
 export type BatchStatus = 'open' | 'committed';
-export type Batch = { id: string; name: string; date: string; status: BatchStatus; expectedTotal: number | null; notes: string; createdBy: string; createdAt: string; committedAt: string | null; committedBy: string | null };
-export type BatchView = Batch & { count: number; total: number; byMethod: { method: string; count: number; total: number }[]; difference: number | null };
+/** The counting room: what the counters found in the plate, by denomination, with their signatures. */
+export type CountSheet = {
+  /** Notes counted per denomination in major units, e.g. { "500": 12, "100": 40 }. */
+  notes: Record<string, number>;
+  /** Coins, cheques and UPI/QR in minor units. */
+  coins: number; cheques: number; upi: number;
+  /** A photo of the count sheet or the plate (https link or a small data: image). */
+  photoUrl: string | null;
+  /** Two people sign the count; changing the count clears the signatures. */
+  counters: { name: string; staffId: string | null; signedAt: string }[];
+  total: number;
+  countedAt: string; countedBy: string;
+};
+export type Batch = { id: string; name: string; date: string; status: BatchStatus; expectedTotal: number | null; notes: string; createdBy: string; createdAt: string; committedAt: string | null; committedBy: string | null; sheet?: CountSheet | null };
+/** `loose` is cash counted but not entered as named gifts; committing records it as an anonymous offering. */
+export type BatchView = Batch & { count: number; total: number; byMethod: { method: string; count: number; total: number }[]; difference: number | null; loose: number; signed: number };
 
 // ---------- groups: posts, resources, finder ----------
 

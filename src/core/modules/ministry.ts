@@ -17,7 +17,44 @@ function batchView(ctx: Ctx, b: Batch): BatchView {
     const m = byMethod.get(d.method ?? 'other') ?? { count: 0, total: 0 };
     byMethod.set(d.method ?? 'other', { count: m.count + 1, total: m.total + d.amount });
   }
-  return { ...b, count: gifts.length, total, byMethod: [...byMethod].map(([method, v]) => ({ method, ...v })), difference: b.expectedTotal === null ? null : total - b.expectedTotal };
+  const loose = b.sheet ? Math.max(0, b.sheet.total - total) : 0;
+  return { ...b, count: gifts.length, total, byMethod: [...byMethod].map(([method, v]) => ({ method, ...v })), difference: b.expectedTotal === null ? null : total - b.expectedTotal, loose, signed: b.sheet?.counters.length ?? 0 };
+}
+
+const minor = (v: unknown, what: string) => {
+  const n = Math.round(Number(v ?? 0));
+  if (!Number.isFinite(n) || n < 0 || n > 1_000_000_000_00) throw new ApiError(422, 'invalid', `${what} should be an amount.`, { [what]: 'Amount' });
+  return n;
+};
+
+/** The count sheet from the counting room: denominations, coins, cheques, UPI and a photo. */
+function cleanCount(ctx: Ctx, body: Record<string, unknown>, cur: Batch['sheet']): NonNullable<Batch['sheet']> {
+  const raw = (body.notes && typeof body.notes === 'object' ? body.notes : {}) as Record<string, unknown>;
+  const notes: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    const denom = Number(k);
+    const n = Math.round(Number(v ?? 0));
+    if (!Number.isFinite(denom) || denom <= 0 || !Number.isFinite(n) || n < 0 || n > 1_000_000) throw new ApiError(422, 'invalid', 'Note counts should be whole numbers.');
+    if (n > 0) notes[String(denom)] = n;
+  }
+  const coins = minor(body.coins, 'coins');
+  const cheques = minor(body.cheques, 'cheques');
+  const upi = minor(body.upi, 'upi');
+  let photoUrl: string | null = cur?.photoUrl ?? null;
+  if (body.photoUrl !== undefined) {
+    const p = String(body.photoUrl ?? '').trim();
+    if (p && !/^https:\/\//.test(p) && !/^data:image\/(jpeg|png|webp);base64,/.test(p)) throw new ApiError(422, 'invalid', 'The photo should be an https link or a photo taken in the app.');
+    if (p.length > 700_000) throw new ApiError(422, 'invalid', 'That photo is too big. Take it again in the app, which shrinks it.');
+    photoUrl = p || null;
+  }
+  const total = Object.entries(notes).reduce((s, [d, n]) => s + Number(d) * n * 100, 0) + coins + cheques + upi;
+  return { notes, coins, cheques, upi, photoUrl, counters: [], total, countedAt: ctx.now.toISOString(), countedBy: ctx.staff?.name ?? '' };
+}
+
+/** Where loose cash goes when a counted batch is committed: the fund the office names, else the general one. */
+function looseFund(ctx: Ctx, id: unknown) {
+  const funds = ctx.db.all('funds').filter((f) => f.active);
+  return (id ? funds.find((f) => f.id === id) : undefined) ?? funds.find((f) => /tithe|offering|general/i.test(f.name)) ?? funds[0] ?? null;
 }
 
 // ----- live service -----
@@ -110,12 +147,53 @@ export function registerMinistry(r: Router) {
     if (patch.expectedTotal !== undefined) patch.expectedTotal = patch.expectedTotal ? Math.round(Number(patch.expectedTotal)) : null;
     return batchView(ctx, ctx.db.put('batches', { ...b, ...patch }));
   });
+  // ----- the counting room -----
+  r.put('/admin/giving/batches/:id/count', { perm: 'giving.edit' }, (ctx) => {
+    const b = find(ctx, 'batches', ctx.params[0], 'Batch');
+    if (b.status !== 'open') throw new ApiError(409, 'committed', 'Reopen the batch to change the count.');
+    const count = cleanCount(ctx, ctx.body, b.sheet ?? null);
+    ctx.audit('counted', 'batch', b.id, `Counted ${(count.total / 100).toFixed(0)} for “${b.name}”`);
+    return batchView(ctx, ctx.db.put('batches', { ...b, sheet: count, expectedTotal: count.total }));
+  });
+  r.post('/admin/giving/batches/:id/sign', { perm: ['giving.edit', 'giving.view'] }, (ctx) => {
+    const b = find(ctx, 'batches', ctx.params[0], 'Batch');
+    if (!b.sheet) throw new ApiError(422, 'no_count', 'Fill in the count sheet first.');
+    if (b.status !== 'open') throw new ApiError(409, 'committed', 'This batch is already committed.');
+    const name = String(ctx.body.name ?? ctx.staff?.name ?? '').trim().slice(0, 80);
+    if (!name) throw new ApiError(422, 'invalid', 'Who is signing?', { name: 'Required' });
+    if (b.sheet.counters.length >= 2) throw new ApiError(409, 'signed', 'Two people have already signed this count.');
+    if (b.sheet.counters.some((c) => c.name.toLowerCase() === name.toLowerCase())) throw new ApiError(409, 'same_person', 'The second signature must be a different person.');
+    const counters = [...b.sheet.counters, { name, staffId: ctx.staff?.id ?? null, signedAt: ctx.now.toISOString() }];
+    ctx.audit('signed', 'batch', b.id, `${name} signed the count for “${b.name}”`);
+    return batchView(ctx, ctx.db.put('batches', { ...b, sheet: { ...b.sheet, counters } }));
+  });
+  r.del('/admin/giving/batches/:id/sign', { perm: 'giving.edit' }, (ctx) => {
+    const b = find(ctx, 'batches', ctx.params[0], 'Batch');
+    if (b.sheet && b.status === 'open') ctx.db.put('batches', { ...b, sheet: { ...b.sheet, counters: [] } });
+    return batchView(ctx, ctx.db.get('batches', b.id)!);
+  });
+
   r.post('/admin/giving/batches/:id/commit', { perm: 'giving.edit' }, (ctx) => {
     const b = find(ctx, 'batches', ctx.params[0], 'Batch');
-    const v = batchView(ctx, b);
+    let v = batchView(ctx, b);
+    if (b.sheet && v.signed < 2 && !ctx.body.force) throw new ApiError(409, 'unsigned', 'Two counters should sign the count sheet before the batch is committed.');
+    // Cash in the plate that nobody entered by name becomes one anonymous offering, so the books match the count.
+    if (v.loose > 0) {
+      const fund = looseFund(ctx, ctx.body.looseFundId);
+      if (!fund) throw new ApiError(422, 'no_fund', 'Add a fund first so the loose offering has somewhere to go.');
+      const at = ctx.now.toISOString();
+      ctx.db.put('donations', {
+        id: ctx.id('dn'), donorId: null, donorName: 'Loose offering', donorEmail: null, donorPhone: null,
+        fundId: fund.id, fundName: fund.name, amount: v.loose, currency: settings(ctx).currency, frequency: 'once', status: 'succeeded', method: 'cash', pan: null,
+        donorCitizenship: 'IN', fcra: false, provider: 'offline', providerRef: null, providerPaymentId: null, createdAt: at, paidAt: `${b.date}T12:00:00.000Z`, eventId: null,
+        receiptNumber: null, batchId: b.id,
+      });
+      ctx.audit('recorded', 'donation', null, `Loose offering of ${(v.loose / 100).toFixed(0)} from “${b.name}” to ${fund.name}`);
+      v = batchView(ctx, b);
+    }
     if (!v.count) throw new ApiError(422, 'empty', 'Add gifts to the batch before committing it.');
     if (v.difference && !ctx.body.force) throw new ApiError(409, 'mismatch', `The gifts add up to ${(v.total / 100).toFixed(2)}, which doesn't match the counted total. Check the entries or commit anyway.`);
-    ctx.audit('committed', 'batch', b.id, `Committed the batch “${b.name}” (${v.count} gifts)`);
+    ctx.audit('committed', 'batch', b.id, `Committed the batch “${b.name}” (${v.count} gifts${b.sheet ? `, counted by ${b.sheet.counters.map((c) => c.name).join(' and ') || 'nobody'}` : ''})`);
     return batchView(ctx, ctx.db.put('batches', { ...b, status: 'committed', committedAt: ctx.now.toISOString(), committedBy: ctx.staff?.name ?? '' }));
   });
   r.post('/admin/giving/batches/:id/reopen', { perm: 'giving.edit' }, (ctx) => {
