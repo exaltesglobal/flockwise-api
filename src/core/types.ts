@@ -1345,6 +1345,7 @@ export type Collections = {
   assets: Asset;
   readingPlans: ReadingPlan;
   readingProgress: ReadingProgress;
+  feasts: Feast;
   rooms: Room;
   checkins: Checkin;
   teams: Team;
@@ -1388,7 +1389,7 @@ export const KINDS = [
   'funds', 'donations', 'pledges', 'plans', 'announcements', 'staff', 'rooms', 'checkins', 'teams', 'assignments', 'blockouts',
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
-  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress',
+  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
   'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
@@ -2205,3 +2206,25 @@ export type MyReadingPlan = {
   church: { participants: number; readToday: number; percent: number };
 };
 export type MyReading = { plans: MyReadingPlan[] };
+
+// ---- Love-feast and kitchen planner ----
+export type FeastUnit = 'kg' | 'g' | 'l' | 'ml' | 'pcs' | 'bunch' | 'packet';
+export type FeastSplit = 'church' | 'per_head' | 'per_family';
+/** Quantity per head; cost per unit in minor units (null = not priced). */
+export type FeastIngredient = { name: string; perHead: number; unit: FeastUnit; costPerUnit: number | null };
+export type FeastDish = { id: string; name: string; ingredients: FeastIngredient[]; cookId: string | null; cookName: string };
+export type Feast = {
+  id: string; eventId: string; name: string; template: string; menu: FeastDish[];
+  /** Guests beyond the RSVPs (visitors, children not on the app). */
+  extraHeads: number;
+  /** When set, cooks for this many regardless of RSVPs. */
+  headsOverride: number | null;
+  split: FeastSplit; notes: string; createdAt: string; createdBy: string;
+};
+export type ShoppingItem = { name: string; unit: FeastUnit; qty: number; costPerUnit: number | null; cost: number | null; dishes: string[] };
+export type FeastView = Feast & {
+  event: { id: string; title: string; startsAt: string; location: string } | null;
+  rsvps: number; families: number; heads: number; shopping: ShoppingItem[]; estimatedCost: number; perHead: number; perFamily: number;
+};
+export type FeastTemplate = { id: string; name: string; description: string; dishes: Omit<FeastDish, 'id' | 'cookId' | 'cookName'>[] };
+export type FeastsHub = { feasts: FeastView[]; templates: FeastTemplate[]; units: FeastUnit[]; events: { id: string; title: string; startsAt: string; going: number }[] };
