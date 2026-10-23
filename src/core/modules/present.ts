@@ -3,9 +3,10 @@
 import { ApiError } from '../errors.js';
 import { hasIndic, transliterateLines } from '../transliterate.js';
 import type { Ctx, Router } from '../engine.js';
-import type { BandItem, Collections, LowerThird, ObsSettings, PlanItem, PresentationState, PresentationTheme, PresentationView, Slide, Song, SongStats } from '../types.js';
+import type { BandItem, CaptionsSettings, CaptionsView, Collections, LanguageCode, LowerThird, ObsSettings, PlanItem, PresentationState, PresentationTheme, PresentationView, Slide, Song, SongStats } from '../types.js';
 import { OBS_MOMENTS } from '../types.js';
 import { church, DAY, find, pick, settings } from '../util.js';
+import { translateCaption } from './ai.js';
 import { liveView } from './ministry.js';
 
 export const DEFAULT_THEME: PresentationTheme = { background: '#0f1f1c', textColor: '#ffffff', imageUrl: '', fontScale: 1, linesPerSlide: 4, showAlt: true, titleSlides: true, uppercase: false, transliterate: false };
@@ -188,6 +189,21 @@ const cleanLower = (v: unknown, id: string): LowerThird | null => {
   return title ? { id: String(o.id ?? id).slice(0, 40), title, subtitle: String(o.subtitle ?? '').trim().slice(0, 120) } : null;
 };
 
+const CAPTION_LANGS: LanguageCode[] = ['en', 'hi', 'te', 'ta', 'ml', 'kn'];
+const MAX_CAPTION_LINES = 400;
+/** Off, preaching in the church's first language, shown in English (or the church's second language when English is preached). */
+function defaultCaptions(ctx: Ctx): CaptionsSettings {
+  const langs = (settings(ctx).languages ?? []).filter((l) => CAPTION_LANGS.includes(l));
+  const from = langs[0] ?? 'en';
+  return { on: false, from, to: from === 'en' ? langs.find((l) => l !== 'en') ?? 'te' : 'en', show: 'both' };
+}
+function captionsOf(ctx: Ctx, state: PresentationState, eventId: string, staff: boolean): CaptionsView {
+  const s: CaptionsSettings = state.captions ?? defaultCaptions(ctx);
+  const log = ctx.db.get('captions', eventId);
+  const lines = log?.lines ?? [];
+  return { ...s, lines: lines.slice(staff ? -40 : -3), count: lines.length };
+}
+
 function view(ctx: Ctx, ev: Collections['events'], staff = true): PresentationView {
   const live = liveView(ctx, ev);
   const theme = themeOf(ctx);
@@ -209,6 +225,7 @@ function view(ctx: Ctx, ev: Collections['events'], staff = true): PresentationVi
     charts: bandItems(ctx, live.plan.items),
     obs: obsOf(ctx),
     ...(staff ? { screenKey: screenKey(ctx) } : {}),
+    captions: captionsOf(ctx, state, ev.id, staff),
   };
 }
 
@@ -282,10 +299,40 @@ export function registerPresent(r: Router) {
       case 'queue': s.lowerThirds = (Array.isArray(ctx.body.lowerThirds) ? ctx.body.lowerThirds : []).slice(0, 40).map((l: unknown, i: number) => cleanLower(l, `q${i}`)).filter((l: LowerThird | null): l is LowerThird => !!l); break;
       case 'overlay': s.overlayLyrics = !!ctx.body.on; break;
       case 'message': s.message = String(ctx.body.message ?? '').slice(0, 200); break;
+      case 'captions': {
+        const c = (ctx.body.captions ?? {}) as Partial<CaptionsSettings>;
+        const cur = s.captions ?? defaultCaptions(ctx);
+        const lang = (v: unknown, d: LanguageCode) => (CAPTION_LANGS.includes(v as LanguageCode) ? (v as LanguageCode) : d);
+        s.captions = { on: typeof c.on === 'boolean' ? c.on : cur.on, from: lang(c.from, cur.from), to: lang(c.to, cur.to), show: c.show === 'translated' || c.show === 'original' || c.show === 'both' ? c.show : cur.show };
+        break;
+      }
       default: throw new ApiError(422, 'invalid', 'Unknown action.');
     }
     ctx.db.put('presentations', { ...s, updatedAt: ctx.now.toISOString() });
     return view(ctx, ev);
+  });
+
+  // One line the media desk's browser heard (or typed) during the sermon: translated and put on the screens.
+  r.post('/admin/services/:eventId/captions', { perm: ['services', 'checkin'] }, async (ctx) => {
+    const ev = find(ctx, 'events', ctx.params[0], 'Event');
+    const text = String(ctx.body.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 600);
+    if (text.length < 2) throw new ApiError(422, 'invalid', 'Nothing to caption.', { text: 'Required' });
+    const state = stateFor(ctx, ev.id);
+    const c = captionsOf(ctx, state, ev.id, true);
+    const translated = c.from === c.to ? null : await translateCaption(ctx, text, c.from, c.to);
+    const log = ctx.db.get('captions', ev.id) ?? { id: ev.id, eventId: ev.id, lines: [], updatedAt: ctx.now.toISOString() };
+    const line = { id: ctx.id('cl'), at: ctx.now.toISOString(), text, translated };
+    ctx.db.put('captions', { ...log, lines: [...log.lines, line].slice(-MAX_CAPTION_LINES), updatedAt: ctx.now.toISOString() });
+    return { line, count: Math.min(log.lines.length + 1, MAX_CAPTION_LINES) };
+  });
+  r.get('/admin/services/:eventId/captions', { staff: true }, (ctx) => {
+    const ev = find(ctx, 'events', ctx.params[0], 'Event');
+    const log = ctx.db.get('captions', ev.id);
+    return { lines: log?.lines ?? [], count: log?.lines.length ?? 0 };
+  });
+  r.del('/admin/services/:eventId/captions', { perm: ['services', 'checkin'] }, (ctx) => {
+    ctx.db.del('captions', ctx.params[0]!);
+    return { ok: true as const };
   });
 
   // Projector, stage display and OBS overlay without signing in: the link carries the church's screen key.

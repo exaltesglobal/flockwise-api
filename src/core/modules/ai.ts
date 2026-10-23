@@ -45,6 +45,27 @@ async function run(ctx: Ctx, req: AiRequest) {
   return res;
 }
 
+/**
+ * One line of live captions, translated fast and plainly. Twenty lines count as one request
+ * against the month's limit, since a sermon is a few hundred lines.
+ */
+export async function translateCaption(ctx: Ctx, text: string, from: string, to: string): Promise<string> {
+  if (!ctx.env.ai) throw new ApiError(503, 'ai_off', 'AI features are not switched on for this server yet.');
+  const st = status(ctx);
+  if (st.used >= st.limit) throw new ApiError(429, 'ai_limit', `You have used all ${st.limit} AI requests for this month. They reset on the 1st.`);
+  const key = `ai:captions:${st.month}`;
+  const n = Number(ctx.db.get('meta', key)?.value ?? 0) + 1;
+  ctx.db.put('meta', { id: key, value: String(n) });
+  if (n % 20 === 1) ctx.db.put('meta', { id: `ai:${st.month}`, value: String(st.used + 1) });
+  const res = await ctx.env.ai({
+    system: `Translate live sermon captions from ${LANGS[from] ?? from} into ${LANGS[to] ?? to}, in its own script, the way a church interpreter in India would say it aloud: short, natural, faithful. Keep names and Bible references. The speech recognition may have mistakes; make the best sense of them. Reply with only the translation of this one line.`,
+    messages: [{ role: 'user', content: text }],
+    maxTokens: 400,
+    effort: 'low',
+  }).catch((e: Error) => { throw new ApiError(502, 'ai_failed', e.message || 'The AI service did not answer.'); });
+  return textOf(res.content);
+}
+
 const textOf = (blocks: AiBlock[]) => blocks.filter((b): b is Extract<AiBlock, { type: 'text' }> => b.type === 'text').map((b) => b.text).join('\n').trim();
 
 function json<T>(blocks: AiBlock[]): T {

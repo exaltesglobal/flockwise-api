@@ -976,7 +976,22 @@ export type PresentationState = {
   overlayLyrics?: boolean;
   /** When the countdown ends (defaults to the service start). */
   countdownTo?: string | null;
+  /** Live sermon captions on the projector (see modules/present.ts). */
+  captions?: CaptionsSettings;
 };
+/** Live captions: the preacher's words, heard by the media desk's browser, translated for the screen. */
+export type CaptionsSettings = {
+  on: boolean;
+  /** The language being preached in. */
+  from: LanguageCode;
+  /** The language shown on the screen. */
+  to: LanguageCode;
+  /** Show the translation with the original under it, the translation alone, or the original alone. */
+  show: 'both' | 'translated' | 'original';
+};
+export type CaptionLine = { id: string; at: string; text: string; translated: string | null };
+export type CaptionsLog = { id: string; eventId: string; lines: CaptionLine[]; updatedAt: string };
+export type CaptionsView = CaptionsSettings & { lines: CaptionLine[]; count: number };
 /** One plan item for the musicians' phones: the full chart in the service key, plus who and what. */
 export type BandItem = {
   itemIndex: number;
@@ -1043,6 +1058,8 @@ export type PresentationView = {
   obs: ObsSettings;
   /** Key for the sign-in-free screen links (projector PC, OBS Browser Source). Office logins only. */
   screenKey?: string;
+  /** Live sermon captions: the last few lines for the screens, more for the presenter. */
+  captions: CaptionsView;
 };
 export type SongStats = {
   top: { songId: string; title: string; uses: number; lastUsedAt: string | null }[];
@@ -1416,6 +1433,7 @@ export type Collections = {
   greetingLinks: GreetingLink;
   annualReturns: AnnualReturn;
   missedCalls: MissedCall;
+  captions: CaptionsLog;
   ballots: Ballot;
   ballotStubs: BallotStub;
   missionaries: Missionary;
@@ -1503,7 +1521,7 @@ export const KINDS = [
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals', 'practices',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
-  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls',
+  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
   'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns', 'calendarFeeds',
 ] as const satisfies readonly Kind[];

@@ -1032,3 +1032,17 @@ Members without a smartphone give a free missed call from their own number. The 
 | POST/GET | `/public/missed-call/:key` (public) | The engine side of the webhook: `{ok, action, reply}`; 404 for a wrong key |
 
 Settings live in `Automations.missedCall`; calls in collection `missedCalls` (`action`: checked_in, already, no_service, closed, prayer, unknown, duplicate, off). Web: Sundays & events › "Missed-call line": set-up, the webhook URL with provider notes, "Try a number", stats, unknown numbers with "This is…" (person search), recent calls, and a printable A4 notice-board poster with the number and the line in the church's languages.
+
+## Live sermon captions on the projector, translated (Cathedral)
+
+The media desk's browser listens to the preacher with the browser's own speech recognition (Chrome or Edge; nothing is recorded or uploaded) in the preaching language, and sends each finished phrase (a full stop or three seconds of speech) to the engine, which translates it into the screen language and keeps the lines for the service. The projector, the presenter's preview and the OBS overlay show the latest line on their next poll (every second): the translation large, the original under it, or either alone. Typed lines work the same way for a desk without a microphone. Twenty caption lines count as one AI request against the month's limit.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| POST | `/admin/services/:eventId/presentation` | New action `captions` with `{captions: {on?, from?, to?, show? ('both' \| 'translated' \| 'original')}}`; languages en, hi, te, ta, ml, kn; the default is the church's first language into English (or its second language when English is preached) |
+| POST | `/admin/services/:eventId/captions` (services or checkin) | `{text}` up to 600 characters → `{line: {id, at, text, translated}, count}`; `translated` is null when the two languages are the same; 503/429 as for the other AI routes |
+| GET | `/admin/services/:eventId/captions` (staff) | Every line kept for the service (up to 400) |
+| DELETE | `/admin/services/:eventId/captions` | Clears the lines; the settings stay |
+| GET | `/admin/services/:eventId/presentation`, `/screens/:eventId?key=` | `PresentationView.captions` (`CaptionsView`: the settings, `lines` (last 40 for staff, 3 for screens), `count`) |
+
+Settings live on `PresentationState.captions`; lines in collection `captions` (id = event id). Web: the presenter page (`/present/:eventId`) has a "Live captions" card (on/off, preaching language → screen language, what to show, Listen to the preacher, type a line, the last lines, Clear); the projector draws `.pres-captions` at the foot of the slide and the OBS overlay shows the line when no lyrics bar is up.
