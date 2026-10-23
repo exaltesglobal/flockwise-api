@@ -527,6 +527,8 @@ export type ChurchSettings = Church & {
   screenKey?: string;
   /** AI requests allowed each month (the plan's allowance). */
   aiMonthlyLimit?: number;
+  /** The giving fund that pays benevolence (help) requests; null = guess from the fund names. */
+  benevolenceFundId?: string | null;
   /** The church's own word for a zone: Zone, Prayer cell, Kudumba unit, Ward, Area. */
   zoneLabel?: string;
   tally?: Partial<TallySettings>;
@@ -1079,7 +1081,7 @@ export type CanvaDesign = { id: string; title: string; editUrl: string; viewUrl:
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
 /** Things Flockwise can tell people about on its own. The office picks the channels for each. */
-export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update';
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update';
 
 // ---------- Christmas carol rounds ----------
 
@@ -1339,6 +1341,7 @@ export type Collections = {
   carolRequests: CarolRequest;
   rideRequests: RideRequest;
   rideOffers: RideOffer;
+  aidRequests: AidRequest;
   rooms: Room;
   checkins: Checkin;
   teams: Team;
@@ -1382,7 +1385,7 @@ export const KINDS = [
   'funds', 'donations', 'pledges', 'plans', 'announcements', 'staff', 'rooms', 'checkins', 'teams', 'assignments', 'blockouts',
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
-  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers',
+  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
   'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
@@ -2130,3 +2133,26 @@ export type RideRequestView = RideRequest & { zoneName: string | null; driver: {
 export type RideOfferView = RideOffer & { zoneName: string | null; seatsLeft: number; riders: { id: string; familyName: string; people: number; phone: string | null; address: string | null; zoneName: string | null; note: string }[] };
 export type RidesHub = { sunday: string; sundays: string[]; serviceTime: string | null; requests: RideRequestView[]; offers: RideOfferView[]; zones: { id: string; name: string }[]; waiting: number; matched: number; seatsLeft: number };
 export type MyRides = { sunday: string; sundays: string[]; serviceTime: string | null; request: RideRequestView | null; offer: RideOfferView | null };
+
+// ---------- benevolence fund ----------
+
+export type AidKind = 'medical' | 'education' | 'rent' | 'food' | 'funeral' | 'other';
+export type AidStatus = 'requested' | 'reviewing' | 'approved' | 'declined' | 'paid' | 'withdrawn';
+export type AidNote = { at: string; by: string; text: string };
+/** A quiet request for help from the church, seen only by staff with the care permission. */
+export type AidRequest = {
+  id: string; personId: string; personName: string; phone: string | null; kind: AidKind;
+  /** Asked for, in minor units. */
+  amount: number;
+  /** Approved (and, once paid, actually paid), in minor units. */
+  approved: number | null;
+  currency: Currency; reason: string; status: AidStatus; requestedAt: string; requestedBy: string; source: 'member' | 'office';
+  decidedBy: string | null; decidedAt: string | null; decisionNote: string;
+  paidAt: string | null; paidBy: string | null; paidVia: ExpenseMethod | null; paidRef: string | null;
+  /** The payment voucher in Accounts. */
+  expenseId: string | null;
+  notes: AidNote[];
+};
+export type AidSummary = { fundId: string | null; fundName: string | null; received: number; paid: number; balance: number; open: number; approvedUnpaid: number };
+export type BenevolenceHub = { summary: AidSummary; requests: AidRequest[]; funds: { id: string; name: string }[]; kinds: AidKind[] };
+export type MyAid = { requests: Pick<AidRequest, 'id' | 'kind' | 'amount' | 'approved' | 'currency' | 'reason' | 'status' | 'requestedAt' | 'decisionNote' | 'paidAt'>[]; kinds: AidKind[] };

@@ -24,7 +24,7 @@ const APPROVERS = ['owner', 'admin', 'finance'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const clean = (v: unknown, max = 300) => String(v ?? '').trim().slice(0, max);
 
-function heads(ctx: Ctx) {
+export function heads(ctx: Ctx) {
   let all = ctx.db.all('accountHeads');
   if (!all.length) {
     for (const name of DEFAULT_HEADS) ctx.db.put('accountHeads', { id: ctx.id('ah'), name, tallyName: null, tallyGroup: 'Indirect Expenses', budgets: {}, active: true });
@@ -47,7 +47,7 @@ function toMinor(v: unknown) {
   return Math.round(n * 100);
 }
 
-function nextVoucher(ctx: Ctx, date: string) {
+export function nextVoucher(ctx: Ctx, date: string) {
   const fy = fiscalYearRange(ctx, undefined);
   const d = new Date(`${date}T00:00:00Z`);
   const year = d < fy.from ? fy.start - 1 : d >= fy.to ? fy.start + 1 : fy.start;

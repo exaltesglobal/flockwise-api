@@ -58,6 +58,7 @@ export function personData(ctx: Ctx, p: Collections['people']) {
     formResponses: ctx.db.all('formResponses').filter((x) => x.personId === id).map((x) => ({ form: ctx.db.get('forms', x.formId)?.title ?? x.formId, at: x.createdAt, answers: x.answers })),
     registers: ctx.db.all('registers').filter((x) => x.personId === id || x.spouseId === id).map((x) => ({ register: x.kind, number: x.number, date: x.date })),
     whatsapp: ctx.db.all('botMessages').filter((m) => m.personId === id || (p.phone && normPhone(m.phone) === normPhone(p.phone))).map((m) => ({ at: m.at, message: m.text })),
+    helpRequests: ctx.db.all('aidRequests').filter((a) => a.personId === id).map((a) => ({ at: a.requestedAt, kind: a.kind, asked: a.amount / 100, approved: a.approved === null ? null : a.approved / 100, status: a.status })),
     pastoralCare: ctx.db.all('care').filter((c) => c.personId === id && !c.confidential).map((c) => ({ title: c.title, status: c.status, openedAt: c.createdAt })),
   };
 }
