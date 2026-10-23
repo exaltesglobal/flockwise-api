@@ -168,7 +168,7 @@ test('Canva: the office is sent to Canva, comes back connected, and opens a desi
   assert.equal(d.editUrl, 'https://www.canva.com/design/DAF1/edit');
   const upload = calls.find((c) => c.url.endsWith('/asset-uploads'))!;
   assert.equal(upload.headers?.['Content-Type'], 'application/octet-stream');
-  assert.ok(upload.headers?.['Asset-Upload-Metadata']);
+  assert.equal(Buffer.from(JSON.parse(upload.headers!['Asset-Upload-Metadata']).name_base64, 'base64').toString(), 'Christmas card');
   const make = calls.find((c) => c.url.endsWith('/designs'))!;
   assert.deepEqual(JSON.parse(make.body as string), { design_type: { type: 'custom', width: 1080, height: 1350 }, title: 'Christmas card', asset_id: 'asset1' });
   assert.equal((await ok(await req('GET', '/v1/admin/canva/designs', undefined, owner))).length, 1);

@@ -330,7 +330,8 @@ export function registerConnections(r: Router) {
     if (image) {
       if (image.length > 8_000_000) throw new ApiError(422, 'too_large', 'Pictures up to about 6 MB.');
       const { bytes, contentType } = dataUrlBytes(image);
-      const meta = b64(JSON.stringify({ name_base64: b64(unescape(encodeURIComponent(title.slice(0, 50)))) }));
+      // The header is plain JSON; only the name inside it is Base64.
+      const meta = JSON.stringify({ name_base64: b64(unescape(encodeURIComponent(title.slice(0, 50)))) });
       const job = await canvaCall(ctx, { method: 'POST', path: '/asset-uploads', raw: { bytes, contentType, headers: { 'Asset-Upload-Metadata': meta } } });
       let j = job?.job;
       for (let i = 0; i < 20 && j && j.status === 'in_progress'; i++) {
