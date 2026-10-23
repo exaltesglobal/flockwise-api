@@ -2,7 +2,7 @@
 // pastoral home visits: plan by area, log what happened, and see families not visited this year.
 import { ApiError } from '../errors.js';
 import type { Ctx, Router } from '../engine.js';
-import type { Collections, Visit, VisitPurpose, VisitView, Zone, ZoneDetail, ZoneFamily, ZoneReportRow, ZoneView } from '../types.js';
+import type { Collections, Visit, VisitAction, VisitActionItem, VisitPurpose, VisitView, Zone, ZoneDetail, ZoneFamily, ZoneReportRow, ZoneView } from '../types.js';
 import { age, find, fullName, localDate } from '../util.js';
 
 export const VISIT_PURPOSES: Record<VisitPurpose, string> = {
@@ -16,6 +16,8 @@ export const VISIT_PURPOSES: Record<VisitPurpose, string> = {
 
 const clean = (v: unknown, max = 300) => String(v ?? '').trim().slice(0, max);
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+/** Action items from the form or the AI write-up: short text, done flag, optional due date. */
+const cleanActions = (v: unknown): VisitAction[] => (Array.isArray(v) ? v : []).map((a: unknown) => { const x = (a ?? {}) as Record<string, unknown>; return { text: clean(typeof a === 'string' ? a : x.text, 200), done: !!x.done, due: DATE_RE.test(String(x.due)) ? String(x.due) : null }; }).filter((a) => a.text).slice(0, 12);
 
 export const familyKey = (p: Collections['people']) => (p.householdName ? `h:${p.householdName}` : `solo:${p.id}`);
 
@@ -237,6 +239,31 @@ export function registerZones(r: Router) {
     return { since, families: familyRows(ctx, people, since).filter((f) => !f.lastVisitAt || f.lastVisitAt < since) };
   });
 
+  /** Open action items from logged visits: the pastor's to-do list, soonest due first. */
+  r.get('/admin/visits/actions', { perm: 'people.view' }, (ctx): VisitActionItem[] => {
+    const mine = ctx.query.mine === '1' && ctx.staff ? ctx.staff.id : null;
+    const all = ctx.query.all === '1';
+    return ctx.db
+      .all('visits')
+      .filter((v) => v.status === 'done' && (v.actions?.length ?? 0) > 0 && canSee(ctx, v) && (!mine || v.visitorIds.includes(mine)))
+      .flatMap((v) => (v.actions ?? []).map((a, index) => ({ ...a, visitId: v.id, index, familyKey: v.familyKey, familyName: v.familyName, visitedOn: v.visitedOn, visitors: visitView(ctx, v).visitors })))
+      .filter((a) => all || !a.done)
+      .sort((a, b) => Number(a.done) - Number(b.done) || (a.due ?? '9999').localeCompare(b.due ?? '9999') || (b.visitedOn ?? '').localeCompare(a.visitedOn ?? ''))
+      .slice(0, 200);
+  });
+
+  /** Tick an action item off (or back on) from the to-do list. */
+  r.post('/admin/visits/:id/actions/:index', { perm: 'care' }, (ctx) => {
+    const v = find(ctx, 'visits', ctx.params[0], 'Visit');
+    if (!canSee(ctx, v)) throw new ApiError(403, 'forbidden', 'This visit is confidential.');
+    const i = Number(ctx.params[1]);
+    const actions = [...(v.actions ?? [])];
+    if (!actions[i]) throw new ApiError(404, 'not_found', 'No such action item.');
+    actions[i] = { ...actions[i], done: ctx.body?.done === undefined ? !actions[i].done : !!ctx.body.done };
+    ctx.db.put('visits', { ...v, actions });
+    return visitView(ctx, { ...v, actions });
+  });
+
   r.post('/admin/visits', { perm: 'care' }, (ctx) => {
     const person = ctx.body.personId ? find(ctx, 'people', String(ctx.body.personId), 'Person') : null;
     const key = person ? familyKey(person) : clean(ctx.body.familyKey, 120);
@@ -263,6 +290,8 @@ export function registerZones(r: Router) {
       prayerPoints: clean(ctx.body.prayerPoints, 1000) || null,
       followUp: clean(ctx.body.followUp, 500) || null,
       confidential: !!ctx.body.confidential,
+      voiceNote: clean(ctx.body.voiceNote, 8000) || null,
+      actions: cleanActions(ctx.body.actions),
       createdAt: ctx.now.toISOString(),
       createdBy: ctx.staff?.name ?? 'Church office',
     });
@@ -288,6 +317,8 @@ export function registerZones(r: Router) {
     if (Array.isArray(ctx.body.visitorIds)) next.visitorIds = (ctx.body.visitorIds as unknown[]).map(String).filter((id) => ctx.db.get('staff', id));
     if (Array.isArray(ctx.body.visitorNames)) next.visitorNames = (ctx.body.visitorNames as unknown[]).map((x) => clean(x, 80)).filter(Boolean).slice(0, 6);
     if (ctx.body.confidential !== undefined) next.confidential = !!ctx.body.confidential;
+    if (ctx.body.voiceNote !== undefined) next.voiceNote = clean(ctx.body.voiceNote, 8000) || null;
+    if (ctx.body.actions !== undefined) next.actions = cleanActions(ctx.body.actions);
     ctx.db.put('visits', next);
     if (next.status !== v.status) ctx.audit('updated', 'visit', v.id, `${next.status === 'done' ? 'Logged' : next.status === 'cancelled' ? 'Cancelled' : 'Re-planned'} the visit to ${v.familyName}`);
     return visitView(ctx, next);

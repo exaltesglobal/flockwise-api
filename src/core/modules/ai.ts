@@ -7,7 +7,7 @@ import type { Db } from '../db.js';
 import { ApiError } from '../errors.js';
 import { limitsFor, aiExtra } from '../plans.js';
 import { TOOLS, trim } from '../mcp.js';
-import type { AiAnswer, AiDraft, AiPurpose, AiScannedSong, AiSermonKind, AiSetlist, AiSongScan, AiStatus } from '../types.js';
+import type { AiAnswer, AiDraft, AiPurpose, AiScannedSong, AiSermonKind, AiSetlist, AiSongScan, AiStatus, AiVisitNotes, VisitPurpose } from '../types.js';
 import { settings } from '../util.js';
 
 const LANGS: Record<string, string> = { en: 'English', hi: 'Hindi', te: 'Telugu', ta: 'Tamil', ml: 'Malayalam', kn: 'Kannada', mr: 'Marathi', bn: 'Bengali', gu: 'Gujarati', pa: 'Punjabi', or: 'Odia', as: 'Assamese', ur: 'Urdu', kok: 'Konkani', mni: 'Manipuri', lus: 'Mizo', kha: 'Khasi', ne: 'Nepali' };
@@ -176,6 +176,45 @@ export function registerAi(r: Router) {
       effort: kind === 'outline' ? 'medium' : 'low',
     });
     return { text: textOf(res.content) };
+  });
+
+  // The pastor talks through a visit on the way home; the diary entry, prayer points and action
+  // items come back structured so the visit form fills itself. The spoken words are kept too.
+  r.post('/admin/ai/visit-notes', { perm: 'care' }, async (ctx): Promise<AiVisitNotes> => {
+    const transcript = str(ctx.body.transcript, 12_000);
+    if (transcript.split(/\s+/).length < 4) throw new ApiError(400, 'bad_request', 'Dictate or type what happened on the visit first.');
+    const family = str(ctx.body.familyName, 120);
+    const lang = LANGS[String(ctx.body.language ?? 'en')] ?? 'English';
+    const schema = {
+      type: 'object',
+      properties: {
+        summary: { type: 'string' },
+        prayerPoints: { type: 'array', items: { type: 'string' } },
+        actions: { type: 'array', items: { type: 'object', properties: { text: { type: 'string' }, due: { type: ['string', 'null'] } }, required: ['text', 'due'], additionalProperties: false } },
+        purpose: { type: 'string', enum: ['home', 'new_family', 'hospital', 'house_blessing', 'bereavement', 'other'] },
+        concerns: { type: 'array', items: { type: 'string' } },
+        confidential: { type: 'boolean' },
+      },
+      required: ['summary', 'prayerPoints', 'actions', 'purpose', 'concerns', 'confidential'],
+      additionalProperties: false,
+    };
+    const res = await run(ctx, {
+      system: `${churchContext(ctx)}\n\nYou write up a pastor's spoken notes after a pastoral visit as a diary entry. Keep to what was said; never add facts. Write in ${lang}. Reply with JSON only.`,
+      messages: [{ role: 'user', content: `Family visited: ${family || '(not given)'}\nDate: ${str(ctx.body.date, 10) || ctx.now.toISOString().slice(0, 10)}\nTranscript (speech-to-text, may have errors):\n${transcript}\n\nReturn: summary (a clear diary paragraph of 60–120 words in the pastor's voice, fixing speech-to-text slips, no fillers), prayerPoints (short, one per need), actions (things the pastor or office said they would do, each as an imperative sentence; due as YYYY-MM-DD only when a date or clear timeframe was spoken, else null), purpose (one of home, new_family, hospital, house_blessing, bereavement, other), concerns (health, money, family, faith or safety worries worth the care team's eye, a few words each), confidential (true when the notes touch illness, marriage, money trouble, abuse or anything the family would not want widely known).` }],
+      schema,
+      maxTokens: 2500,
+      effort: 'low',
+    });
+    const out = json<AiVisitNotes>(res.content);
+    const purposes: VisitPurpose[] = ['home', 'new_family', 'hospital', 'house_blessing', 'bereavement', 'other'];
+    return {
+      summary: str(out.summary, 3000),
+      prayerPoints: (Array.isArray(out.prayerPoints) ? out.prayerPoints : []).map((x) => str(x, 200)).filter(Boolean).slice(0, 8),
+      actions: (Array.isArray(out.actions) ? out.actions : []).map((a) => ({ text: str(a?.text, 200), due: /^\d{4}-\d{2}-\d{2}$/.test(String(a?.due)) ? String(a.due) : null })).filter((a) => a.text).slice(0, 10),
+      purpose: purposes.includes(out.purpose) ? out.purpose : 'home',
+      concerns: (Array.isArray(out.concerns) ? out.concerns : []).map((x) => str(x, 120)).filter(Boolean).slice(0, 6),
+      confidential: !!out.confidential,
+    };
   });
 
   // Photos of a songbook page, a handwritten chord sheet or a projected slide become songs for the

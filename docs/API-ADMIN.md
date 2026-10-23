@@ -952,3 +952,18 @@ Committee elections (pick up to `seats` of the candidates) and AGM resolutions (
 | GET | `/me/elections/:id/receipt/:code` | `ReceiptCheck {counted, choices}` so a voter can confirm their ballot was counted |
 
 Web: office People › "Elections & AGM" (draft form with candidates from the people list, open with closing time, the roll, paper count, close, the count with bars, publish); member `/app/vote` (home quick link "Vote", six languages, ballot with a confirm step, receipt kept on the phone, result bars, "check it was counted"). Demo: a committee election open until Sunday 1 pm and last month's published resolution.
+
+## Pastor's visitation diary by voice (Thrive+)
+
+A visit is talked through on the way home, in any of the dictation languages, and the AI writes the diary entry. The browser's own speech recognition does the dictation, so no audio is uploaded; only the text reaches the server, and the spoken words are kept on the visit as `Visit.voiceNote` (up to 8000 characters). One write-up is one AI request against the monthly allowance. Action items from visits become a shared to-do list on the Zones & visits page. Lives in `core/modules/zones.ts` (visits, actions) and `core/modules/ai.ts` (write-up).
+
+- `Visit.voiceNote?: string | null` and `Visit.actions?: VisitAction[]` (`{text, done, due: string | null}`), accepted on create and patch.
+- `AiVisitNotes`: `summary` (the diary entry), `prayerPoints[]`, `actions[{text, due}]` (due dates resolved from "next week", "on Friday"), `purpose` (one of the visit kinds), `concerns[]`, `confidential` (health, money, family trouble).
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| POST | `/admin/ai/visit-notes` (care) | `{transcript (at least four words), familyName?, date?, language?}` → `AiVisitNotes`; 429 once the month's AI allowance is used |
+| GET | `/admin/visits/actions?mine=1&all=1` (people.view) | `VisitActionItem[]` (`visitId`, `index`, `text`, `done`, `due`, `familyKey`, `familyName`, `visitedOn`, `visitors`) for visits the caller may see; open items first, soonest due first; `mine=1` keeps only visits the caller made; `all=1` includes done items |
+| POST | `/admin/visits/:id/actions/:index` (care) | `{done?: boolean}` ticks or unticks one item (toggles when omitted) |
+
+Web: the visit form has a "Say what happened" card (Dictate button with the language picker, or type; "Write it up" fills what happened, prayer points, follow-up, kind of visit, confidential and the action items, all editable before saving) and an "Action items" editor with due dates. The Visits tab opens with "To do from visits" (tick to clear; the tab's "Only my visits" filter applies to it too). Demo mode uses a built-in stand-in for the AI.

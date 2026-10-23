@@ -144,6 +144,19 @@ async function demoAi(req: AiRequest): Promise<AiResponse> {
     const sentences = body.replace(/\b(um+|uh+|you know|like)\b,?\s*/gi, '').split(/(?<=[.!?])\s+/).filter(Boolean);
     return text(`## Main point\n${sentences.slice(0, 2).join(' ')}\n\n## Going deeper\n${sentences.slice(2).join(' ') || 'The preacher’s remaining notes, tidied (demo).'}\n\n_Tidied in demo mode. Connect an AI key on the server for the real thing._`);
   }
+  if ('prayerPoints' in props && 'actions' in props) {
+    // A spoken visit write-up: sentences become the diary line, "pray" lines the prayer points, promises the actions.
+    const body = ask.slice(ask.indexOf('Transcript (speech-to-text, may have errors):') + 46, ask.lastIndexOf('\n\nReturn:')).trim();
+    const sentences = body.replace(/\b(um+|uh+|you know|like|so yeah)\b,?\s*/gi, '').split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean);
+    const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1).replace(/[.!?]*$/, '.');
+    const isAction = (x: string) => /\b(will|need to|needs to|should|must|follow up|call|visit again|send|arrange|ask|remind|bring)\b/i.test(x);
+    const isPrayer = (x: string) => /\bpray/i.test(x);
+    const actions = sentences.filter(isAction).slice(0, 5).map((x) => ({ text: cap(x.replace(/^(i|we|i'll|we'll|i will|we will)\s+/i, '').replace(/^(will|need to|needs to|should|must)\s+/i, '')), due: /next week|this week|tomorrow|sunday|monday|friday/i.test(x) ? new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10) : null }));
+    const prayer = sentences.filter(isPrayer).slice(0, 4).map((x) => cap(x.replace(/.*\bpray(ed|ing)?\s+(for|that|about)\s+/i, '')));
+    const purpose = /hospital|surgery|ward|operation/i.test(body) ? 'hospital' : /funeral|passed away|died|bereave/i.test(body) ? 'bereavement' : /new (house|home|flat)|blessing/i.test(body) ? 'house_blessing' : /new family|first visit|just moved/i.test(body) ? 'new_family' : 'home';
+    const concerns = [/job|salary|loan|debt|fees|money/i.test(body) ? 'Money: ' + (sentences.find((x) => /job|salary|loan|debt|fees|money/i.test(x)) ?? '').slice(0, 60) : '', /surgery|hospital|ill|sick|cancer|diabet|bp\b|pain/i.test(body) ? 'Health' : '', /marriage|husband|wife|divorce|fight/i.test(body) ? 'Marriage and family' : ''].filter(Boolean);
+    return text(JSON.stringify({ summary: sentences.filter((x) => !isAction(x)).slice(0, 5).map(cap).join(' '), prayerPoints: prayer, actions, purpose, concerns, confidential: /surgery|cancer|divorce|loan|debt|abuse|hiv|depress/i.test(body) }));
+  }
   if ('songs' in props) {
     const ids = [...ask.matchAll(/^(\S+) \| ([^|]+)\|/gm)].slice(0, Number(/Number of songs: (\d+)/.exec(ask)?.[1] ?? 4));
     return text(JSON.stringify({ songs: ids.map((m, i) => ({ songId: m[1], reason: i === 0 ? 'A strong call to worship.' : 'Fits the theme and flows from the song before.' })), note: 'Starts upbeat and settles into reflective worship (demo suggestion).' }));

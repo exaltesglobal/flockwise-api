@@ -1012,6 +1012,15 @@ export type AiSermonKind = 'outline' | 'discussion' | 'social' | 'kids' | 'summa
 /** A song read off a photo of a songbook page or a handwritten sheet. */
 export type AiScannedSong = { title: string; author: string; key: string; language: string; lyrics: string; chordChart: string; warnings: string[] };
 export type AiSongScan = { songs: AiScannedSong[]; pages: number };
+/** A spoken visit write-up, structured: what to file, what to pray for, what to do next. */
+export type AiVisitNotes = {
+  summary: string;
+  prayerPoints: string[];
+  actions: { text: string; due: string | null }[];
+  purpose: VisitPurpose;
+  concerns: string[];
+  confidential: boolean;
+};
 
 // ---------- integrations ----------
 
@@ -1260,9 +1269,15 @@ export type Visit = {
   prayerPoints: string | null;
   followUp: string | null;
   confidential: boolean;
+  /** What the pastor said into the phone after the visit, kept as spoken. */
+  voiceNote?: string | null;
+  /** Action items pulled out of the notes, ticked off as they are done. */
+  actions?: VisitAction[];
   createdAt: string;
   createdBy: string;
 };
+export type VisitAction = { text: string; done: boolean; due: string | null };
+export type VisitActionItem = VisitAction & { visitId: string; index: number; familyKey: string; familyName: string; visitedOn: string | null; visitors: string[] };
 export type VisitView = Visit & { zoneName: string | null; visitors: string[] };
 export type ZoneReportRow = { zoneId: string | null; zoneName: string; families: number; visited: number; percent: number; visitsDone: number; planned: number };
 
