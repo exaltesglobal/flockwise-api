@@ -67,7 +67,7 @@ export function exportSummary(ctx: Ctx): ExportSummary {
     const n = ctx.db.count(k);
     if (n) counts[FRIENDLY[k] ?? k] = n;
   }
-  return { people: ctx.db.count('people'), gifts: ctx.db.all('donations').filter((d) => d.status === 'succeeded').length, attendance: ctx.db.count('checkins'), files: Object.keys(counts).length + 1, counts };
+  return { people: ctx.db.count('people'), gifts: ctx.db.all('donations').filter((d) => d.status === 'succeeded').length, attendance: ctx.db.count('checkins'), files: Object.keys(counts).length + 5, counts };
 }
 
 export function exportBundle(ctx: Ctx): ExportBundle {
