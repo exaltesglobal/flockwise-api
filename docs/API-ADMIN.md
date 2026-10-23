@@ -1068,3 +1068,19 @@ Web: Office › Import people now reads both kinds (auto-detected, switchable), 
 ## Getting started checklist (dashboard)
 
 `GET /admin/getting-started` (any staff) → `GettingStarted {steps: [{id, title, body, done, link, perm}], done, total, dismissed, trialDaysLeft, plan}`. Eight steps worked out from the records, never ticked by hand: church profile + logo, ten or more people, an upcoming service, a second office user, Razorpay connected, WhatsApp or SMS configured, a Team app login, a first announcement. `POST /admin/getting-started/dismiss` `{undo?}` hides it (meta `gettingStarted:dismissed`) or brings it back. The web shows the card at the top of the dashboard until every step is done or it is hidden, with a "Do it" link per step for staff who hold that permission. Module `core/modules/getting-started.ts`.
+
+## Offering QR codes (UPI, via Razorpay)
+
+One reusable Razorpay UPI QR code per fund for the offering box, the projector and the bulletin. Module `core/modules/offering-qr.ts`, collection `qrCodes` (`OfferingQr {id, providerId, fundId, fundName, name, imageUrl, payload, status active|closed, createdAt, createdBy, closedAt}`), Grow+.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/admin/giving/qr` (giving.view) | `OfferingQrHub {ready, reason, webhookEvent: 'qr_code.credited', codes: OfferingQrView[], funds}`; `ready` is false until the church's Razorpay account is connected; each code carries `giftsThisMonth`, `totalThisMonth`, `giftsAll`, `totalAll`, `lastGiftAt`, `publicUrl` |
+| POST | `/admin/giving/qr` (giving.edit) | `{fundId, name?}` → `OfferingQrView`. On the server Flockwise creates a `upi_qr`, `multiple_use`, any-amount code on the church's Razorpay account (`POST /payments/qr_codes`, notes `church_id`, `qr_id`, `fund_id`) and keeps Razorpay's `image_url`; in the demo it stores a `upi://pay?…` payload and the web draws the code. At most 12 live codes. |
+| POST | `/admin/giving/qr/:id/close` | Closes it at Razorpay too; old gifts stay |
+| POST | `/admin/giving/qr/:id/test-gift` | Demo and tests only (404 on a live server): `{amount?, contact?}` pretends someone scanned the code |
+| GET | `/public/qr/:id` (public) | `PublicOfferingQr {id, name, fundName, churchName, logoUrl, imageUrl, payload, status, currency}` for the full-screen projector page `/qr/:id` |
+
+**Webhook.** Add the event `qr_code.credited` to the church's Razorpay webhook (`/v1/webhooks/razorpay/<church id>`). The server passes it to `applyQrCredited(ctx, {qrId: notes.qr_id, providerId: qr.id, payment: {id, amount, vpa, contact, email, method, createdAt}})`, which finds the code (by our id in the notes, else by Razorpay's id), skips a payment id already recorded (retries), matches the giver to a person by mobile or email when Razorpay shares them (else `donorName: 'UPI giver'` with `upiVpa`), and records a succeeded `upi` gift (`provider: razorpay`, `providerRef` = the QR id, `providerPaymentId` = `pay_…`, `qrId`) through `onDonationSucceeded`, so it gets a receipt number and shows in statements, 80G lists and the dashboard. Gifts carry `DonationRecord.qrId` and `upiVpa`.
+
+Web: Giving › **Offering QR** tab (`src/admin/pages/offering-qr.tsx`): cards per code with the QR, fund, gifts this month, "Open on screen", print an A4 poster (`.qr-print`), close; a new-code form; a setup note with the webhook event when Razorpay is not connected yet. Public `/qr/:id` (`src/public/qr.tsx`) is a full-screen code with the church name and fund for the projector or a phone held up at the door.

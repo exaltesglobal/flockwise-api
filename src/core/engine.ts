@@ -87,6 +87,11 @@ export type Env = {
     resume(ref: string, fcra: boolean): Promise<void>;
     cancel(ref: string, fcra: boolean): Promise<void>;
   };
+  /** Razorpay UPI QR codes on the church's account (offering box, screen). Absent in the demo, where the code is drawn locally. */
+  qrCodes?: {
+    create(input: { name: string; description: string; notes: Record<string, string> }): Promise<{ id: string; imageUrl: string }>;
+    close(id: string): Promise<void>;
+  };
   /** Checks a church's Razorpay keys with Razorpay. Absent in the demo. */
   verifyRazorpay?: (keyId: string, keySecret: string) => Promise<boolean>;
   /** True when the host has its own Razorpay keys for this church (the server's original church). */

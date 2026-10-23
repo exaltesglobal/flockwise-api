@@ -87,7 +87,8 @@ Webhook setup (Razorpay > Account & Settings > Webhooks > Add new webhook):
 - URL: `https://api.flockwise.church/v1/webhooks/razorpay`
 - Secret: same as `RAZORPAY_WEBHOOK_SECRET`
 - Events: `payment_link.paid`, `payment_link.expired`, `payment_link.cancelled`,
-  `subscription.charged`, `subscription.halted`, `subscription.cancelled`, `payment.failed`
+  `subscription.charged`, `subscription.halted`, `subscription.cancelled`, `payment.failed`,
+  `qr_code.credited` (offering QR codes)
 - Enable **Subscriptions** (monthly gifts / UPI AutoPay) on the account; Razorpay may need to approve it.
 - Monthly-gift plans are created automatically; no plan ids to configure.
 

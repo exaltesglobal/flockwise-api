@@ -130,7 +130,7 @@ const GATES: [RegExp, PlanId][] = [
   [/^\/admin\/services\/[^/]+\/captions/, 'cathedral'],
   [/^\/admin\/(services|songs|workflows|workflow-cards|people-fields|bookings|resources|calendar|insights|presentation|ai\/(?!status))/, 'thrive'],
   [/^\/admin\/(checkin|volunteers|groups|forms|care|sermons|integrations|registers|zones|visits|accounts|expenses)/, 'grow'],
-  [/^\/admin\/giving\/(pledges|receipts|batches|statements|10bd|form)/, 'grow'],
+  [/^\/admin\/giving\/(pledges|receipts|batches|statements|10bd|form|qr)/, 'grow'],
   [/^\/admin\/offerings/, 'grow'],
   [/^\/admin\/sunday-school/, 'grow'],
   [/^\/admin\/missions/, 'grow'],

@@ -1,7 +1,7 @@
 import { type Context, Hono } from 'hono';
 
 import { config } from '../config.js';
-import { AI_PACK, applyBillingEvent, applyRecurringEvent, botConfig, handleBotMessage, markAiPackPaid, markSetupPaid, SETUP_KIND, type BillingInterval, type PlanId } from '../core/index.js';
+import { AI_PACK, applyBillingEvent, applyQrCredited, applyRecurringEvent, botConfig, handleBotMessage, markAiPackPaid, markSetupPaid, SETUP_KIND, type BillingInterval, type PlanId } from '../core/index.js';
 import { applyWebhook, churchAccounts } from '../giving.js';
 import { verifyChitthi, verifyWebhook } from '../razorpay.js';
 import type { Hub, Tenant } from '../server.js';
@@ -20,6 +20,16 @@ export function webhookRoutes(hub: Hub) {
       if (typeof evt.event === 'string' && evt.event.startsWith('subscription.') && sub?.id) {
         const pay = evt.payload?.payment?.entity;
         applyRecurringEvent(t.engine.systemCtx(), { event: evt.event, ref: sub.id, currentEnd: sub.current_end ?? null, amount: pay?.amount, method: pay?.method === 'upi' ? 'upi' : pay?.method === 'card' ? 'card' : pay?.method ? 'netbanking' : null });
+      }
+      // Someone scanned one of the church's offering QR codes.
+      const qr = evt.payload?.qr_code?.entity;
+      const pay = evt.payload?.payment?.entity;
+      if (evt.event === 'qr_code.credited' && qr?.id && pay?.id) {
+        applyQrCredited(t.engine.systemCtx(), {
+          qrId: qr.notes?.qr_id ?? null,
+          providerId: qr.id,
+          payment: { id: pay.id, amount: Number(pay.amount), vpa: pay.vpa ?? null, contact: pay.contact ?? null, email: pay.email ?? null, method: pay.method ?? 'upi', createdAt: pay.created_at ? new Date(pay.created_at * 1000).toISOString() : null },
+        });
       }
     } catch (e) {
       console.error('Webhook handling failed', e);

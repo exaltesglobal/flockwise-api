@@ -6,12 +6,13 @@ import { createHash, randomBytes } from 'node:crypto';
 import { hashPassword, hashSecret, randomString, verifyPassword, seal, signAccess, unseal } from './auth.js';
 import { aiConfigured, claude } from './ai.js';
 import { config } from './config.js';
+import { ApiError } from './errors.js';
 import { bootstrapChurch, createChurchEngine, createPlatform, Db, type Env, type HttpRequest, type HttpResponse } from './core/index.js';
 import { googleHooks } from './google.js';
 import type { Currency } from './core/types.js';
-import { razorpayCheckout, razorpaySubscriptions } from './giving.js';
+import { churchAccounts, razorpayCheckout, razorpaySubscriptions } from './giving.js';
 import { channelStatus, deliver, expoPush, sendOtpEmail, sendViaMailbox } from './providers.js';
-import { cancelSubscription, checkKeys, createPaymentLink, createPlan, createSubscription, getPaymentLink } from './razorpay.js';
+import { cancelSubscription, checkKeys, closeQrCode, createPaymentLink, createPlan, createQrCode, createSubscription, getPaymentLink } from './razorpay.js';
 import { coreStore } from './store/core-store.js';
 import type { Store } from './store/types.js';
 
@@ -57,6 +58,18 @@ export function createHub() {
         pause: (ref, fcra) => razorpaySubscriptions(getTenant()!).pause(ref, fcra),
         resume: (ref, fcra) => razorpaySubscriptions(getTenant()!).resume(ref, fcra),
         cancel: (ref, fcra) => razorpaySubscriptions(getTenant()!).cancel(ref, fcra),
+      },
+      qrCodes: {
+        create: async (input) => {
+          const acct = churchAccounts(getTenant()!).main;
+          if (!acct) throw new ApiError(409, 'no_keys', 'Connect the church’s Razorpay account in Settings › Giving first.');
+          const made = await createQrCode(acct, input);
+          return { id: made.id, imageUrl: made.image_url };
+        },
+        close: async (id) => {
+          const acct = churchAccounts(getTenant()!).main;
+          if (acct) await closeQrCode(acct, id);
+        },
       },
       webUrl: config.webUrl,
       apiUrl: `${config.apiPublicUrl}/v1`,

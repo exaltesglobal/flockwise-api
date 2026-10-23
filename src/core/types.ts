@@ -261,7 +261,39 @@ export type DonationRecord = {
   rentalId?: string | null;
   /** Deposit batch for cash and cheque counted together. */
   batchId?: string | null;
+  /** Set when the gift was scanned from an offering QR code (see modules/offering-qr.ts); the giver's UPI id when Razorpay shares it. */
+  qrId?: string | null;
+  upiVpa?: string | null;
 };
+
+// ----- offering QR codes: a Razorpay UPI QR per fund for the offering box, the screen and the bulletin -----
+export type OfferingQr = {
+  id: string;
+  /** Razorpay's qr_… id; null in the demo, where the code is drawn from `payload`. */
+  providerId: string | null;
+  fundId: string;
+  fundName: string;
+  /** Where it hangs: "Offering box", "Building fund stall". */
+  name: string;
+  /** Razorpay's hosted image of the code. */
+  imageUrl: string | null;
+  /** A upi:// string to draw the code locally when there is no image. */
+  payload: string | null;
+  status: 'active' | 'closed';
+  createdAt: string;
+  createdBy: string;
+  closedAt: string | null;
+};
+export type OfferingQrView = OfferingQr & { giftsThisMonth: number; totalThisMonth: number; giftsAll: number; totalAll: number; lastGiftAt: string | null; publicUrl: string };
+export type OfferingQrHub = {
+  /** False until the church's Razorpay account is connected (the server creates the codes there). */
+  ready: boolean;
+  reason: string | null;
+  webhookEvent: 'qr_code.credited';
+  codes: OfferingQrView[];
+  funds: { id: string; name: string }[];
+};
+export type PublicOfferingQr = { id: string; name: string; fundName: string; churchName: string; logoUrl: string | null; imageUrl: string | null; payload: string | null; status: OfferingQr['status']; currency: Currency };
 
 export type AdminDonation = Donation & {
   donorId: string | null;
@@ -1437,6 +1469,7 @@ export type Collections = {
   greetingLinks: GreetingLink;
   annualReturns: AnnualReturn;
   missedCalls: MissedCall;
+  qrCodes: OfferingQr;
   captions: CaptionsLog;
   ballots: Ballot;
   ballotStubs: BallotStub;
@@ -1534,7 +1567,7 @@ export const KINDS = [
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals', 'practices',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
-  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions',
+  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
   'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns', 'calendarFeeds',
 ] as const satisfies readonly Kind[];

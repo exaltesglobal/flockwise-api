@@ -48,6 +48,22 @@ export function createPaymentLink(
   });
 }
 
+/** A reusable UPI QR code (any amount, many payments) for the offering box or the screen. Razorpay sends `qr_code.credited` for each payment. */
+export function createQrCode(acct: RazorpayAccount, input: { name: string; description: string; notes: Record<string, string> }) {
+  return call<{ id: string; image_url: string; status: string }>(acct, 'POST', '/payments/qr_codes', {
+    type: 'upi_qr',
+    name: input.name.slice(0, 40),
+    usage: 'multiple_use',
+    fixed_amount: false,
+    description: input.description.slice(0, 2048),
+    notes: input.notes,
+  });
+}
+
+export function closeQrCode(acct: RazorpayAccount, id: string) {
+  return call<{ id: string; status: string }>(acct, 'POST', `/payments/qr_codes/${encodeURIComponent(id)}/close`);
+}
+
 export function createPlan(acct: RazorpayAccount, input: { amount: number; currency: string; name: string; period?: 'monthly' | 'yearly' }) {
   return call<{ id: string }>(acct, 'POST', '/plans', { period: input.period ?? 'monthly', interval: 1, item: { name: input.name, amount: input.amount, currency: input.currency } });
 }
