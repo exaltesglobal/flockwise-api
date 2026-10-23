@@ -1518,6 +1518,11 @@ export type Collections = {
   expenses: Expense;
 };
 export type Kind = keyof Collections;
+
+// ----- export everything (Settings › Privacy) -----
+export type ExportFile = { name: string; rows: number; csv: string };
+export type ExportSummary = { people: number; gifts: number; attendance: number; files: number; counts: Record<string, number> };
+export type ExportBundle = { generatedAt: string; church: string; readme: string; files: ExportFile[] };
 export const KINDS = [
   'settings', 'automations', 'people', 'campuses', 'events', 'rsvps', 'groups', 'groupMembers', 'joinRequests', 'groupMeetings',
   'funds', 'donations', 'pledges', 'plans', 'announcements', 'staff', 'rooms', 'checkins', 'teams', 'assignments', 'blockouts',
