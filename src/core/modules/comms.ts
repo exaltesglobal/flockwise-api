@@ -12,6 +12,7 @@ import { notify } from './notify.js';
 import { assetReminders } from './assets.js';
 import { readingReminders } from './reading.js';
 import { practiceReminders } from './practice.js';
+import { smsDigestDue } from './sms-digest.js';
 import { rideReminders } from './rides.js';
 import { titheReminders } from './tithe.js';
 import { setBotState } from './whatsapp-bot.js';
@@ -155,6 +156,7 @@ export const DEFAULT_AUTOMATIONS: Automations = {
   missing: { enabled: true, channel: 'whatsapp', subject: 'We miss you', body: 'Hi {{firstName}}, we have missed you at {{church}}! Is there anything we can pray about with you?', weeks: 3, createFollowUp: true },
   volunteerReminder: { enabled: true, channel: 'email', subject: 'Reminder: you are serving soon', body: 'Hi {{firstName}}, a reminder that you are serving this week. Check the details in the app: {{appLink}}', daysBefore: 2 },
   staffDigest: { enabled: true, daysAhead: 7 },
+  smsDigest: { enabled: false, day: 6, hour: 17, audience: 'no_app', channel: 'sms', note: '' },
 };
 
 // Older saved settings may predate newer automations, so defaults fill the gaps.
@@ -175,6 +177,7 @@ export async function runDue(ctx: Ctx) {
   }
   const today = localDate(ctx, ctx.now);
   const hour = localHour(ctx, ctx.now);
+  await smsDigestDue(ctx, today); // has its own day and hour, so it runs on every tick and dedupes itself
   if (hour < 8) return; // daily jobs run after 8 am church time
   const done = ctx.db.get('meta', 'automations:lastRun')?.value;
   if (done === today) return;
@@ -358,6 +361,10 @@ export function registerComms(r: Router) {
     if (ctx.body.staffDigest) {
       const d = ctx.body.staffDigest;
       next.staffDigest = { enabled: typeof d.enabled === 'boolean' ? d.enabled : cur.staffDigest.enabled, daysAhead: d.daysAhead ? Math.min(31, Math.max(1, Math.round(Number(d.daysAhead)))) : cur.staffDigest.daysAhead };
+    }
+    if (ctx.body.smsDigest) {
+      const d = ctx.body.smsDigest; const c = cur.smsDigest ?? DEFAULT_AUTOMATIONS.smsDigest!;
+      next.smsDigest = { enabled: typeof d.enabled === 'boolean' ? d.enabled : c.enabled, day: d.day !== undefined ? Math.min(6, Math.max(0, Math.round(Number(d.day)) || 0)) : c.day, hour: d.hour !== undefined ? Math.min(21, Math.max(6, Math.round(Number(d.hour)) || 0)) : c.hour, audience: d.audience === 'everyone' ? 'everyone' : d.audience === 'no_app' ? 'no_app' : c.audience, channel: d.channel === 'whatsapp' ? 'whatsapp' : d.channel === 'sms' ? 'sms' : c.channel, note: typeof d.note === 'string' ? d.note.trim().slice(0, 160) : c.note };
     }
     ctx.audit('updated', 'automations', null, 'Updated message automations');
     return ctx.db.put('automations', next);

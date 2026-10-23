@@ -432,7 +432,12 @@ export type Automations = {
   volunteerReminder: Automation & { daysBefore: number };
   /** Email to pastors and care staff listing upcoming birthdays and anniversaries. */
   staffDigest: { enabled: boolean; daysAhead: number };
+  /** Weekly SMS (or WhatsApp) in each member's own script for those without the app (see modules/sms-digest.ts). */
+  smsDigest?: SmsDigestSettings;
 };
+export type SmsDigestSettings = { enabled: boolean; day: number; hour: number; audience: 'no_app' | 'everyone'; channel: 'sms' | 'whatsapp'; note: string };
+export type SmsDigestPreview = { personId: string | null; name: string; language: LanguageCode; text: string; chars: number; segments: number };
+export type SmsDigestStatus = { settings: SmsDigestSettings; recipients: number; byLanguage: Record<string, number>; sample: SmsDigestPreview | null; lastSentAt: string | null; nextAt: string | null; channelReady: boolean };
 export type ChannelStatus = Record<Channel, { configured: boolean; provider: string }>;
 
 // ---------- pastoral care ----------

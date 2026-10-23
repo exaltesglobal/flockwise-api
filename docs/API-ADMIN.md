@@ -902,3 +902,15 @@ Module `core/modules/prayer-wall.ts`. Anyone can send a prayer request from `/pr
 | GET/POST | `/admin/prayer/kiosk` (care) | `PrayerKiosk`: `enabled`, `publicUrl`, `kioskUrl`, `key`, stats incl. `fromCards`/`fromKiosk`. POST `{enabled?, rotate?}`; the first call mints the key |
 
 Web: Care & prayer › Prayer requests › "Lobby kiosk & QR cards" (the public link as a QR, the kiosk link with copy/open/new link, the on/off switch, and "Print 8 cards (A4)" with the QR, writing lines and tick boxes); prayer rows show a Prayer card / Lobby kiosk badge and the contact number. Public `/pray` (with `?kiosk=1` for a plain large-type form) and `/pray/wall`; the church page shows "Ask for prayer".
+
+## Weekly SMS digest in local script (Grow+)
+
+One text a week for the members who are not on the app: the Sunday service time (their campus's, else the public page's), up to four published events in the next seven days, the verse from the latest published bulletin, an optional line from the office and the church phone number for prayer requests. Every label is written in English, Hindi, Tamil, Telugu, Malayalam and Kannada, so each person gets it in their own `language` without the AI. Lives in `core/modules/sms-digest.ts`; settings sit with the other automations.
+
+- `Automations.smsDigest: { enabled, day (0 Sun–6 Sat), hour (6–21, church time), audience: 'no_app' | 'everyone', channel: 'sms' | 'whatsapp', note (≤160) }`, saved through `PUT /admin/messages/automations { smsDigest: {...} }`. Default: off, Saturday 5 pm, SMS, people without the app.
+- Recipients: active people with a phone and consent for the channel; `no_app` leaves out anyone with a member-app device registered.
+- `GET /admin/messages/sms-digest` (perm `comms`) → `SmsDigestStatus { settings, recipients, byLanguage, sample, lastSentAt, nextAt, channelReady }`.
+- `GET /admin/messages/sms-digest/preview?personId=&language=` → `SmsDigestPreview { text, chars, segments }`. Segments follow SMS rules: 160/153 for plain Latin text, 70/67 once any Indian script is in it, so the office can see the cost before switching it on.
+- `POST /admin/messages/sms-digest/send` sends now to everyone due, one text per person in their language, and records one `messages` row (`source: 'automation'`, subject "Weekly digest").
+- The daily tick checks it on every run (not only the once-a-day 8 am block): on the chosen weekday once the hour has passed, once per day (`meta smsdigest:<date>`).
+- Web: Messages › Automations › "Weekly text in their own language" card with day/hour, audience, channel, office line, recipient count by language, a phone-width preview in any of the six languages with the segment count, and "Send now".
