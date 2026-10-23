@@ -380,7 +380,8 @@ Baptism, confirmation, marriage and burial registers, plus membership transfer l
 - `PATCH /admin/registers/:id` (people.edit) `{ ...fields, reason? }` → each changed value is written as a dated marginal note with the staff name.
 - `POST /admin/registers/:id/notes` (people.edit) `{ text }`.
 - `POST /admin/registers/:id/void` (owner, admin or pastor) `{ reason }`: entries are never deleted.
-- `POST /admin/registers/:id/certificate` (people.view) → `Certificate` (rows to print, or the letter text for a transfer) and counts the copy.
+- `POST /admin/registers/:id/certificate` (people.view) → `Certificate` (rows to print, or the letter text for a transfer) and counts the copy. The first issue sets the entry's `verifyCode` (10 characters, same on every copy); `Certificate.verifyUrl` is `<web>/verify/<code>`, printed as a QR with the code under it.
+- `GET /public/verify/:code` (public) → `CertificateCheck`: `ok` (recorded, not void), title, number, name, date, place, officiant, church name/city/logo, `copies`, `recordedAt`, and `voidReason` when void. Nothing else from the register. 404 for an unknown code. Web: `/verify/:code` and `/verify` (type the code).
 
 ## Zones and home visits (Grow plan)
 

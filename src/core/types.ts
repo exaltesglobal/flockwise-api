@@ -1164,6 +1164,8 @@ export type RegisterEntry = {
   /** Marginal notes: corrections (made automatically on edit) and later remarks. */
   notes: RegisterNote[];
   certificatesIssued: number;
+  /** Code behind the QR on the certificate; anyone with it can confirm the entry at /verify/:code. Set when the first certificate is issued. */
+  verifyCode?: string | null;
   createdAt: string;
   createdBy: string;
   updatedAt: string;
@@ -1179,7 +1181,11 @@ export type Certificate = {
   letter: string | null;
   issuedAt: string;
   copy: number;
+  /** Public page that confirms the entry; printed as a QR on the certificate. */
+  verifyUrl: string;
 };
+/** What anyone scanning a certificate's QR sees: enough to confirm it, nothing more. */
+export type CertificateCheck = { ok: boolean; title: string; number: string; name: string; date: string; place: string; officiant: string; church: { name: string; city: string; logoUrl: string | null }; status: 'recorded' | 'void'; voidReason: string | null; copies: number; recordedAt: string };
 
 /** A zone, area, prayer cell or family unit (kudumba unit, ward) that households belong to. */
 export type Zone = {

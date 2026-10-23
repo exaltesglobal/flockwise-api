@@ -3,7 +3,7 @@
 // are never deleted (only voided with a reason), and every correction leaves a marginal note.
 import { ApiError } from '../errors.js';
 import type { Ctx, Router } from '../engine.js';
-import type { Certificate, Collections, RegisterEntry, RegisterField, RegisterKind, RegisterSummary } from '../types.js';
+import type { Certificate, CertificateCheck, Collections, RegisterEntry, RegisterField, RegisterKind, RegisterSummary } from '../types.js';
 import { find, fullName, localDate, page, settings } from '../util.js';
 
 export const REGISTER_KINDS: RegisterKind[] = ['baptism', 'confirmation', 'marriage', 'burial', 'transfer'];
@@ -161,7 +161,16 @@ export function certificate(ctx: Ctx, e: RegisterEntry, copy: number): Certifica
     letter,
     issuedAt: localDate(ctx, ctx.now),
     copy,
+    verifyUrl: `${ctx.env.webUrl}/verify/${e.verifyCode ?? ''}`,
   };
+}
+
+const VERIFY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+/** What the QR on a certificate opens: the entry as recorded, or that it is void. */
+export function certificateCheck(ctx: Ctx, e: RegisterEntry): CertificateCheck {
+  const s = settings(ctx);
+  return { ok: e.status === 'recorded', title: REGISTER_LABELS[e.kind].certificate, number: e.number, name: e.name, date: fmtDate(e.date), place: e.place, officiant: e.officiant, church: { name: s.name, city: s.city, logoUrl: s.logoUrl ?? null }, status: e.status, voidReason: e.status === 'void' ? e.voidReason : null, copies: e.certificatesIssued, recordedAt: e.createdAt.slice(0, 10) };
 }
 
 const FIELDS_EDITABLE = ['date', 'place', 'officiant', 'name', 'remarks'] as const;
@@ -280,8 +289,15 @@ export function registerRegisters(r: Router) {
   r.post('/admin/registers/:id/certificate', { perm: 'people.view' }, (ctx) => {
     const e = find(ctx, 'registers', ctx.params[0], 'Register entry');
     if (e.status === 'void') throw new ApiError(409, 'void', 'A void entry has no certificate.');
-    const next = ctx.db.put('registers', { ...e, certificatesIssued: e.certificatesIssued + 1 });
+    const next = ctx.db.put('registers', { ...e, certificatesIssued: e.certificatesIssued + 1, verifyCode: e.verifyCode || ctx.env.random(10, VERIFY_ALPHABET) });
     ctx.audit('created', 'register', e.id, `Issued ${REGISTER_LABELS[e.kind].certificate.toLowerCase()} for ${e.number} (copy ${next.certificatesIssued})`);
     return certificate(ctx, next, next.certificatesIssued);
+  });
+  // Anyone with the QR (a school, another church, an embassy) can confirm the certificate is real and not void.
+  r.get('/public/verify/:code', { public: true }, (ctx): CertificateCheck => {
+    const code = String(ctx.params[0] ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const e = code.length >= 8 ? ctx.db.all('registers').find((x) => x.verifyCode === code) : undefined;
+    if (!e) throw new ApiError(404, 'not_found', 'No certificate matches this code. Check it, or ask the church office.');
+    return certificateCheck(ctx, e);
   });
 }

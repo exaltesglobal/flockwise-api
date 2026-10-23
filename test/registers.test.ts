@@ -47,10 +47,23 @@ test('registers: baptism and marriage entries, corrections, void and certificate
   assert.equal(c1.title, 'Certificate of Baptism');
   assert.equal(c2.copy, 2);
   assert.ok(c1.rows.some((r: any) => r.label === "Father's name" && r.value === 'Paul Registar'));
+  // The QR on the certificate: one code per entry, same on every copy; anyone can check it.
+  assert.match(c1.verifyUrl, /\/verify\/[A-Z2-9]{10}$/);
+  assert.equal(c2.verifyUrl, c1.verifyUrl);
+  const code = c1.verifyUrl.split('/').pop();
+  const check = await call(null, 'GET', `/public/verify/${code.toLowerCase()}`);
+  assert.equal(check.ok, true);
+  assert.equal(check.number, e.number);
+  assert.equal(check.title, 'Certificate of Baptism');
+  assert.equal(check.copies, 2);
+  assert.ok(!('details' in check) && !('notes' in check), 'only what confirms it');
+  await assert.rejects(call(null, 'GET', '/public/verify/NOPE123456'), /No certificate/);
 
   await assert.rejects(call(a, 'POST', `/admin/registers/${e2.id}/void`, {}), /reason/);
   const v = await call(a, 'POST', `/admin/registers/${e2.id}/void`, { reason: 'Entered twice' });
   assert.equal(v.status, 'void');
+  const vc = await call(a, 'POST', `/admin/registers/${e2.id}/certificate`).catch((err: any) => err);
+  assert.equal(vc.status, 409);
   await assert.rejects(call(a, 'PATCH', `/admin/registers/${e2.id}`, { name: 'x' }), /void/);
   const list = await call(a, 'GET', '/admin/registers', undefined, { kind: 'baptism' });
   assert.ok(!list.data.some((x: any) => x.id === e2.id), 'void entries hidden by default');
