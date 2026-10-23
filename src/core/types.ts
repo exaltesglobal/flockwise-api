@@ -1519,6 +1519,10 @@ export type Collections = {
 };
 export type Kind = keyof Collections;
 
+// ----- getting started checklist on the dashboard -----
+export type GettingStartedStep = { id: string; title: string; body: string; done: boolean; link: string; perm: Permission };
+export type GettingStarted = { steps: GettingStartedStep[]; done: number; total: number; dismissed: boolean; trialDaysLeft: number | null; plan: string };
+
 // ----- export everything (Settings › Privacy) -----
 export type ExportFile = { name: string; rows: number; csv: string };
 export type ExportSummary = { people: number; gifts: number; attendance: number; files: number; counts: Record<string, number> };
