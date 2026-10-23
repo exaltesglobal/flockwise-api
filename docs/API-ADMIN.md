@@ -1103,3 +1103,18 @@ The treasurer uploads the bank's statement export (CSV or XLSX from SBI, HDFC, I
 Matching: a Razorpay narration is a settlement (online gifts are already recorded), small "charges" debits are bank charges, interest credits are interest. Otherwise candidates must have the same amount and sit within ten days: gifts (offline, cheque/bank transfer/UPI, not in a batch, same FCRA side) scored by reference in the narration, the giver's mobile or UPI id, their name; committed batches whose counted total (or count sheet total) equals a cash or cheque deposit within two weeks; paid non-cash vouchers scored by reference and payee. A strong score or a single candidate matches by itself; the rest show as suggestions.
 
 Web: Giving & finance › **Bank** (`src/admin/pages/bank.tsx`): account and period, upload dialog (drop the file, columns guessed and editable, preview), totals strip, the lines with their match or suggestions and Record as gift / Record as expense / Not a gift or expense, and "Recorded but not on the statement".
+
+## Safeguarding (People › Safeguarding)
+
+Records that people who work with children are cleared: police verification, child-protection training, a signed declaration and references. Module `core/modules/safeguarding.ts`, collection `safeguarding` (one `SafeguardRecord {id = person id, checks: SafeguardCheck[]}`), rules in meta `safeguarding:settings` (`SafeguardSettings {teamIds, sundaySchool, required, validMonths, blockRota}`; until saved, teams whose name says kids/children/nursery/Sunday school are picked, Sunday school teachers are included, police + training + declaration are required, valid 36 / 24 / 12 months, references never expire, rota only warns). Grow+.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/admin/safeguarding` (people.view or volunteers) | `SafeguardHub {settings, teams, people: SafeguardPersonView[], counts {cleared, expiring, expired, missing}, atRisk}`; people in scope with their roles, per-kind state (expiring = within 60 days), every check, and upcoming rota slots on safeguarded teams; `atRisk` = not cleared and on the rota in the next 30 days |
+| PATCH | `/admin/safeguarding/settings` (people.edit) | Any of the settings fields |
+| POST | `/admin/safeguarding/:personId/checks` | `{kind: police\|training\|declaration\|reference, issuedOn, expiresOn?, reference?, note?}` → the person's view; no future dates; expiry defaults to issue date + `validMonths` |
+| DELETE | `/admin/safeguarding/:personId/checks/:checkId` | |
+
+Rota: `GET /admin/volunteers/schedule/:eventId/available` gives a reason "Not cleared to work with children (…)" for uncleared members of a safeguarded team; with `blockRota` they are unavailable and `POST /admin/volunteers/assignments` answers 409 `not_cleared` (force does not override it).
+
+Web: People › Safeguarding (`src/admin/pages/safeguarding.tsx`): counts, filter, a row per person with a chip per required check, a record dialog, and the rules card.

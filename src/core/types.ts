@@ -293,6 +293,45 @@ export type OfferingQrHub = {
   codes: OfferingQrView[];
   funds: { id: string; name: string }[];
 };
+// ----- safeguarding: police verification, training and declarations for people who work with children -----
+export type SafeguardKind = 'police' | 'training' | 'declaration' | 'reference';
+export type SafeguardCheck = { id: string; kind: SafeguardKind; issuedOn: string; expiresOn: string | null; reference: string | null; note: string | null; recordedBy: string; recordedAt: string };
+/** One record per person (id = person id). */
+export type SafeguardRecord = { id: string; checks: SafeguardCheck[] };
+export type SafeguardSettings = {
+  /** Teams whose members must be cleared. */
+  teamIds: string[];
+  /** Sunday school teachers must be cleared too. */
+  sundaySchool: boolean;
+  /** Which checks make a person cleared. */
+  required: SafeguardKind[];
+  /** Months each kind stays valid when no expiry date is given (0 = never expires). */
+  validMonths: Record<SafeguardKind, number>;
+  /** True: the rota refuses to schedule someone who is not cleared on a team that needs it. False: it only warns. */
+  blockRota: boolean;
+};
+export type SafeguardStatus = 'cleared' | 'expiring' | 'expired' | 'missing';
+export type SafeguardPersonView = {
+  personId: string;
+  name: string;
+  phone: string | null;
+  roles: string[];
+  status: SafeguardStatus;
+  /** Per required kind: the latest check, when it runs out, and its state. */
+  items: { kind: SafeguardKind; check: SafeguardCheck | null; expiresOn: string | null; state: SafeguardStatus }[];
+  checks: SafeguardCheck[];
+  /** Upcoming rota slots on a team that needs clearance. */
+  scheduled: { eventId: string; title: string; startsAt: string; teamName: string }[];
+};
+export type SafeguardHub = {
+  settings: SafeguardSettings;
+  teams: { id: string; name: string }[];
+  people: SafeguardPersonView[];
+  counts: Record<SafeguardStatus, number>;
+  /** Not cleared but on the rota in the next 30 days. */
+  atRisk: number;
+};
+
 // ----- bank reconciliation: statement lines against gifts, batch deposits and vouchers -----
 export type BankAccountId = 'main' | 'fcra';
 export type BankMatchKind = 'gift' | 'expense' | 'batch' | 'settlement' | 'charges' | 'interest' | 'ignored';
@@ -1509,6 +1548,7 @@ export type Collections = {
   qrCodes: OfferingQr;
   bankStatements: BankStatement;
   bankLines: BankLine;
+  safeguarding: SafeguardRecord;
   captions: CaptionsLog;
   ballots: Ballot;
   ballotStubs: BallotStub;
@@ -1606,7 +1646,7 @@ export const KINDS = [
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals', 'practices',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
-  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes', 'bankStatements', 'bankLines',
+  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes', 'bankStatements', 'bankLines', 'safeguarding',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
   'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns', 'calendarFeeds',
 ] as const satisfies readonly Kind[];

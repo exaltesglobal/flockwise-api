@@ -5,6 +5,7 @@ import type { SongColours, Assignment, AvailablePerson, Collections, MyServing, 
 import { bySoonest, dateOnly, DAY, eventView, find, fullName, memberEvent, pick, requireFields, settings, upcoming } from '../util.js';
 import { sendDirect } from './comms.js';
 import { notify } from './notify.js';
+import { rotaClearance } from './safeguarding.js';
 
 const COLORS = ['#1F6B5C', '#F2A93B', '#3B82F6', '#A855F7', '#EF4444', '#14B8A6', '#F97316', '#64748B'];
 const PLAN_KINDS: PlanItem['kind'][] = ['song', 'reading', 'sermon', 'prayer', 'announcement', 'offering', 'video', 'other'];
@@ -87,6 +88,8 @@ function assign(ctx: Ctx, ev: Collections['events'], teamId: string, positionId:
   find(ctx, 'people', personId, 'Person');
   const c = conflict(ctx, ev, personId);
   if (c && !force) throw new ApiError(409, 'conflict', `${name(ctx, personId)} can't serve: ${c}.`);
+  const clear = rotaClearance(ctx, teamId, personId);
+  if (clear?.block) throw new ApiError(409, 'not_cleared', `${name(ctx, personId)} can't serve on ${t.name}: ${clear.reason.toLowerCase()}. Record their checks under People › Safeguarding.`);
   const existing = ctx.db.all('assignments').find((a) => a.eventId === ev.id && a.teamId === teamId && a.positionId === positionId && a.personId === personId);
   const a = existing
     ? ctx.db.put('assignments', { ...existing, status: 'pending', respondedAt: null })
@@ -248,8 +251,10 @@ export function registerServing(r: Router) {
       .filter((m) => !positionId || m.positionIds.includes(positionId))
       .filter((m) => ctx.db.get('people', m.personId))
       .map((m) => {
-        const reason = conflict(ctx, ev, m.personId);
-        return { personId: m.personId, name: name(ctx, m.personId), available: !reason, reason, ...served(ctx, m.personId) };
+        const conflictReason = conflict(ctx, ev, m.personId);
+        const clear = rotaClearance(ctx, t.id, m.personId);
+        const reason = conflictReason ?? clear?.reason ?? null;
+        return { personId: m.personId, name: name(ctx, m.personId), available: !conflictReason && !clear?.block, reason, ...served(ctx, m.personId) };
       })
       .sort((x, y) => Number(y.available) - Number(x.available) || x.timesServed90d - y.timesServed90d);
   });
