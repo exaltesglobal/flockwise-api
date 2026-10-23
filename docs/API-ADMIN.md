@@ -1170,3 +1170,22 @@ Web: Care › Prayer vigils (`src/admin/pages/vigils.tsx`) and the member page `
 `HttpRequest.binary: true` makes the server's HTTP hook return the body as `bytes` (used for these downloads).
 
 Web: Settings › Integrations › Canva lists the designs with Edit and **Save to Flockwise** (PNG, JPG or PDF).
+
+## Discipleship (Care › Discipleship)
+
+One-to-one mentoring: a mature believer walks with a new believer, someone preparing for baptism, a young leader, a young couple. Module `core/modules/discipleship.ts`, collections `mentorships` (`Mentorship {mentorId, menteeId, focus new_believer|baptism|leadership|marriage|youth|other, goal, everyDays 7|14|30, status active|paused|completed, startedOn, endedOn, nudgedFor}`) and `mentorMeetings` (`{mentorshipId, date, topic, note, loggedBy, via office|app}`). Grow+.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/admin/discipleship` (care or people.view) | `DiscipleshipHub {pairs: MentorshipView[] (+names, phones, meetings, lastMet, dueOn, overdue), counts {active, overdue, meetingsThisMonth, mentors}, needMentor}`; `needMentor` = people who joined in the last 120 days, 13 or older, with no open pair |
+| POST | `/admin/discipleship` (care) | `{mentorId, menteeId, focus?, goal?, everyDays?}` → `MentorshipDetail` (+log); 409 if already paired |
+| GET | `/admin/discipleship/:id` | |
+| PATCH | `/admin/discipleship/:id` | `{focus?, goal?, everyDays?, status?}` |
+| POST | `/admin/discipleship/:id/meetings` | `{date?, topic?, note?}` (no future dates) |
+| DELETE | `/admin/discipleship/:id/meetings/:mid` | |
+
+Due date = last meeting (or start) + `everyDays`; overdue after 3 more days. Daily job `mentorNudges` sends `mentor.nudge` to the mentor once per due date.
+
+Member app: `GET /me/mentoring` → `MyMentoring {mentees (with recent topics), mentors}`; `POST /me/mentoring/:id/meetings` `{date?, topic?, note?}` (mentor only, active pairs).
+
+Web: Care › Discipleship (`src/admin/pages/discipleship.tsx`) and the member page `/app/mentoring`.

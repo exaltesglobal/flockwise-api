@@ -330,6 +330,18 @@ export type VigilView = Vigil & { slots: number; covered: number; people: number
 export type VigilDetail = VigilView & { slotList: VigilSlot[] };
 export type MyVigil = { id: string; name: string; kind: VigilKind; purpose: string; startsAt: string; endsAt: string; slotMinutes: number; location: string; covered: number; slots: { start: string; end: string; count: number; full: boolean; mine: boolean }[] };
 
+// ----- discipleship: one-to-one mentoring pairs and their meetings -----
+export type MentorFocus = 'new_believer' | 'baptism' | 'leadership' | 'marriage' | 'youth' | 'other';
+export type Mentorship = { id: string; mentorId: string; menteeId: string; focus: MentorFocus; goal: string; everyDays: number; status: 'active' | 'paused' | 'completed'; startedOn: string; endedOn: string | null; nudgedFor: string | null; createdAt: string };
+export type MentorMeeting = { id: string; mentorshipId: string; date: string; topic: string; note: string; loggedBy: string; via: 'office' | 'app'; createdAt: string };
+export type MentorshipView = Mentorship & { mentorName: string; menteeName: string; mentorPhone: string | null; menteePhone: string | null; meetings: number; lastMet: string | null; dueOn: string; overdue: boolean };
+export type MentorshipDetail = MentorshipView & { log: MentorMeeting[] };
+export type DiscipleshipHub = { pairs: MentorshipView[]; counts: { active: number; overdue: number; meetingsThisMonth: number; mentors: number }; needMentor: { personId: string; name: string; joinedAt: string; status: PersonStatus }[] };
+export type MyMentoring = {
+  mentees: { id: string; name: string; phone: string | null; focus: MentorFocus; goal: string; lastMet: string | null; dueOn: string; overdue: boolean; recent: { date: string; topic: string }[] }[];
+  mentors: { id: string; name: string; phone: string | null; focus: MentorFocus; lastMet: string | null }[];
+};
+
 // ----- safeguarding: police verification, training and declarations for people who work with children -----
 export type SafeguardKind = 'police' | 'training' | 'declaration' | 'reference';
 export type SafeguardCheck = { id: string; kind: SafeguardKind; issuedOn: string; expiresOn: string | null; reference: string | null; note: string | null; recordedBy: string; recordedAt: string };
@@ -1339,7 +1351,7 @@ export type CanvaExportResult = { design: CanvaDesign; media: MediaItem[]; urls:
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
 /** Things Flockwise can tell people about on its own. The office picks the channels for each. */
-export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder' | 'verse.week' | 'election.open' | 'election.result' | 'recap.ready' | 'greeting.video' | 'vigil.reminder';
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder' | 'verse.week' | 'election.open' | 'election.result' | 'recap.ready' | 'greeting.video' | 'vigil.reminder' | 'mentor.nudge';
 
 // ---------- Christmas carol rounds ----------
 
@@ -1594,6 +1606,8 @@ export type Collections = {
   courseEnrollments: CourseEnrollment;
   vigils: Vigil;
   vigilSignups: VigilSignup;
+  mentorships: Mentorship;
+  mentorMeetings: MentorMeeting;
   captions: CaptionsLog;
   ballots: Ballot;
   ballotStubs: BallotStub;
@@ -1691,7 +1705,7 @@ export const KINDS = [
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals', 'practices',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
-  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes', 'bankStatements', 'bankLines', 'safeguarding', 'courses', 'courseEnrollments', 'vigils', 'vigilSignups',
+  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes', 'bankStatements', 'bankLines', 'safeguarding', 'courses', 'courseEnrollments', 'vigils', 'vigilSignups', 'mentorships', 'mentorMeetings',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
   'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns', 'calendarFeeds',
 ] as const satisfies readonly Kind[];
