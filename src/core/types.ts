@@ -812,6 +812,8 @@ export type ChurchSettings = Church & {
   benevolenceFundId?: string | null;
   /** The church's own word for a zone: Zone, Prayer cell, Kudumba unit, Ward, Area. */
   zoneLabel?: string;
+  /** Features switched on or off in Settings › Features (see core/features.ts); missing = the default. */
+  features?: Partial<Record<string, boolean>>;
   tally?: Partial<TallySettings>;
   privacy?: Partial<PrivacySettings>;
   livestream?: Partial<LiveSettings>;

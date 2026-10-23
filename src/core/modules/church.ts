@@ -2,6 +2,7 @@
 import { ApiError } from '../errors.js';
 import type { Ctx, Router } from '../engine.js';
 import { isBuiltIn, PERMISSIONS, permsOf, ROLE_LABELS } from '../perms.js';
+import { cleanFeatures } from '../features.js';
 import { checkLimit } from '../plans.js';
 import type { BrandFont, BrandKit, Collections, CustomRole, EventAttendee, EventInput, GroupDetail, GroupInput, Permission, PersonAccess, RoleScope, StaffRole, StaffView } from '../types.js';
 import { PERMISSION_INFO, ROLE_SCOPES } from '../types.js';
@@ -392,6 +393,7 @@ export function registerChurch(r: Router) {
       ...s,
       ...patch,
       ...(ctx.body.brand !== undefined ? { brand: brandKit(ctx.body.brand, s.brand) } : {}),
+      ...(ctx.body.features !== undefined ? { features: cleanFeatures(ctx.body.features, s.features) } : {}),
       fcra: { ...s.fcra, ...pick(ctx.body.fcra ?? {}, ['registered', 'registrationNumber', 'accountLast4']) },
       receipts80g: { ...s.receipts80g, ...pick(ctx.body.receipts80g ?? {}, ['enabled', 'registrationNumber', 'pan']) },
     };
