@@ -1364,6 +1364,7 @@ export type Collections = {
   recaps: Recap;
   videoGreetings: VideoGreeting;
   greetingLinks: GreetingLink;
+  annualReturns: AnnualReturn;
   ballots: Ballot;
   ballotStubs: BallotStub;
   missionaries: Missionary;
@@ -1451,7 +1452,7 @@ export const KINDS = [
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals', 'practices',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
-  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks',
+  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
   'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns', 'calendarFeeds',
 ] as const satisfies readonly Kind[];
@@ -1914,6 +1915,50 @@ export type ElectionResultRow = { candidateId: string; name: string; note: strin
 export type ElectionResults = { rows: ElectionResultRow[]; ballots: number; invalid: number; tie: boolean; passed: boolean | null };
 export type ElectionTurnout = { eligible: number; app: number; paper: number; voted: number; percent: number };
 export type ElectionView = Election & { turnout: ElectionTurnout; results: ElectionResults | null };
+
+// ---------- Denomination annual return, auto-filled from the church's own records ----------
+
+export type ReturnTemplateId = 'csi' | 'cni' | 'ag' | 'methodist' | 'baptist' | 'pentecostal' | 'marthoma' | 'lutheran' | 'generic';
+export type ReturnLineKind = 'number' | 'money' | 'text';
+/** One line of the form: filled from the data (`auto`) or typed by the office (`manual`). */
+export type ReturnLine = { key: string; label: string; kind: ReturnLineKind; source: 'auto' | 'manual'; hint?: string };
+export type ReturnSection = { id: string; title: string; lines: ReturnLine[] };
+export type ReturnTemplate = { id: ReturnTemplateId; name: string; body: string; /** What the body calls the local unit: Pastorate, Local church, Assembly… */ unit: string; /** What it calls the level above: Diocese, District, Section… */ above: string; sections: ReturnSection[] };
+/** The form's header: who is filing. Kept with the return and reused next year. */
+export type ReturnHeader = { body: string; above: string; unit: string; code: string; minister: string; preparedBy: string };
+export type AnnualReturn = {
+  /** `${templateId}:${year}` */
+  id: string;
+  templateId: ReturnTemplateId;
+  /** Start year of the period (financial year in India). */
+  year: number;
+  header: ReturnHeader;
+  /** The office's own figures, by line key; a line without one shows the figure from the data. */
+  values: Record<string, number | string>;
+  notes: string;
+  status: 'draft' | 'submitted';
+  /** Every line's final figure, frozen when submitted. */
+  snapshot: Record<string, number | string | null> | null;
+  submittedAt: string | null;
+  submittedBy: string;
+  updatedAt: string;
+};
+export type ReturnLineView = ReturnLine & { /** From the data, null for a manual line. */ auto: number | string | null; /** What the form shows: the office's figure, else the data's. */ value: number | string | null; overridden: boolean };
+export type ReturnSectionView = { id: string; title: string; lines: ReturnLineView[] };
+export type AnnualReturnView = {
+  template: Pick<ReturnTemplate, 'id' | 'name' | 'body' | 'unit' | 'above'>;
+  year: number;
+  label: string;
+  from: string;
+  to: string;
+  currency: Currency;
+  church: { name: string; address: string; phone: string; email: string; city: string };
+  header: ReturnHeader;
+  sections: ReturnSectionView[];
+  return: AnnualReturn | null;
+  /** Other years with a saved return. */
+  years: { year: number; label: string; status: AnnualReturn['status'] }[];
+};
 
 // ---------- Pastor's video greeting: recorded once, sent personalised on every birthday ----------
 
