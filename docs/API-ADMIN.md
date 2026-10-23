@@ -1018,3 +1018,17 @@ Every Indian church body asks its local units for the same kind of statement onc
 | GET | `/admin/annual-return/export.csv?template=&year=` | `{csv}`: section, line, value, the data figure, source (data/office) |
 
 Web: Office › "Annual return" (`/admin/annual-return`): pick the form and year, the header fields, one table per section with the records' figure beside an input (blank = follow the data; a reset arrow when overridden), notes, Save, Mark as submitted (confirmation), Reopen, CSV, and Print, which lays the form out on A4 with the church's logo, the body's name, the period, every section, the notes and four signature lines (minister, secretary, treasurer, prepared by).
+
+## Missed-call attendance and prayer line for feature phones (Grow+)
+
+Members without a smartphone give a free missed call from their own number. The church takes a virtual number from its telephony provider (Exotel, Knowlarity, MyOperator, Ozonetel, Twilio…) and points the provider's missed-call webhook at `/v1/webhooks/missed-call/<church id>/<key>` (GET or POST; the caller's number is read from `CallFrom`, `From`, `caller_id`, `caller_number`… and the dialled number from `CallTo`, `To`, `dispnumber`…). A call from a phone on a person's record during a service (three hours before to an hour after, like the door QR) checks the caller in with method `phone`, plus the adults of their household when that option is on; at any other time, or on the prayer number, a prayer request (`source: 'phone'`) goes to the pastors with a call-back note (notification `prayer.new`). The caller gets a text back (SMS or WhatsApp) in their own language: welcome and marked present, already present, no service on, check-in closed, a pastor will call, or "we do not know this number". Repeats within two minutes are ignored. Unknown numbers wait for the office to link.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/admin/missed-call` (checkin, care or settings) | `MissedCallHub`: `settings`, `webhookUrl` (null until the server has `API_PUBLIC_URL`), `channelReady`, `serviceNow`, `stats` (`lastSunday`, `checkedIn` incl. household, `prayer`, `unknown`, `total`), `recent` (50), `unknown` (30 days) |
+| PUT | `/admin/missed-call` (settings) | `{enabled, attendanceNumber, prayerNumber, household, reply, channel ('sms' \| 'whatsapp'), provider, newKey?}`; makes the key on first save; 422 when switching on without a number. One number (prayer blank) does both: attendance during a service, prayer otherwise |
+| POST | `/admin/missed-call/try` | `{from, to?}` runs a call as the provider would, texts nobody, `test: true`, not counted |
+| POST | `/admin/missed-call/:id/link` (people.edit or checkin) | `{personId}` puts the number on the person's record if they have none, marks them present if the service is still on, and names every call from that number |
+| POST/GET | `/public/missed-call/:key` (public) | The engine side of the webhook: `{ok, action, reply}`; 404 for a wrong key |
+
+Settings live in `Automations.missedCall`; calls in collection `missedCalls` (`action`: checked_in, already, no_service, closed, prayer, unknown, duplicate, off). Web: Sundays & events › "Missed-call line": set-up, the webhook URL with provider notes, "Try a number", stats, unknown numbers with "This is…" (person search), recent calls, and a printable A4 notice-board poster with the number and the line in the church's languages.

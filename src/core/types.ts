@@ -303,7 +303,7 @@ export type AnnouncementInput = Pick<AdminAnnouncement, 'title' | 'body' | 'stat
 // ---------- check-in ----------
 
 export type Room = { id: string; name: string; minAge: number; maxAge: number; capacity: number | null };
-export type CheckinMethod = 'staff' | 'kiosk' | 'qr' | 'self' | 'app';
+export type CheckinMethod = 'staff' | 'kiosk' | 'qr' | 'self' | 'app' | 'phone';
 export type Checkin = {
   id: string;
   eventId: string;
@@ -434,6 +434,56 @@ export type Automations = {
   staffDigest: { enabled: boolean; daysAhead: number };
   /** Weekly SMS (or WhatsApp) in each member's own script for those without the app (see modules/sms-digest.ts). */
   smsDigest?: SmsDigestSettings;
+  /** The missed-call line for feature phones (see modules/missed-call.ts). */
+  missedCall?: MissedCallSettings;
+};
+/** A missed call from a registered phone marks attendance during a service and asks for prayer at any other time. */
+export type MissedCallSettings = {
+  enabled: boolean;
+  /** Secret in the webhook URL the telephony provider posts to. */
+  key: string;
+  /** The virtual number members call for attendance; blank means the one number does both. */
+  attendanceNumber: string;
+  /** The number for prayer; blank means the one number does both. */
+  prayerNumber: string;
+  /** Mark every adult in the caller's household present too. */
+  household: boolean;
+  /** Text the caller back in their own language. */
+  reply: boolean;
+  channel: 'sms' | 'whatsapp';
+  /** Exotel, Knowlarity, MyOperator, Ozonetel, Twilio… for the office's own notes. */
+  provider: string;
+};
+export type MissedCallLine = 'attendance' | 'prayer';
+export type MissedCallAction = 'checked_in' | 'already' | 'no_service' | 'closed' | 'prayer' | 'unknown' | 'duplicate' | 'off';
+export type MissedCall = {
+  id: string;
+  at: string;
+  /** The caller, as dialled (last ten digits kept for matching). */
+  from: string;
+  to: string;
+  line: MissedCallLine;
+  personId: string | null;
+  personName: string | null;
+  action: MissedCallAction;
+  eventId: string | null;
+  eventTitle: string | null;
+  /** Household adults marked present along with the caller. */
+  others: number;
+  reply: string | null;
+  replied: boolean;
+  test: boolean;
+};
+export type MissedCallHub = {
+  settings: MissedCallSettings;
+  /** Where the provider posts missed calls; null until the server has a public address. */
+  webhookUrl: string | null;
+  channelReady: boolean;
+  serviceNow: { id: string; title: string; startsAt: string } | null;
+  stats: { lastSunday: number; checkedIn: number; prayer: number; unknown: number; total: number };
+  recent: MissedCall[];
+  /** Callers the records do not know, last 30 days, for the office to link. */
+  unknown: MissedCall[];
 };
 export type SmsDigestSettings = { enabled: boolean; day: number; hour: number; audience: 'no_app' | 'everyone'; channel: 'sms' | 'whatsapp'; note: string };
 export type SmsDigestPreview = { personId: string | null; name: string; language: LanguageCode; text: string; chars: number; segments: number };
@@ -478,7 +528,7 @@ export type PrayerRequest = {
   chainSentAt?: string | null;
   chainCount?: number;
   /** Where it came from: the member app (default), the public /pray page from a QR card, the lobby kiosk, or WhatsApp. */
-  source?: 'app' | 'card' | 'kiosk' | 'whatsapp';
+  source?: 'app' | 'card' | 'kiosk' | 'whatsapp' | 'phone';
   /** A phone number a visitor left for follow-up, when they are not a member. */
   contact?: string | null;
 };
@@ -1365,6 +1415,7 @@ export type Collections = {
   videoGreetings: VideoGreeting;
   greetingLinks: GreetingLink;
   annualReturns: AnnualReturn;
+  missedCalls: MissedCall;
   ballots: Ballot;
   ballotStubs: BallotStub;
   missionaries: Missionary;
@@ -1452,7 +1503,7 @@ export const KINDS = [
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals', 'practices',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
-  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns',
+  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
   'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns', 'calendarFeeds',
 ] as const satisfies readonly Kind[];

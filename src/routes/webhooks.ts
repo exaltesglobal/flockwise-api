@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { type Context, Hono } from 'hono';
 
 import { config } from '../config.js';
 import { AI_PACK, applyBillingEvent, applyRecurringEvent, botConfig, handleBotMessage, markAiPackPaid, markSetupPaid, SETUP_KIND, type BillingInterval, type PlanId } from '../core/index.js';
@@ -64,6 +64,31 @@ export function webhookRoutes(hub: Hub) {
       return c.redirect(`${back}?canva=error&reason=${encodeURIComponent((e as Error).message)}#integrations`);
     }
   });
+
+  // The missed-call line: the telephony provider (Exotel, Knowlarity, MyOperator, Ozonetel, Twilio…)
+  // fetches or posts this when a member gives a missed call. The secret key is in the path; the
+  // engine reads the caller's number from whatever field name the provider uses.
+  const missedCall = async (c: Context) => {
+    const t = hub.tenants.get(c.req.param('church') ?? '');
+    if (!t) return c.json({ error: { code: 'not_found', message: 'Unknown church' } }, 404);
+    let body: Record<string, unknown> = {};
+    if (c.req.method === 'POST') {
+      try {
+        const ct = c.req.header('content-type') ?? '';
+        body = ct.includes('json') ? ((await c.req.json()) as Record<string, unknown>) : Object.fromEntries(Object.entries(await c.req.parseBody()).map(([k, v]) => [k, typeof v === 'string' ? v : '']));
+      } catch {
+        body = {};
+      }
+    }
+    try {
+      return c.json(await t.engine.handle({ method: 'POST', path: `/public/missed-call/${c.req.param('key')}`, query: c.req.query(), body, auth: null }));
+    } catch (e) {
+      const err = e as { status?: number; code?: string; message: string };
+      return c.json({ error: { code: err.code ?? 'error', message: err.message } }, (err.status as 404) ?? 500);
+    }
+  };
+  app.post('/webhooks/missed-call/:church/:key', missedCall);
+  app.get('/webhooks/missed-call/:church/:key', missedCall);
 
   // The WhatsApp assistant: Chitthi forwards message.received for a church's WhatsApp number.
   app.post('/webhooks/chitthi/:church', async (c) => {
