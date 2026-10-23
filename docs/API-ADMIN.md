@@ -1220,3 +1220,14 @@ Grow plan and up. Kinds: `wedding`, `funeral`, `dedication`, `house_blessing`, `
 - `DELETE /admin/occasions/:id` (care).
 - `GET /me/occasions`, `POST /me/occasions` `{ kind, date?, time?, place?, phone?, title?, note? }` (up to 3 waiting requests; notifies pastors with `occasion.request`), `DELETE /me/occasions/:id` withdraws a waiting request.
 - Daily: the pastor gets `occasion.reminder` the day before, listing open checklist items.
+
+## Skills & helping hands
+
+Grow plan and up. A skill profile is kept per person (`skillProfiles`, id = person id): `skills` (up to 20, tidied to a suggestion's spelling), `note`, `serve` (happy to help the church, default yes) and `share` (shown to other members, default no). Board posts (`boardPosts`) are `job`, `need` or `offer`, close themselves after 30 days, and a member can have 3 open at a time.
+
+- `GET /admin/skills` (people.view or volunteers): `{ people, skills: [{ skill, count }], posts, counts: { people, willingToServe, openPosts } }`.
+- `PATCH /admin/skills/:personId` (people.edit): `{ skills (array or comma text), note, serve, share }`.
+- `POST /admin/board/:id/hide|show` (people.edit): moderate a post.
+- `GET /me/skills`: `{ mine, directory (members who chose to share), posts (open posts plus my own), suggestions }`.
+- `PUT /me/skills`: `{ skills, note, serve, share }`.
+- `POST /me/board` `{ kind, title, body?, place? }`, `POST /me/board/:id/close`.

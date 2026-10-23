@@ -365,6 +365,16 @@ export type OccasionView = Occasion & { people: { id: string; name: string }[]; 
 export type OccasionsHub = { upcoming: OccasionView[]; requests: OccasionView[]; past: OccasionView[]; counts: { requests: number; thisMonth: number; thisYear: Record<OccasionKind, number> }; pastors: { id: string; name: string }[] };
 export type MyOccasion = { id: string; kind: OccasionKind; title: string; status: OccasionStatus; date: string | null; time: string | null; place: string; pastorName: string | null };
 
+// ----- skills & helping hands: who can do what, and a board for jobs, needs and offers -----
+/** One per person (id = person id). */
+export type SkillProfile = { id: string; skills: string[]; note: string; serve: boolean; share: boolean; updatedAt: string };
+export type BoardKind = 'job' | 'need' | 'offer';
+export type BoardPost = { id: string; personId: string; kind: BoardKind; title: string; body: string; place: string; status: 'open' | 'closed' | 'hidden'; createdAt: string; expiresOn: string };
+export type BoardPostView = BoardPost & { name: string; phone: string | null; expired: boolean };
+export type SkillPerson = { personId: string; name: string; phone: string | null; skills: string[]; note: string; serve: boolean; share: boolean; updatedAt: string };
+export type SkillsHub = { people: SkillPerson[]; skills: { skill: string; count: number }[]; posts: BoardPostView[]; counts: { people: number; willingToServe: number; openPosts: number } };
+export type MySkills = { mine: { skills: string[]; note: string; serve: boolean; share: boolean } | null; directory: { personId: string; name: string; phone: string | null; skills: string[]; note: string }[]; posts: (BoardPostView & { mine: boolean })[]; suggestions: string[] };
+
 // ----- safeguarding: police verification, training and declarations for people who work with children -----
 export type SafeguardKind = 'police' | 'training' | 'declaration' | 'reference';
 export type SafeguardCheck = { id: string; kind: SafeguardKind; issuedOn: string; expiresOn: string | null; reference: string | null; note: string | null; recordedBy: string; recordedAt: string };
@@ -1634,6 +1644,8 @@ export type Collections = {
   libraryBooks: LibraryBook;
   libraryLoans: LibraryLoan;
   occasions: Occasion;
+  skillProfiles: SkillProfile;
+  boardPosts: BoardPost;
   captions: CaptionsLog;
   ballots: Ballot;
   ballotStubs: BallotStub;
@@ -1731,7 +1743,7 @@ export const KINDS = [
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals', 'practices',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
-  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes', 'bankStatements', 'bankLines', 'safeguarding', 'courses', 'courseEnrollments', 'vigils', 'vigilSignups', 'mentorships', 'mentorMeetings', 'libraryBooks', 'libraryLoans', 'occasions',
+  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes', 'bankStatements', 'bankLines', 'safeguarding', 'courses', 'courseEnrollments', 'vigils', 'vigilSignups', 'mentorships', 'mentorMeetings', 'libraryBooks', 'libraryLoans', 'occasions', 'skillProfiles', 'boardPosts',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
   'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns', 'calendarFeeds',
 ] as const satisfies readonly Kind[];
