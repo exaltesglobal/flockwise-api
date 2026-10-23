@@ -139,6 +139,7 @@ const GATES: [RegExp, PlanId][] = [
   [/^\/admin\/library/, 'grow'],
   [/^\/admin\/occasions/, 'grow'],
   [/^\/admin\/skills/, 'grow'],
+  [/^\/admin\/camps/, 'grow'],
   [/^\/admin\/sunday-school/, 'grow'],
   [/^\/admin\/missions/, 'grow'],
   [/^\/admin\/rides/, 'grow'],

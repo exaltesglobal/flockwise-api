@@ -1231,3 +1231,14 @@ Grow plan and up. A skill profile is kept per person (`skillProfiles`, id = pers
 - `GET /me/skills`: `{ mine, directory (members who chose to share), posts (open posts plus my own), suggestions }`.
 - `PUT /me/skills`: `{ skills, note, serve, share }`.
 - `POST /me/board` `{ kind, title, body?, place? }`, `POST /me/board/:id/close`.
+
+## Camps & retreats
+
+Grow plan and up. A camp has dates, place, fee (₹ per person), optional capacity, `open` for sign-ups, rooms (`{ name, beds, for: any|male|female|family }`) and buses (`{ name, seats }`).
+
+- `GET /admin/camps` (events or people.view): `{ camps }` with `going`, `paidUp`, `due`, `collected`, `roomless`, `busless`.
+- `POST /admin/camps`, `PATCH /admin/camps/:id`, `DELETE /admin/camps/:id` (events; delete is refused once anyone has paid). Removing a room or bus frees the people in it.
+- `GET /admin/camps/:id`: the camp plus `signups` (name, age, gender, household, medical, emergency contact, room, bus, paid).
+- `POST /admin/camps/:id/signups` `{ personIds, medical?, needsBus? }` (office sign-up), `PATCH /admin/camps/:id/signups/:sid` `{ roomId?, busId?, paid?, status?, medical?, needsBus? }` (a full room or bus is refused).
+- `POST /admin/camps/:id/assign`: fills empty beds (families into a family room where they fit, everyone else by gender, next to a relative where possible) and bus seats (families together).
+- `GET /me/camps`: open camps with the household and who is signed up. `POST /me/camps/:id` `{ personIds, emergencyName, emergencyPhone (required), needsBus, medical: { personId: text } }` signs up family members and tells organisers (`camp.signup`). `DELETE /me/camps/:id/:personId` cancels an unpaid place.

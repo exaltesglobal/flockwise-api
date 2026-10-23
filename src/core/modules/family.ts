@@ -21,7 +21,7 @@ export function parent(ctx: Ctx): Person {
   return me;
 }
 
-function household(ctx: Ctx, me: Person): Person[] {
+export function household(ctx: Ctx, me: Person): Person[] {
   if (!me.householdName) return [me];
   return ctx.db.all('people').filter((p) => p.householdName === me.householdName && p.status !== 'inactive');
 }

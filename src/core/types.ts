@@ -375,6 +375,20 @@ export type SkillPerson = { personId: string; name: string; phone: string | null
 export type SkillsHub = { people: SkillPerson[]; skills: { skill: string; count: number }[]; posts: BoardPostView[]; counts: { people: number; willingToServe: number; openPosts: number } };
 export type MySkills = { mine: { skills: string[]; note: string; serve: boolean; share: boolean } | null; directory: { personId: string; name: string; phone: string | null; skills: string[]; note: string }[]; posts: (BoardPostView & { mine: boolean })[]; suggestions: string[] };
 
+// ----- camps & retreats: sign-ups, rooms and bus seats -----
+export type CampRoom = { id: string; name: string; beds: number; for: 'any' | 'male' | 'female' | 'family' };
+export type CampBus = { id: string; name: string; seats: number };
+export type Camp = { id: string; name: string; startsOn: string; endsOn: string; place: string; fee: number; capacity: number; open: boolean; note: string; rooms: CampRoom[]; buses: CampBus[]; createdAt: string };
+export type CampSignup = {
+  id: string; campId: string; personId: string; householdKey: string; status: 'going' | 'cancelled';
+  medical: string; emergencyName: string; emergencyPhone: string; needsBus: boolean;
+  roomId: string | null; busId: string | null; paid: number; via: 'office' | 'app'; signedUpBy: string | null; createdAt: string;
+};
+export type CampSignupView = CampSignup & { name: string; phone: string | null; gender: 'male' | 'female' | null; age: number | null; household: string };
+export type CampView = Camp & { going: number; paidUp: number; due: number; collected: number; roomless: number; busless: number };
+export type CampDetail = CampView & { signups: CampSignupView[] };
+export type MyCamp = { id: string; name: string; startsOn: string; endsOn: string; place: string; fee: number; note: string; full: boolean; family: { personId: string; name: string; signupId: string | null; room: string | null; bus: string | null; paid: number }[] };
+
 // ----- safeguarding: police verification, training and declarations for people who work with children -----
 export type SafeguardKind = 'police' | 'training' | 'declaration' | 'reference';
 export type SafeguardCheck = { id: string; kind: SafeguardKind; issuedOn: string; expiresOn: string | null; reference: string | null; note: string | null; recordedBy: string; recordedAt: string };
@@ -1384,7 +1398,7 @@ export type CanvaExportResult = { design: CanvaDesign; media: MediaItem[]; urls:
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
 /** Things Flockwise can tell people about on its own. The office picks the channels for each. */
-export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder' | 'verse.week' | 'election.open' | 'election.result' | 'recap.ready' | 'greeting.video' | 'vigil.reminder' | 'mentor.nudge' | 'library.due' | 'library.request' | 'occasion.request' | 'occasion.scheduled' | 'occasion.reminder';
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder' | 'verse.week' | 'election.open' | 'election.result' | 'recap.ready' | 'greeting.video' | 'vigil.reminder' | 'mentor.nudge' | 'library.due' | 'library.request' | 'occasion.request' | 'occasion.scheduled' | 'occasion.reminder' | 'camp.signup';
 
 // ---------- Christmas carol rounds ----------
 
@@ -1646,6 +1660,8 @@ export type Collections = {
   occasions: Occasion;
   skillProfiles: SkillProfile;
   boardPosts: BoardPost;
+  camps: Camp;
+  campSignups: CampSignup;
   captions: CaptionsLog;
   ballots: Ballot;
   ballotStubs: BallotStub;
@@ -1743,7 +1759,7 @@ export const KINDS = [
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals', 'practices',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
-  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes', 'bankStatements', 'bankLines', 'safeguarding', 'courses', 'courseEnrollments', 'vigils', 'vigilSignups', 'mentorships', 'mentorMeetings', 'libraryBooks', 'libraryLoans', 'occasions', 'skillProfiles', 'boardPosts',
+  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes', 'bankStatements', 'bankLines', 'safeguarding', 'courses', 'courseEnrollments', 'vigils', 'vigilSignups', 'mentorships', 'mentorMeetings', 'libraryBooks', 'libraryLoans', 'occasions', 'skillProfiles', 'boardPosts', 'camps', 'campSignups',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
   'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns', 'calendarFeeds',
 ] as const satisfies readonly Kind[];
