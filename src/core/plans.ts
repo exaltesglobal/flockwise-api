@@ -121,6 +121,7 @@ export const PLANS: Record<PlanId, Plan> = {
 const GATES: [RegExp, PlanId][] = [
   [/^\/admin\/api-keys/, 'cathedral'],
   [/^\/admin\/ai\/briefing/, 'cathedral'],
+  [/^\/admin\/recaps/, 'thrive'],
   [/^\/admin\/(services|songs|workflows|workflow-cards|people-fields|bookings|resources|calendar|insights|presentation|ai\/(?!status))/, 'thrive'],
   [/^\/admin\/(checkin|volunteers|groups|forms|care|sermons|integrations|registers|zones|visits|accounts|expenses)/, 'grow'],
   [/^\/admin\/giving\/(pledges|receipts|batches|statements|10bd|form)/, 'grow'],

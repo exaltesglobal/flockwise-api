@@ -618,6 +618,32 @@ export function seedDemo(db: Db, env: Env) {
   db.put('sermons', sermon('sm_3', 'Faith that works', 'Mercy Daniel', 21, 'James', 'James 2:14-26', 'What does living faith look like on a Monday morning?'));
   db.put('sermons', sermon('sm_4', 'The God who sees', 'Pastor Samuel Raj', 28, 'Stand-alone', 'Genesis 16', 'Hagar meets the God who sees her in the wilderness.'));
 
+  // Last Sunday's "Sunday in 60 seconds", already published, so the member app and the share page have one to show.
+  {
+    const ev7 = events.find((e) => e.id === 'ev_7')!;
+    const plan7 = db.get('plans', 'ev_7')!;
+    const songs7 = plan7.items.filter((i) => i.kind === 'song').map((i) => i.title);
+    const ci7 = db.all('checkins').filter((c) => c.eventId === 'ev_7');
+    const facts: Collections['recaps']['facts'] = {
+      eventId: 'ev_7', eventTitle: ev7.title, date: ev7.startsAt.slice(0, 10), attendance: 846, children: ci7.filter((c) => c.isChild).length, firstTimers: ['Kiran', 'Deepa'],
+      sermon: { title: 'Hope that does not disappoint', speaker: 'Pastor Samuel Raj', scripture: 'Romans 5:1-5', oneLiner: 'Suffering produces perseverance, character and a hope that holds.' },
+      songs: songs7, celebrations: [], prayers: { requests: 6, prayed: 41 }, giving: null, nextEvents: [{ title: 'Youth Night', startsAt: at(2, 18, 30), location: 'Fellowship Hall' }],
+    };
+    db.put('recaps', {
+      id: 'rc_1', eventId: 'ev_7', eventTitle: ev7.title, date: facts.date, language: 'en', headline: 'A Sunday of hope that holds', status: 'published', createdAt: iso(Date.parse(ev7.endsAt) + 3 * 3_600_000), createdBy: 'Leena George', publishedAt: iso(Date.parse(ev7.endsAt) + 4 * 3_600_000), notified: 0,
+      caption: '✨ Sunday in 60 seconds\n846 of us worshipped together.\nPastor Samuel preached "Hope that does not disappoint" from Romans 5.\nA warm welcome to Kiran and Deepa 🙏\nNext: Youth Night, Tuesday.\n— Grace Community Church',
+      stats: { attendance: 846, children: facts.children, firstTimers: 2, prayed: 41, songs: songs7.length },
+      facts,
+      slides: [
+        { title: 'This Sunday', text: `846 of us gathered at Grace Community Church, ${facts.children} of them in kids church.`, stat: '846' },
+        { title: 'The Word', text: 'Suffering produces perseverance, character and a hope that holds. (Pastor Samuel Raj)', stat: 'Romans 5:1-5' },
+        { title: 'We sang', text: songs7.slice(0, 3).join(' · '), stat: `${songs7.length} songs` },
+        { title: 'Our family', text: 'We welcomed Kiran and Deepa for the first time, and prayed 41 times for six requests on the prayer wall.', stat: '2 new' },
+        { title: 'Coming up', text: 'Youth Night on Tuesday at the Fellowship Hall. See you Sunday!', stat: 'Tuesday' },
+      ],
+    });
+  }
+
   // The demo church's brand kit: a simple mark so the logo shows beside the name everywhere.
   const demoLogo = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#7a2e2e"/><path d="M32 10v44M18 24h28" stroke="#fff" stroke-width="7" stroke-linecap="round"/><path d="M12 50c8-10 32-10 40 0" fill="none" stroke="#e9b949" stroke-width="4" stroke-linecap="round"/></svg>');
   db.put('settings', { ...db.get('settings', 'church')!, logoUrl: demoLogo, brand: { primary: '#7a2e2e', accent: '#e9b949', font: 'classic', logoDarkUrl: null, tagline: 'A home for everyone in Hyderabad' }, publicPage: { enabled: true, tagline: 'A home for everyone in Hyderabad', about: 'Grace Community Church has been serving Hyderabad since 1998. We are a family of families from every part of India, meeting in English and Telugu.', serviceTimes: 'Sundays 9:00 am (English) and 11:30 am (Telugu), Kondapur\nSundays 10:00 am, Secunderabad Hall', heroImageUrl: '', showEvents: true, showGroups: true, showSermons: true, showGiving: true } });

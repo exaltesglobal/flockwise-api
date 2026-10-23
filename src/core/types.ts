@@ -1119,7 +1119,7 @@ export type CanvaDesign = { id: string; title: string; editUrl: string; viewUrl:
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
 /** Things Flockwise can tell people about on its own. The office picks the channels for each. */
-export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder' | 'verse.week' | 'election.open' | 'election.result';
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder' | 'verse.week' | 'election.open' | 'election.result' | 'recap.ready';
 
 // ---------- Christmas carol rounds ----------
 
@@ -1361,6 +1361,7 @@ export type Collections = {
   ssMarks: SsMark;
   verseGames: VerseGame;
   elections: Election;
+  recaps: Recap;
   ballots: Ballot;
   ballotStubs: BallotStub;
   missionaries: Missionary;
@@ -1448,7 +1449,7 @@ export const KINDS = [
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals', 'practices',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
-  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs',
+  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
   'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns', 'calendarFeeds',
 ] as const satisfies readonly Kind[];
@@ -1911,6 +1912,56 @@ export type ElectionResultRow = { candidateId: string; name: string; note: strin
 export type ElectionResults = { rows: ElectionResultRow[]; ballots: number; invalid: number; tie: boolean; passed: boolean | null };
 export type ElectionTurnout = { eligible: number; app: number; paper: number; voted: number; percent: number };
 export type ElectionView = Election & { turnout: ElectionTurnout; results: ElectionResults | null };
+
+// ---------- "Sunday in 60 seconds": AI recap card and reel ----------
+
+/** What a Sunday recap is written from. Nothing here is guessed: check-ins, the service plan, the sermon and the week's records. */
+export type RecapFacts = {
+  eventId: string;
+  eventTitle: string;
+  /** The Sunday, as a local date. */
+  date: string;
+  attendance: number | null;
+  children: number | null;
+  /** First names of people whose first Sunday it was. */
+  firstTimers: string[];
+  sermon: { title: string; speaker: string; scripture: string; oneLiner: string } | null;
+  songs: string[];
+  /** Birthdays, anniversaries and baptism days in the coming week. */
+  celebrations: { kind: CelebrationKind; name: string }[];
+  prayers: { requests: number; prayed: number };
+  /** Gifts in the week ending that Sunday, in minor units; null unless the office chose to include it. */
+  giving: number | null;
+  nextEvents: { title: string; startsAt: string; location: string }[];
+};
+export type RecapSlide = { title: string; text: string; /** One big number or short phrase for the slide, or null. */ stat: string | null };
+export type RecapStatus = 'draft' | 'published';
+/** The numbers the card shows; safe for members (no money). */
+export type RecapStats = { attendance: number | null; children: number | null; firstTimers: number; prayed: number; songs: number };
+export type Recap = {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  date: string;
+  language: LanguageCode;
+  headline: string;
+  /** The WhatsApp status caption. */
+  caption: string;
+  slides: RecapSlide[];
+  stats: RecapStats;
+  facts: RecapFacts;
+  status: RecapStatus;
+  createdAt: string;
+  createdBy: string;
+  publishedAt: string | null;
+  /** People told when it was published. */
+  notified: number;
+};
+export type AiRecap = { headline: string; caption: string; slides: RecapSlide[] };
+/** A past Sunday service the office can write a recap for. */
+export type RecapSunday = { eventId: string; title: string; date: string; startsAt: string; attendance: number | null; recapId: string | null };
+/** A published recap as members and the public share page see it: no money, no facts beyond the card's numbers. */
+export type MemberRecap = Pick<Recap, 'id' | 'eventTitle' | 'date' | 'language' | 'headline' | 'caption' | 'slides' | 'stats' | 'publishedAt'> & { church: { name: string; logoUrl: string | null; brand: BrandKit | null } };
 export type ElectionRoll = { election: { id: string; title: string }; people: { id: string; name: string; phone: string | null; voted: 'app' | 'paper' | null; castAt: string | null }[] };
 export type MemberElection = {
   id: string;

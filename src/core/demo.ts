@@ -144,6 +144,28 @@ async function demoAi(req: AiRequest): Promise<AiResponse> {
     const sentences = body.replace(/\b(um+|uh+|you know|like)\b,?\s*/gi, '').split(/(?<=[.!?])\s+/).filter(Boolean);
     return text(`## Main point\n${sentences.slice(0, 2).join(' ')}\n\n## Going deeper\n${sentences.slice(2).join(' ') || 'The preacher’s remaining notes, tidied (demo).'}\n\n_Tidied in demo mode. Connect an AI key on the server for the real thing._`);
   }
+  if ('headline' in props && 'slides' in props && 'caption' in props) {
+    // A Sunday recap: the facts are in the message, so the stand-in writes the five slides from them.
+    let f: any = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
+    try { f = JSON.parse(ask.slice(ask.indexOf('Facts (JSON):') + 14, ask.indexOf('\n\nWrite:'))); } catch { /* keep the empty facts */ }
+    const church = /staff of ([^,]+),/.exec(req.system ?? '')?.[1] ?? 'our church';
+    const songs: string[] = Array.isArray(f.songs) ? f.songs.slice(0, 3) : [];
+    const first: string[] = Array.isArray(f.firstTimers) ? f.firstTimers : [];
+    const next = f.nextEvents?.[0];
+    const day = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' });
+    const family = [first.length ? `We welcomed ${first.slice(0, 3).join(', ')}${first.length > 3 ? ` and ${first.length - 3} more` : ''} for the first time.` : '', f.celebrations?.length ? `${f.celebrations.length} birthdays and anniversaries this week.` : '', f.prayers?.prayed ? `${f.prayers.prayed} prayers prayed for ${f.prayers.requests} requests.` : ''].filter(Boolean).join(' ');
+    return text(JSON.stringify({
+      headline: f.sermon?.title ? `A Sunday of ${/hope/i.test(f.sermon.title) ? 'hope' : 'grace'} at ${church}` : `Sunday at ${church}`,
+      caption: [`✨ Sunday in 60 seconds`, f.attendance ? `${f.attendance} of us worshipped together.` : 'We worshipped together.', f.sermon ? `${f.sermon.speaker || 'Our pastor'} preached "${f.sermon.title}" from ${f.sermon.scripture}.` : '', first.length ? `A warm welcome to ${first.slice(0, 2).join(' and ')} 🙏` : '', next ? `Next: ${next.title}, ${day(next.startsAt)}.` : '', `— ${church}`].filter(Boolean).join('\n'),
+      slides: [
+        { title: 'This Sunday', text: `${f.attendance ? `${f.attendance} of us` : 'We'} gathered at ${church}${f.children ? `, ${f.children} of them children` : ''}.`, stat: f.attendance ? String(f.attendance) : null },
+        { title: 'The Word', text: f.sermon ? `${f.sermon.oneLiner || f.sermon.title} (${f.sermon.speaker})` : 'We opened the Word together.', stat: f.sermon?.scripture || null },
+        { title: 'We sang', text: songs.length ? songs.join(' · ') : 'Songs of praise and thanks.', stat: songs.length ? `${f.songs.length} songs` : null },
+        { title: 'Our family', text: family || 'Grateful for every family who came.', stat: first.length ? `${first.length} new` : f.prayers?.prayed ? `${f.prayers.prayed} prayers` : null },
+        { title: 'Coming up', text: next ? `${next.title} on ${day(next.startsAt)}${next.location ? ` at ${next.location}` : ''}. See you Sunday!` : 'See you Sunday!', stat: next ? day(next.startsAt) : 'Sunday' },
+      ],
+    }));
+  }
   if ('prayerPoints' in props && 'actions' in props) {
     // A spoken visit write-up: sentences become the diary line, "pray" lines the prayer points, promises the actions.
     const body = ask.slice(ask.indexOf('Transcript (speech-to-text, may have errors):') + 46, ask.lastIndexOf('\n\nReturn:')).trim();

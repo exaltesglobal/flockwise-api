@@ -7,7 +7,7 @@ import type { Db } from '../db.js';
 import { ApiError } from '../errors.js';
 import { limitsFor, aiExtra } from '../plans.js';
 import { TOOLS, trim } from '../mcp.js';
-import type { AiAnswer, AiDraft, AiPurpose, AiScannedSong, AiSermonKind, AiSetlist, AiSongScan, AiStatus, AiVisitNotes, VisitPurpose } from '../types.js';
+import type { AiAnswer, AiDraft, AiPurpose, AiRecap, AiScannedSong, AiSermonKind, AiSetlist, AiSongScan, AiStatus, AiVisitNotes, RecapFacts, VisitPurpose } from '../types.js';
 import { settings } from '../util.js';
 
 const LANGS: Record<string, string> = { en: 'English', hi: 'Hindi', te: 'Telugu', ta: 'Tamil', ml: 'Malayalam', kn: 'Kannada', mr: 'Marathi', bn: 'Bengali', gu: 'Gujarati', pa: 'Punjabi', or: 'Odia', as: 'Assamese', ur: 'Urdu', kok: 'Konkani', mni: 'Manipuri', lus: 'Mizo', kha: 'Khasi', ne: 'Nepali' };
@@ -105,6 +105,37 @@ export async function askAssistant(ctx: Ctx, question: string, history: AiMessag
     messages.push({ role: 'user', content: results });
   }
   return { answer: 'That needed too many lookups. Try asking a narrower question.', toolsUsed: used };
+}
+
+
+/**
+ * "Sunday in 60 seconds": the week's facts become a headline, a WhatsApp status caption and five
+ * short slides for the reel. One request against the month's allowance; the numbers are never
+ * the model's to invent, they come in as facts and the caller keeps them beside the words.
+ */
+export async function writeRecap(ctx: Ctx, facts: RecapFacts, language: string): Promise<AiRecap> {
+  const lang = LANGS[language] ?? 'English';
+  const schema = {
+    type: 'object',
+    properties: {
+      headline: { type: 'string' },
+      caption: { type: 'string' },
+      slides: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, text: { type: 'string' }, stat: { type: ['string', 'null'] } }, required: ['title', 'text', 'stat'], additionalProperties: false } },
+    },
+    required: ['headline', 'caption', 'slides'],
+    additionalProperties: false,
+  };
+  const res = await run(ctx, {
+    system: `${churchContext(ctx)}\n\nYou write the church's Sunday recap for WhatsApp status and the member app: warm, specific, short. Use only the facts given; never invent numbers, names or events, and leave out anything the facts do not have. Write in ${lang}${lang !== 'English' ? ' in its own script' : ''}. Two or three tasteful emoji in the caption are fine; none in slide titles. Reply with JSON only.`,
+    messages: [{ role: 'user', content: `Facts (JSON):\n${JSON.stringify(facts)}\n\nWrite: headline (at most 8 words, the feel of the Sunday), caption (a WhatsApp status caption of 3 to 5 short lines, at most 350 characters, ending with the church name), slides (exactly 5, in order: 1 the Sunday itself with the attendance as stat; 2 the Word, the sermon in one memorable line with the scripture as stat; 3 what we sang, naming up to three songs; 4 our family: first-timers welcomed by first name, celebrations this week, prayers prayed, with one number as stat; 5 coming up this week with the first event and a warm "see you Sunday", the next service day as stat). Each slide: title at most 5 words, text at most 30 words, stat at most 24 characters or null.` }],
+    schema,
+    maxTokens: 2500,
+    effort: 'low',
+  });
+  const out = json<AiRecap>(res.content);
+  const slides = (Array.isArray(out.slides) ? out.slides : []).map((x) => ({ title: str(x?.title, 60), text: str(x?.text, 300), stat: x?.stat ? str(x.stat, 40) : null })).filter((x) => x.title || x.text).slice(0, 6);
+  if (!slides.length) throw new ApiError(502, 'ai_error', 'The recap came back empty. Try again.');
+  return { headline: str(out.headline, 120) || slides[0].title, caption: str(out.caption, 600), slides };
 }
 
 export function registerAi(r: Router) {

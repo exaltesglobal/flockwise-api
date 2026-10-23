@@ -967,3 +967,21 @@ A visit is talked through on the way home, in any of the dictation languages, an
 | POST | `/admin/visits/:id/actions/:index` (care) | `{done?: boolean}` ticks or unticks one item (toggles when omitted) |
 
 Web: the visit form has a "Say what happened" card (Dictate button with the language picker, or type; "Write it up" fills what happened, prayer points, follow-up, kind of visit, confidential and the action items, all editable before saving) and an "Action items" editor with due dates. The Visits tab opens with "To do from visits" (tick to clear; the tab's "Only my visits" filter applies to it too). Demo mode uses a built-in stand-in for the AI.
+
+## "Sunday in 60 seconds": AI recap card and reel (Thrive+)
+
+After the service, one button writes the week up: the facts come from the records (check-ins and headcounts, the service plan's songs, the sermon, first-timers, this week's celebrations, the prayer wall, the week ahead) and the AI only writes the words, in one request against the month's allowance. The result is a headline, a WhatsApp status caption and five short slides. The browser draws the 1080 × 1920 status card and one image per slide in the church's brand colours, and can record the slides as a short WebM reel; nothing is uploaded. Members get a push when it is published and watch it as a story in the app; the share page `/r/:id` opens for anyone from a status link. Money appears only when the office ticks "include giving", and even then only in the words the office approves: members and the share page never receive the facts block. Lives in `core/modules/recap.ts` and `writeRecap` in `core/modules/ai.ts`; collection `recaps`.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/admin/recaps` (comms) | `Recap[]`, newest Sunday first |
+| GET | `/admin/recaps/sundays` | `RecapSunday[]`: the last eight past services with attendance and the id of their recap, if any |
+| GET | `/admin/recaps/facts?eventId=&includeGiving=1` | `RecapFacts` for a service (default: the latest past one), to look at before spending the AI request |
+| POST | `/admin/recaps` | `{eventId?, language? ('en' \| 'hi' \| 'ta' \| 'te' \| 'ml' \| 'kn'), includeGiving?}` → draft `Recap` with `headline`, `caption`, `slides[{title, text, stat}]`, `stats` and `facts`; 409 `not_yet` while the service is still on; 429 once the allowance is used |
+| GET/PATCH/DELETE | `/admin/recaps/:id` | PATCH `{headline?, caption?, slides?}` (one to eight slides) |
+| POST | `/admin/recaps/:id/publish` | Marks it published and tells every member and regular (notification kind `recap.ready`, push by default) with a link to `/app/recap/:id`; `notified` is the count |
+| GET | `/me/recaps` | `MemberRecap[]`: the last six published, each with the church's name, logo and brand kit so the phone can draw the card |
+| GET | `/me/recaps/:id` | One published recap (404 for drafts) |
+| GET | `/public/recaps/:id` (public) | The same, for the share page |
+
+Web: office Sundays & events › "Sunday in 60 seconds" (pick the Sunday, language and whether to include giving, see the facts, write, edit the headline, caption and slides with a live card and slide preview, copy the caption, download the card and slide PNGs, record the reel, publish); member `/app/recap` (home quick link, six languages) and the story player `/app/recap/:id` (progress bars, ten seconds a slide, tap to move, pause, share, save the card); public `/r/:id`. Demo: last Sunday's recap `rc_1` is already published.
