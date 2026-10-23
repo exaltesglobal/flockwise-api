@@ -1110,7 +1110,7 @@ export type CanvaDesign = { id: string; title: string; editUrl: string; viewUrl:
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
 /** Things Flockwise can tell people about on its own. The office picks the channels for each. */
-export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder' | 'verse.week';
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder' | 'verse.week' | 'election.open' | 'election.result';
 
 // ---------- Christmas carol rounds ----------
 
@@ -1345,6 +1345,9 @@ export type Collections = {
   ssExams: SsExam;
   ssMarks: SsMark;
   verseGames: VerseGame;
+  elections: Election;
+  ballots: Ballot;
+  ballotStubs: BallotStub;
   missionaries: Missionary;
   missionSupport: MissionSupport;
   missionReports: MissionReport;
@@ -1430,7 +1433,7 @@ export const KINDS = [
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals', 'practices',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
-  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames',
+  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
   'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns', 'calendarFeeds',
 ] as const satisfies readonly Kind[];
@@ -1854,6 +1857,65 @@ export type MemberVerses = {
 };
 export type VerseAnswerResult = { ok: boolean; accuracy: number; earned: number; message: string; game: VerseGameView };
 export type SsVerseBoards = { week: string; weeks: string[]; boards: VerseBoard[]; stars: { id: string; name: string; className: string; stars: number; weeks: number }[] };
+
+// ---------- AGM and committee elections with secret ballots ----------
+
+export type ElectionStatus = 'draft' | 'open' | 'closed';
+/** A committee election picks `seats` people; a resolution is For / Against / Abstain on one motion. */
+export type ElectionKind = 'election' | 'resolution';
+export type ElectionEligibility = 'members' | 'members_18' | 'everyone_18';
+export type Candidate = { id: string; personId: string | null; name: string; note: string };
+export type Election = {
+  id: string;
+  title: string;
+  kind: ElectionKind;
+  description: string;
+  seats: number;
+  candidates: Candidate[];
+  eligibility: ElectionEligibility;
+  status: ElectionStatus;
+  /** The AGM itself, shown on the ballot. */
+  meetingAt: string | null;
+  venue: string;
+  opensAt: string | null;
+  closesAt: string | null;
+  closedAt: string | null;
+  /** Hall ballots counted by the returning officer, per candidate id. */
+  paperVotes: Record<string, number>;
+  paperInvalid: number;
+  returningOfficer: string;
+  resultsPublished: boolean;
+  createdAt: string;
+  createdBy: string;
+};
+/** One anonymous ballot: no person, the hour it was cast, and a receipt only the voter has. */
+export type Ballot = { id: string; electionId: string; choices: string[]; receipt: string; castHour: string; via: 'app' };
+/** Who has voted, kept apart from the ballots. id is `${electionId}:${personId}`. */
+export type BallotStub = { id: string; electionId: string; personId: string; castAt: string; via: 'app' | 'paper'; markedBy: string | null };
+export type ElectionResultRow = { candidateId: string; name: string; note: string; app: number; paper: number; votes: number; percent: number; elected: boolean };
+export type ElectionResults = { rows: ElectionResultRow[]; ballots: number; invalid: number; tie: boolean; passed: boolean | null };
+export type ElectionTurnout = { eligible: number; app: number; paper: number; voted: number; percent: number };
+export type ElectionView = Election & { turnout: ElectionTurnout; results: ElectionResults | null };
+export type ElectionRoll = { election: { id: string; title: string }; people: { id: string; name: string; phone: string | null; voted: 'app' | 'paper' | null; castAt: string | null }[] };
+export type MemberElection = {
+  id: string;
+  title: string;
+  kind: ElectionKind;
+  description: string;
+  seats: number;
+  candidates: { id: string; name: string; note: string }[];
+  status: ElectionStatus;
+  meetingAt: string | null;
+  venue: string;
+  closesAt: string | null;
+  eligible: boolean;
+  reason: string | null;
+  voted: boolean;
+  results: ElectionResults | null;
+  turnout: ElectionTurnout | null;
+};
+export type VoteReceipt = { receipt: string; choices: string[]; message: string };
+export type ReceiptCheck = { counted: boolean; election: string; choices: string[] };
 
 // ---------- missions support ----------
 

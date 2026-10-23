@@ -485,6 +485,39 @@ export function seedDemo(db: Db, env: Env) {
       }
     db.put('ssExams', { id: 'sse_1', name: 'Half-yearly exam', date: at(-110, 0).slice(0, 10), maxMarks: 100, classIds: cls.map((c) => c.id), status: 'published', createdAt: at(-120, 10) });
     for (const c of cls) for (const pid of c.studentIds) db.put('ssMarks', { id: `sse_1:${pid}`, examId: 'sse_1', personId: pid, classId: c.id, marks: rs() < 0.08 ? null : Math.round(48 + rs() * 50) });
+
+    // AGM: the committee election is open until Sunday after the meeting; last month's resolution is published.
+    const voters = people.filter((p) => p.status === 'member' && p.id !== DEMO_MEMBER && (yrs(p) ?? 30) >= 18);
+    const stand = voters.filter((p) => p.id !== 'p_arun').slice(3, 9);
+    const roles = ['Standing for secretary', 'Standing for treasurer', 'Youth representative', 'Standing for secretary', 'Women\'s fellowship representative', 'Building committee'];
+    const candidates = stand.map((p, i) => ({ id: `cd_${i + 1}`, personId: p.id, name: `${p.firstName} ${p.lastName}`, note: roles[i] }));
+    db.put('elections', {
+      id: 'el_1', title: 'Church committee 2027–2029', kind: 'election', description: 'Three seats on the church committee for the next two years. Vote for up to three. The count is declared after the AGM.', seats: 3, candidates,
+      eligibility: 'members_18', status: 'open', meetingAt: at(toSunday, 11, 30), venue: 'Main hall, Kondapur', opensAt: at(-3, 10), closesAt: at(toSunday, 13), closedAt: null, paperVotes: {}, paperInvalid: 0,
+      returningOfficer: 'Mercy Daniel', resultsPublished: false, createdAt: at(-10, 10), createdBy: 'Mercy Daniel',
+    });
+    const alpha = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const code = (n: number) => Array.from({ length: n }, () => alpha[Math.floor(rs() * alpha.length)]).join('');
+    voters.forEach((p, i) => {
+      if (rs() > 0.42) return;
+      const picks = [...candidates].sort(() => rs() - 0.5).slice(0, 1 + Math.floor(rs() * 3)).map((c) => c.id);
+      const when = at(-2 + Math.floor(rs() * 3), 8 + Math.floor(rs() * 12));
+      db.put('ballots', { id: `bl_${code(14).toLowerCase()}`, electionId: 'el_1', choices: picks, receipt: code(8), castHour: `${when.slice(0, 13)}:00Z`, via: 'app' });
+      db.put('ballotStubs', { id: `el_1:${p.id}`, electionId: 'el_1', personId: p.id, castAt: when, via: 'app', markedBy: null });
+      void i;
+    });
+    db.put('elections', {
+      id: 'el_2', title: 'Adopt the audited accounts for 2025–26', kind: 'resolution', description: 'That the audited accounts for the year ended 31 March 2026, as circulated, be adopted.', seats: 1,
+      candidates: [{ id: 'for', personId: null, name: 'For', note: '' }, { id: 'against', personId: null, name: 'Against', note: '' }, { id: 'abstain', personId: null, name: 'Abstain', note: '' }],
+      eligibility: 'members_18', status: 'closed', meetingAt: at(-21, 11, 30), venue: 'Main hall, Kondapur', opensAt: at(-24, 10), closesAt: at(-21, 13), closedAt: at(-21, 13), paperVotes: { for: 12, against: 2, abstain: 1 }, paperInvalid: 1,
+      returningOfficer: 'Mercy Daniel', resultsPublished: true, createdAt: at(-30, 10), createdBy: 'Mercy Daniel',
+    });
+    voters.slice(0, 57).forEach((p, i) => {
+      const choice = i < 48 ? 'for' : i < 53 ? 'against' : 'abstain';
+      const when = at(-23 + Math.floor(rs() * 3), 8 + Math.floor(rs() * 12));
+      db.put('ballots', { id: `bl_${code(14).toLowerCase()}`, electionId: 'el_2', choices: [choice], receipt: code(8), castHour: `${when.slice(0, 13)}:00Z`, via: 'app' });
+      db.put('ballotStubs', { id: `el_2:${p.id}`, electionId: 'el_2', personId: p.id, castAt: when, via: 'app', markedBy: null });
+    });
     db.put('ssExams', { id: 'sse_2', name: 'Annual exam', date: at(toSunday + 35, 0).slice(0, 10), maxMarks: 100, classIds: cls.map((c) => c.id), status: 'open', createdAt: at(-3, 10) });
   }
 

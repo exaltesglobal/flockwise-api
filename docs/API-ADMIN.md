@@ -928,3 +928,27 @@ The memory verse on a Sunday school lesson (`SsLesson.memoryVerse`, "verse text 
 Notification kind `verse.week` (push only): Monday morning, parents of each enrolled child get the verse and a link to `/app/verses`, once per class per week. Privacy export includes `memoryVerses`.
 
 Web: member `/app/verses` (home quick link "Memory verse", six languages, child switcher, gap chips, mic button where the browser supports it, class board); office Sunday school › "Memory verse board" tab (week picker, per-class table, stars this term).
+
+## AGM and committee elections with secret ballots (Thrive+)
+
+Committee elections (pick up to `seats` of the candidates) and AGM resolutions (For / Against / Abstain) voted on members' phones. A ballot is stored with no name on it (`ballots`: choices, the hour it was cast, a receipt only the voter has); who has voted is kept apart (`ballotStubs`, id `${electionId}:${personId}`, via `app` or `paper`). Nobody, the office included, can join the two. The returning officer adds the hall's paper count, marks paper voters on the roll so the app refuses them a second vote, closes the poll (or it closes itself at `closesAt` on the next tick), and publishes. Lives in `core/modules/elections.ts`.
+
+- Eligibility: `members` (status member), `members_18` (member and 18+, unknown birth date counts as adult), `everyone_18` (members and regulars 18+). Visitors and inactive people never vote.
+- Count: app ballots + `paperVotes` per candidate; top `seats` elected; a tie at the last seat leaves those seats unfilled and sets `results.tie`. A resolution is `passed` when For > Against.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET/POST | `/admin/elections` (settings or people.edit) | `ElectionView[]` (election + `turnout {eligible, app, paper, voted, percent}` + `results` once closed). POST `{title, kind, description, seats, candidates: [{personId?, name, note}], eligibility, meetingAt, venue, closesAt, returningOfficer}` → draft |
+| GET/PATCH/DELETE | `/admin/elections/:id` | PATCH while draft (anything) or open (text, venue, meeting, closing time only); DELETE drafts only |
+| POST | `/admin/elections/:id/open` | `{closesAt}` (future, required) → status open; notification `election.open` to everyone eligible |
+| POST | `/admin/elections/:id/close` | Close now; the count becomes visible to the office |
+| PUT | `/admin/elections/:id/paper` | `{counts: {candidateId: n}, invalid}` from the hall, until the result is published |
+| GET | `/admin/elections/:id/roll` | `ElectionRoll`: eligible people with `voted: 'app' \| 'paper' \| null` and the time, never the choice |
+| POST | `/admin/elections/:id/roll/:personId` | `{voted: true}` marks a paper voter (blocks the app); `{voted: false}` undoes a paper mark; an app vote cannot be undone |
+| POST | `/admin/elections/:id/publish` | Publishes the result to members; notification `election.result` |
+| GET | `/admin/elections/:id/ballots.csv` | Anonymous ballots for an audit, in receipt order, after close |
+| GET | `/me/elections` | `MemberElection[]`: open polls (with `eligible`, `reason`, `voted`, live turnout) and results published in the last 90 days |
+| POST | `/me/elections/:id/vote` | `{choices: string[]}` (1..seats; exactly one for a resolution) → `VoteReceipt {receipt, choices, message}`; 403 when not eligible, 409 `voted` on a second try, 409 `not_open` after close |
+| GET | `/me/elections/:id/receipt/:code` | `ReceiptCheck {counted, choices}` so a voter can confirm their ballot was counted |
+
+Web: office People › "Elections & AGM" (draft form with candidates from the people list, open with closing time, the roll, paper count, close, the count with bars, publish); member `/app/vote` (home quick link "Vote", six languages, ballot with a confirm step, receipt kept on the phone, result bars, "check it was counted"). Demo: a committee election open until Sunday 1 pm and last month's published resolution.

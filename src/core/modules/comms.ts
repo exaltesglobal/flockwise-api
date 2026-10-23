@@ -13,6 +13,7 @@ import { assetReminders } from './assets.js';
 import { readingReminders } from './reading.js';
 import { practiceReminders } from './practice.js';
 import { verseReminders } from './verses.js';
+import { closeDueElections } from './elections.js';
 import { smsDigestDue } from './sms-digest.js';
 import { rideReminders } from './rides.js';
 import { titheReminders } from './tithe.js';
@@ -178,6 +179,7 @@ export async function runDue(ctx: Ctx) {
   }
   const today = localDate(ctx, ctx.now);
   const hour = localHour(ctx, ctx.now);
+  await closeDueElections(ctx);
   await smsDigestDue(ctx, today); // has its own day and hour, so it runs on every tick and dedupes itself
   if (hour < 8) return; // daily jobs run after 8 am church time
   const done = ctx.db.get('meta', 'automations:lastRun')?.value;
