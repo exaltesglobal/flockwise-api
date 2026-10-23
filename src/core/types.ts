@@ -389,6 +389,8 @@ export type Song = {
   licensedFrom?: string;
   /** Colours for the chord chart on screen, the musicians' view and PDFs. Empty = the app's defaults. */
   colours?: SongColours;
+  /** Part recordings for the choir: soprano, alto, tenor, bass, the melody or the whole song (see modules/practice.ts). */
+  parts?: SongPart[];
 };
 export type SongView = Song & { timesUsed: number; lastUsedAt: string | null };
 export type ServiceSummary = { event: AdminEvent; items: number; minutes: number; songs: string[]; theme: string; volunteers: { filled: number; needed: number } };
@@ -926,6 +928,8 @@ export type BandItem = {
   arrangement: string[];
   /** The song's chart colours, when the church set any. */
   colours?: SongColours;
+  /** Part recordings the choir can listen to. */
+  parts?: SongPart[];
 };
 /** What the stream does as the presenter moves through the plan. Lives in church settings; the browser on the media desk talks to OBS. */
 export type ObsSettings = {
@@ -1085,7 +1089,7 @@ export type CanvaDesign = { id: string; title: string; editUrl: string; viewUrl:
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
 /** Things Flockwise can tell people about on its own. The office picks the channels for each. */
-export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new';
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder';
 
 // ---------- Christmas carol rounds ----------
 
@@ -1352,6 +1356,7 @@ export type Collections = {
   feasts: Feast;
   rentalOffers: RentalOffer;
   rentals: Rental;
+  practices: Practice;
   rooms: Room;
   checkins: Checkin;
   teams: Team;
@@ -1395,7 +1400,7 @@ export const KINDS = [
   'funds', 'donations', 'pledges', 'plans', 'announcements', 'staff', 'rooms', 'checkins', 'teams', 'assignments', 'blockouts',
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
-  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals',
+  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals', 'practices',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
   'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
@@ -2261,3 +2266,35 @@ export type RentalsHub = {
 export type PublicRentalSpace = { id: string; name: string; kind: ResourceKind; capacity: number | null; description: string; blurb: string; terms: string; photoUrl: string | null; ratePerHour: number; minHours: number; deposit: number; currency: Currency };
 export type PublicRentals = { church: { name: string; phone: string; email: string }; spaces: PublicRentalSpace[] };
 export type PublicRental = { id: string; token: string; church: { name: string; phone: string; email: string }; resourceName: string; renterName: string; purpose: string; startsAt: string; endsAt: string; hours: number; amount: number; deposit: number; total: number; currency: Currency; status: RentalStatus; paidAt: string | null };
+
+// ---------- choir practice ----------
+
+export type SongPartName = 'soprano' | 'alto' | 'tenor' | 'bass' | 'melody' | 'harmony' | 'instrumental' | 'full';
+/** One recording of a song: a voice part on its own, or the whole thing. A link, or a file from the media library. */
+export type SongPart = { id: string; part: SongPartName; name: string; url: string; mediaId: string | null; addedBy: string; addedAt: string };
+export type PracticeSong = { id: string; title: string; author: string; key: string; parts: SongPart[] };
+/** One rehearsal of a team: who came and what was practised. */
+export type Practice = { id: string; teamId: string; at: string; minutes: number; eventId: string | null; songIds: string[]; presentIds: string[]; notes: string; recordedBy: string; createdAt: string; updatedAt: string };
+export type PracticeView = Practice & { teamName: string; eventTitle: string | null; songs: PracticeSong[]; present: number; roster: number };
+export type PracticeMember = { personId: string; name: string; positions: string[]; present: number; total: number; missedInARow: number; lastAt: string | null };
+export type Rehearsal = { eventId: string; eventTitle: string; at: string; notes: string; songs: PracticeSong[] };
+export type PracticesHub = {
+  teams: { id: string; name: string; color: string; roster: number }[];
+  teamId: string | null;
+  practices: PracticeView[];
+  /** The chosen team's roster with attendance over the practices shown. */
+  members: PracticeMember[];
+  nextRehearsal: Rehearsal | null;
+  parts: SongPartName[];
+  /** Songs in the library that have any part recording. */
+  songsWithParts: PracticeSong[];
+};
+export type MyPractice = {
+  teams: { id: string; name: string; myParts: string[]; isLeader: boolean; roster: { personId: string; name: string }[] }[];
+  nextRehearsal: Rehearsal | null;
+  /** Songs with part recordings, the next service's first. */
+  songs: PracticeSong[];
+  attendance: { present: number; total: number; lastAt: string | null };
+  recent: { id: string; at: string; teamName: string; wasPresent: boolean; songs: string[]; presentIds: string[] }[];
+  parts: SongPartName[];
+};

@@ -868,3 +868,22 @@ Public, no sign-in (`/rent` on the web):
 | POST | `/public/rentals/:token/cancel` | Renter withdraws an open request; the booking is cancelled and the office told |
 
 Statuses: `requested → awaiting_payment → paid → refunded`, or `declined` / `cancelled`. Notification kind `rental.new` (email + push to staff with `events`). Web: office page `/admin/rentals` "Hall hire" (requests, side panel with approve/decline/paid offline/refund/notes and the copyable pay link; "Spaces for hire" tab for rates); public `/rent`, `/rent/pay/:token`, `/rent/return`; the church page shows "Hire our hall" when a space is enabled.
+
+## Choir practice: attendance and part recordings (Thrive+)
+
+Module `core/modules/practice.ts`; collection `practices` (one per rehearsal of a team) and `Song.parts` (`SongPart[]`: `part` soprano|alto|tenor|bass|melody|harmony|instrumental|full, `name`, `url`, `mediaId`). The rehearsal time and notes come from the service plan (`Plan.rehearsalAt`, `rehearsalNotes`); the songs default to that plan's song items. Office routes need `services` or `volunteers`.
+
+| Method | Path | What |
+|---|---|---|
+| GET | `/admin/practices?teamId=` | `PracticesHub`: `teams`, the chosen `teamId` (defaults to the team whose name says worship/choir/music), `practices` (newest first, each with `songs`, `present`, `roster`), `members` (attendance over the last 12: `present`, `total`, `missedInARow`, `lastAt`, worst first), `nextRehearsal`, `parts`, `songsWithParts` |
+| POST | `/admin/practices` | `{teamId, at, minutes?, eventId?, songIds?, presentIds?, notes?}`. Ids outside the roster are dropped; `songIds` default to the event's plan |
+| PATCH | `/admin/practices/:id` | Any of the same fields |
+| DELETE | `/admin/practices/:id` | |
+| GET | `/admin/practices/attendance.csv?teamId=` | Singer × last 26 practices (raw CSV) |
+| POST | `/admin/songs/:id/parts` | `{part, url?, mediaId?, name?, replace?}` → `PracticeSong`. A link (Drive, YouTube, WhatsApp export) or a media-library file. 422 for an unknown part or no link |
+| DELETE | `/admin/songs/:id/parts/:partId` | |
+| GET | `/me/practice?teamId=` | `MyPractice`: my teams with `myParts`, `isLeader` and the `roster`; `nextRehearsal`; `songs` with parts (the next service's first); `attendance` over the last 12; `recent` |
+| POST | `/me/practice` | Team leader only (`team.leaderId` is me): `{teamId, at, eventId?, songIds?, presentIds, notes?}` from the Team app |
+| PATCH | `/me/practice/:id` | Team leader only |
+
+The musicians' view (`BandItem.parts`) carries the recordings of each song. The daily tick sends `practice.reminder` (push + WhatsApp by default) to the rehearsing teams the day before and the day of `rehearsalAt` (once per day, meta key `practice:<eventId>:<date>`), naming the songs and marking those with recordings ♪. Rehearsing teams are those with a practice recorded for the event, else teams whose name sounds like singing, else teams rostered for the event. The privacy export lists practices the member attended. Web: `/admin/practice` "Choir practice" (Practices, Attendance with CSV, Part recordings tabs; record modal with the roster as tick boxes), member `/app/practice` in six languages (audio players for direct audio links, otherwise a Listen button; leaders get "Mark who came"), and a Listen row in `/present/:eventId/band`.

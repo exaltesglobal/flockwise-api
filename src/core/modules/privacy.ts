@@ -59,6 +59,7 @@ export function personData(ctx: Ctx, p: Collections['people']) {
     registers: ctx.db.all('registers').filter((x) => x.personId === id || x.spouseId === id).map((x) => ({ register: x.kind, number: x.number, date: x.date })),
     whatsapp: ctx.db.all('botMessages').filter((m) => m.personId === id || (p.phone && normPhone(m.phone) === normPhone(p.phone))).map((m) => ({ at: m.at, message: m.text })),
     helpRequests: ctx.db.all('aidRequests').filter((a) => a.personId === id).map((a) => ({ at: a.requestedAt, kind: a.kind, asked: a.amount / 100, approved: a.approved === null ? null : a.approved / 100, status: a.status })),
+    practices: ctx.db.all('practices').filter((x) => x.presentIds.includes(id)).map((x) => ({ at: x.at, team: ctx.db.get('teams', x.teamId)?.name ?? x.teamId })),
     readingPlans: ctx.db.all('readingProgress').filter((r) => r.personId === id).map((r) => ({ plan: ctx.db.get('readingPlans', r.planId)?.name ?? r.planId, joinedAt: r.joinedAt, daysRead: r.done.length })),
 
     pastoralCare: ctx.db.all('care').filter((c) => c.personId === id && !c.confidential).map((c) => ({ title: c.title, status: c.status, openedAt: c.createdAt })),
