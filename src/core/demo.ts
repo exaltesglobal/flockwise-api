@@ -90,6 +90,13 @@ function demoHttp(req: HttpRequest): HttpResponse {
   if (u.startsWith('https://api.canva.com/rest/v1/oauth/token')) return reply(200, { access_token: 'demo-canva-access', refresh_token: 'demo-canva-refresh', expires_in: 14_400 });
   if (u.startsWith('https://api.canva.com/rest/v1/users/me/profile')) return reply(200, { display_name: 'Grace Church Media', team_name: 'Grace Community Church' });
   if (u.startsWith('https://api.canva.com/rest/v1/asset-uploads')) return reply(200, { job: { id: 'job_demo', status: 'success', asset: { id: 'asset_demo', name: 'Flockwise picture' } } });
+  if (u.startsWith('https://api.canva.com/rest/v1/exports')) return reply(200, { job: { id: 'export_demo', status: 'success', urls: ['https://export-download.canva.com/demo/design.png'] } });
+  if (u.startsWith('https://export-download.canva.com/')) return { status: 200, headers: { 'content-type': 'image/png' }, text: '', bytes: new Uint8Array([137, 80, 78, 71]) };
+  if (u.startsWith('https://storage.googleapis.com/upload/')) return reply(200, { name: 'uploaded' });
+  if (u.startsWith('https://api.canva.com/rest/v1/designs/') && req.method === 'GET') {
+    const id = u.split('/designs/')[1].split(/[?/]/)[0];
+    return reply(200, { design: { id, title: 'Harvest festival poster', urls: { edit_url: `https://www.canva.com/design/${id}/edit`, view_url: `https://www.canva.com/design/${id}/view` }, thumbnail: { url: `https://document-export.canva.com/${id}/thumbnail.png` } } });
+  }
   if (u.startsWith('https://api.canva.com/rest/v1/designs')) {
     const b = JSON.parse(typeof req.body === 'string' ? req.body : '{}') as { title?: string };
     const id = `DAF${Math.random().toString(36).slice(2, 10)}`;

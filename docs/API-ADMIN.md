@@ -1159,3 +1159,14 @@ Member app: `GET /me/vigils` → `{vigils: MyVigil[]}` (open vigils not yet over
 Reminders (`vigilReminders`, every tick): notification `vigil.reminder` 30 minutes before a prayer slot, 12 hours before a slot of 12 hours or more (fasting days), once per sign-up.
 
 Web: Care › Prayer vigils (`src/admin/pages/vigils.tsx`) and the member page `/app/vigils`.
+
+## Canva: bringing a finished design back
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| POST | `/admin/canva/designs/:id/refresh` (comms) | Reads the design from Canva (`design:meta:read`): fresh title, edit/view links and thumbnail |
+| POST | `/admin/canva/designs/:id/export` (comms) | `{format: png\|jpg\|pdf, folder?}` → `CanvaExportResult {design, media, urls}`. Canva exports it (`design:content:read`, job polled); with Cloud Storage connected each page is downloaded and stored in the media library (folder `events` for invitations, else `brand`); otherwise `urls` are Canva's download links (24 hours). The design keeps `lastExport {format, urls, expiresAt, mediaIds, createdAt, by}` |
+
+`HttpRequest.binary: true` makes the server's HTTP hook return the body as `bytes` (used for these downloads).
+
+Web: Settings › Integrations › Canva lists the designs with Edit and **Save to Flockwise** (PNG, JPG or PDF).

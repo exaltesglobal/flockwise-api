@@ -131,8 +131,8 @@ export type Env = {
 /** One licensed lyrics service. `key` is sent as a bearer token. */
 export type LyricsFeed = { id: string; name: string; url: string; key: string; covers: 'all' | 'ccli' };
 
-export type HttpRequest = { method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; url: string; headers?: Record<string, string>; body?: string | Uint8Array; timeoutMs?: number };
-export type HttpResponse = { status: number; headers: Record<string, string>; text: string };
+export type HttpRequest = { method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; url: string; headers?: Record<string, string>; body?: string | Uint8Array; timeoutMs?: number; /** Read the answer as bytes (downloads). */ binary?: boolean };
+export type HttpResponse = { status: number; headers: Record<string, string>; text: string; bytes?: Uint8Array };
 export type GoogleKey = { clientEmail: string; privateKey: string; projectId: string };
 
 /** What a signed access token says. The engine re-reads the staff role from the database on each request. */

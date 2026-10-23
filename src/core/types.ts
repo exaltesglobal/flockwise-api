@@ -1329,7 +1329,11 @@ export type MediaItem = {
 export type MediaUpload = { item: MediaItem; uploadUrl: string; headers: Record<string, string> };
 export type MediaList = { data: MediaItem[]; gcs: GcsStatus };
 /** A Canva design Flockwise opened for the church. */
-export type CanvaDesign = { id: string; title: string; editUrl: string; viewUrl: string; thumbnailUrl: string | null; kind: string; createdAt: string };
+export type CanvaExportFormat = 'png' | 'jpg' | 'pdf';
+/** The last time a design was brought back from Canva: Canva's download links last 24 hours; saved copies stay in the media library. */
+export type CanvaExport = { format: CanvaExportFormat; urls: string[]; expiresAt: string; mediaIds: string[]; createdAt: string; by: string };
+export type CanvaDesign = { id: string; title: string; editUrl: string; viewUrl: string; thumbnailUrl: string | null; kind: string; createdAt: string; updatedAt?: string; lastExport?: CanvaExport | null };
+export type CanvaExportResult = { design: CanvaDesign; media: MediaItem[]; urls: string[] };
 
 /** A phone that can receive push notifications, registered by the member app or the team app. */
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };

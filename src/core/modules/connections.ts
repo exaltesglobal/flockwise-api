@@ -3,7 +3,7 @@
 // with the brand kit applied). Credentials are sealed by the host; the demo has stand-ins.
 import type { Ctx, GoogleKey, HttpRequest, Router } from '../engine.js';
 import { ApiError } from '../errors.js';
-import type { CanvaConfig, CanvaDesign, CanvaStatus, ConnectionsStatus, GcsConfig, GcsStatus, MediaFolder, MediaItem, MediaList, MediaUpload, ZoomConfig, ZoomStatus } from '../types.js';
+import type { CanvaConfig, CanvaDesign, CanvaExportFormat, CanvaExportResult, CanvaStatus, ConnectionsStatus, GcsConfig, GcsStatus, MediaFolder, MediaItem, MediaList, MediaUpload, ZoomConfig, ZoomStatus } from '../types.js';
 import { MEDIA_FOLDERS } from '../types.js';
 import { churchId, eventView, find, requireFields, settings } from '../util.js';
 
@@ -348,5 +348,49 @@ export function registerConnections(r: Router) {
     ctx.db.put('canvaDesigns', rec);
     ctx.audit('created', 'design', rec.id, `Opened "${rec.title}" in Canva`);
     return rec;
+  });
+
+  /** Fresh title, links and thumbnail from Canva (the thumbnail link only lasts a few hours). */
+  r.post('/admin/canva/designs/:id/refresh', { perm: 'comms' }, async (ctx): Promise<CanvaDesign> => {
+    const rec = find(ctx, 'canvaDesigns', ctx.params[0], 'Design');
+    const d = (await canvaCall(ctx, { method: 'GET', path: `/designs/${encodeURIComponent(rec.id)}` }))?.design;
+    if (!d) throw new ApiError(502, 'canva_error', 'Canva did not return the design.');
+    return ctx.db.put('canvaDesigns', { ...rec, title: String(d.title ?? rec.title), editUrl: String(d.urls?.edit_url ?? rec.editUrl), viewUrl: String(d.urls?.view_url ?? rec.viewUrl), thumbnailUrl: d.thumbnail?.url ? String(d.thumbnail.url) : rec.thumbnailUrl, updatedAt: ctx.now.toISOString() });
+  });
+  /**
+   * Brings a finished design back: Canva exports it (PNG, JPG or PDF), and with Cloud Storage
+   * connected each page is copied into the media library; otherwise Canva's 24-hour links come back.
+   */
+  r.post('/admin/canva/designs/:id/export', { perm: 'comms' }, async (ctx): Promise<CanvaExportResult> => {
+    const rec = find(ctx, 'canvaDesigns', ctx.params[0], 'Design');
+    const format = (['png', 'jpg', 'pdf'].includes(String(ctx.body?.format)) ? ctx.body.format : 'png') as CanvaExportFormat;
+    const folder = (MEDIA_FOLDERS.some((f) => f.id === ctx.body?.folder) ? ctx.body.folder : rec.kind === 'invitation' ? 'events' : 'brand') as MediaFolder;
+    const started = await canvaCall(ctx, { method: 'POST', path: '/exports', body: { design_id: rec.id, format: format === 'jpg' ? { type: 'jpg', quality: 90 } : { type: format } } });
+    let j = started?.job;
+    for (let i = 0; i < 40 && j && j.status === 'in_progress'; i++) {
+      await new Promise((res) => setTimeout(res, ctx.env.demo ? 0 : 1500));
+      j = (await canvaCall(ctx, { method: 'GET', path: `/exports/${encodeURIComponent(j.id)}` }))?.job;
+    }
+    if (!j || j.status !== 'success' || !Array.isArray(j.urls) || !j.urls.length) throw new ApiError(502, 'canva_error', `Canva could not export the design${j?.error?.message ? `: ${j.error.message}` : j?.status === 'in_progress' ? ': it is taking too long, please try again' : ''}.`);
+    const urls = (j.urls as unknown[]).map(String).slice(0, 30);
+    const media: MediaItem[] = [];
+    const c = gcsConfig(ctx);
+    if (c && ctx.env.google) {
+      const token = await ctx.env.google.accessToken(keyOf(ctx, c), 'https://www.googleapis.com/auth/devstorage.read_write');
+      const contentType = format === 'pdf' ? 'application/pdf' : format === 'jpg' ? 'image/jpeg' : 'image/png';
+      for (const [i, url] of urls.entries()) {
+        const file = await needHttp(ctx)({ method: 'GET', url, binary: true, timeoutMs: 60_000 });
+        if (file.status >= 300 || !file.bytes) throw new ApiError(502, 'canva_error', 'Could not download the export from Canva. Please try again.');
+        const id = ctx.id('md');
+        const name = `${rec.title}${urls.length > 1 ? ` (page ${i + 1})` : ''}.${format}`;
+        const object = `${churchId(ctx)}/${folder}/${ctx.now.toISOString().slice(0, 7)}/${id}-${safeName(name)}`;
+        const up = await needHttp(ctx)({ method: 'POST', url: `https://storage.googleapis.com/upload/storage/v1/b/${encodeURIComponent(c.bucket)}/o?uploadType=media&name=${encodeURIComponent(object)}`, headers: { Authorization: `Bearer ${token}`, 'Content-Type': contentType }, body: file.bytes, timeoutMs: 60_000 });
+        if (up.status >= 300) throw new ApiError(502, 'storage_error', `Cloud Storage refused the file: ${apiMessage(json(up), `answered ${up.status}`)}.`);
+        media.push(ctx.db.put('media', { id, name, contentType, size: file.bytes.length, folder, object, url: publicUrl(c.bucket, object), status: 'ready', uploadedBy: ctx.staff?.name ?? '', createdAt: ctx.now.toISOString() }));
+      }
+    }
+    const design = ctx.db.put('canvaDesigns', { ...rec, updatedAt: ctx.now.toISOString(), lastExport: { format, urls, expiresAt: new Date(ctx.now.getTime() + 24 * 3600_000).toISOString(), mediaIds: media.map((m) => m.id), createdAt: ctx.now.toISOString(), by: ctx.staff?.name ?? '' } });
+    ctx.audit('exported', 'design', rec.id, `Saved "${rec.title}" from Canva as ${format.toUpperCase()}${media.length ? ' to the media library' : ''}`);
+    return { design, media: await mediaView(ctx, c, media), urls };
   });
 }

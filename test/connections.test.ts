@@ -40,6 +40,11 @@ server.hooks.http = async (req) => {
   if (u.endsWith('/users/me/profile')) return reply(200, { display_name: 'Anna', team_name: 'First Church' });
   if (u.endsWith('/asset-uploads')) return reply(200, { job: { id: 'j1', status: 'in_progress' } });
   if (u.endsWith('/asset-uploads/j1')) return reply(200, { job: { id: 'j1', status: 'success', asset: { id: 'asset1' } } });
+  if (u.endsWith('/designs/DAF1') && req.method === 'GET') return reply(200, { design: { id: 'DAF1', title: 'Christmas card final', urls: { edit_url: 'https://www.canva.com/design/DAF1/edit', view_url: 'https://www.canva.com/design/DAF1/view' }, thumbnail: { url: 'https://document-export.canva.com/thumb.png' } } });
+  if (u.endsWith('/exports')) return reply(200, { job: { id: 'e1', status: 'in_progress' } });
+  if (u.endsWith('/exports/e1')) return reply(200, { job: { id: 'e1', status: 'success', urls: ['https://export-download.canva.com/p1.png', 'https://export-download.canva.com/p2.png'] } });
+  if (u.startsWith('https://export-download.canva.com/')) return { status: 200, headers: {}, text: '', bytes: new Uint8Array([137, 80, 78, 71, 1, 2]) };
+  if (u.startsWith('https://storage.googleapis.com/upload/storage/v1/b/first-media/o?')) return reply(200, { name: 'ok' });
   if (u.endsWith('/designs')) return reply(200, { design: { id: 'DAF1', title: 'Christmas card', urls: { edit_url: 'https://www.canva.com/design/DAF1/edit', view_url: 'https://www.canva.com/design/DAF1/view' } } });
   return reply(404, { message: `no stub for ${u}` });
 };
@@ -167,6 +172,22 @@ test('Canva: the office is sent to Canva, comes back connected, and opens a desi
   const make = calls.find((c) => c.url.endsWith('/designs'))!;
   assert.deepEqual(JSON.parse(make.body as string), { design_type: { type: 'custom', width: 1080, height: 1350 }, title: 'Christmas card', asset_id: 'asset1' });
   assert.equal((await ok(await req('GET', '/v1/admin/canva/designs', undefined, owner))).length, 1);
+  // Bring it back: fresh title and thumbnail, then a two-page PNG export copied into the media library.
+  const fresh = await ok(await req('POST', '/v1/admin/canva/designs/DAF1/refresh', {}, owner));
+  assert.equal(fresh.title, 'Christmas card final');
+  assert.equal(fresh.thumbnailUrl, 'https://document-export.canva.com/thumb.png');
+  const ex = await ok(await req('POST', '/v1/admin/canva/designs/DAF1/export', { format: 'png' }, owner));
+  assert.deepEqual(JSON.parse(calls.find((c) => c.url.endsWith('/exports'))!.body as string), { design_id: 'DAF1', format: { type: 'png' } });
+  assert.ok(calls.find((c) => c.url.startsWith('https://export-download.canva.com/'))!.binary);
+  assert.equal(ex.urls.length, 2);
+  assert.equal(ex.media.length, 2);
+  assert.equal(ex.media[0].folder, 'events');
+  assert.equal(ex.media[1].name, 'Christmas card final (page 2).png');
+  const put = calls.find((c) => c.url.startsWith('https://storage.googleapis.com/upload/'))!;
+  assert.equal(put.headers?.['Content-Type'], 'image/png');
+  assert.ok(put.body instanceof Uint8Array);
+  assert.equal(ex.design.lastExport.mediaIds.length, 2);
+  assert.equal((await ok(await req('GET', '/v1/admin/media?folder=events', undefined, owner))).data.length, 2);
   const off = await ok(await req('DELETE', '/v1/admin/integrations/canva', undefined, owner));
   assert.equal(off.connected, false);
 });

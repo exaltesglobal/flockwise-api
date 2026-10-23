@@ -197,6 +197,7 @@ async function httpRequest(req: HttpRequest): Promise<HttpResponse> {
   const res = await fetch(req.url, { method: req.method, headers: req.headers, body: req.body as BodyInit | undefined, signal: AbortSignal.timeout(req.timeoutMs ?? 20_000) });
   const headers: Record<string, string> = {};
   res.headers.forEach((v, k) => (headers[k] = v));
+  if (req.binary) return { status: res.status, headers, text: '', bytes: new Uint8Array(await res.arrayBuffer()) };
   return { status: res.status, headers, text: await res.text() };
 }
 
