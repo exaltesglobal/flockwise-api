@@ -1118,3 +1118,24 @@ Records that people who work with children are cleared: police verification, chi
 Rota: `GET /admin/volunteers/schedule/:eventId/available` gives a reason "Not cleared to work with children (…)" for uncleared members of a safeguarded team; with `blockRota` they are unavailable and `POST /admin/volunteers/assignments` answers 409 `not_cleared` (force does not override it).
 
 Web: People › Safeguarding (`src/admin/pages/safeguarding.tsx`): counts, filter, a row per person with a chip per required check, a record dialog, and the rules card.
+
+## Classes and courses (People › Courses)
+
+Baptism class, membership class, pre-marital counselling, Alpha, or any course of your own: sessions, a roster, attendance per session, and completion once a person has come to enough sessions. Module `core/modules/courses.ts`, collections `courses` (`Course {id, name, template, description, leaderName, location, sessions: CourseSession[] {id, title, date|null}, minAttendance, openToEnroll, capacity|null, completeTag|null, status open|finished}`) and `courseEnrollments` (`CourseEnrollment {courseId, personId, attended: sessionId[], status enrolled|completed|dropped, completedAt, via office|app}`). Grow+.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/admin/courses` (people.view) | `CoursesHub {courses: CourseView[] (+enrolled, completed, nextSession), templates [{id, name, sessions, minAttendance}]}`; open courses first |
+| POST | `/admin/courses` (people.edit) | `{template: baptism\|membership\|premarital\|alpha\|custom, name?, description?, leaderName?, location?, sessions?, minAttendance?, openToEnroll?, capacity?, completeTag?}` → `CourseDetail`; a template fills the name, description, sessions, minimum and tag; a custom course needs a name and at least one session |
+| GET | `/admin/courses/:id` | `CourseDetail` (+roster: enrolments with name and phone) |
+| PATCH | `/admin/courses/:id` | Any course field, `status: finished` to close it; sessions keep their ids when sent back; completion is re-checked |
+| POST | `/admin/courses/:id/enroll` | `{personIds}`; adding someone already in is harmless; 409 `full` past capacity |
+| POST | `/admin/courses/:id/attendance` | `{sessionId, present: personIds}`; everyone else on the roster is marked absent for that session |
+| POST | `/admin/courses/:id/enrollments/:eid/drop` | |
+| POST | `/admin/courses/:id/enrollments/:eid/complete` | Marks every session attended (make-up sessions) |
+
+Completion: attended ≥ `minAttendance` sessions completes the enrolment, adds `completeTag` to the person's tags (once) and writes an audit line; dropping below the bar again moves them back to enrolled (the tag stays).
+
+Member app: `GET /me/courses` → `{courses: MyCourse[]}` (courses the member is in, plus open ones taking sign-ups, with `full` and `mine {status, attended}`); `POST /me/courses/:id/enroll` (409 `closed` when sign-up is off or the course is finished, 409 `full`); `DELETE /me/courses/:id` leaves a course they have not completed.
+
+Web: People › Courses (`src/admin/pages/courses.tsx`) and the member page `/app/courses`.

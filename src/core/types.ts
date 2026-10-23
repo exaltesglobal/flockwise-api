@@ -293,6 +293,34 @@ export type OfferingQrHub = {
   codes: OfferingQrView[];
   funds: { id: string; name: string }[];
 };
+// ----- classes and courses: baptism class, membership class, pre-marital, Alpha -----
+export type CourseTemplate = 'baptism' | 'membership' | 'premarital' | 'alpha' | 'custom';
+export type CourseSession = { id: string; title: string; date: string | null };
+export type Course = {
+  id: string;
+  name: string;
+  template: CourseTemplate;
+  description: string;
+  leaderName: string;
+  location: string;
+  sessions: CourseSession[];
+  /** Sessions a person must attend to complete. */
+  minAttendance: number;
+  /** Members can sign up from the app. */
+  openToEnroll: boolean;
+  capacity: number | null;
+  /** Tag added to the person when they complete (e.g. "Baptism class done"). */
+  completeTag: string | null;
+  status: 'open' | 'finished';
+  createdAt: string;
+};
+export type CourseEnrollment = { id: string; courseId: string; personId: string; enrolledAt: string; attended: string[]; status: 'enrolled' | 'completed' | 'dropped'; completedAt: string | null; via: 'office' | 'app' };
+export type CourseView = Course & { enrolled: number; completed: number; nextSession: CourseSession | null };
+export type CourseRosterRow = CourseEnrollment & { name: string; phone: string | null };
+export type CourseDetail = CourseView & { roster: CourseRosterRow[] };
+export type CoursesHub = { courses: CourseView[]; templates: { id: CourseTemplate; name: string; sessions: number; minAttendance: number }[] };
+export type MyCourse = { id: string; name: string; description: string; leaderName: string; location: string; sessions: CourseSession[]; minAttendance: number; full: boolean; mine: { status: CourseEnrollment['status']; attended: number } | null };
+
 // ----- safeguarding: police verification, training and declarations for people who work with children -----
 export type SafeguardKind = 'police' | 'training' | 'declaration' | 'reference';
 export type SafeguardCheck = { id: string; kind: SafeguardKind; issuedOn: string; expiresOn: string | null; reference: string | null; note: string | null; recordedBy: string; recordedAt: string };
@@ -1549,6 +1577,8 @@ export type Collections = {
   bankStatements: BankStatement;
   bankLines: BankLine;
   safeguarding: SafeguardRecord;
+  courses: Course;
+  courseEnrollments: CourseEnrollment;
   captions: CaptionsLog;
   ballots: Ballot;
   ballotStubs: BallotStub;
@@ -1646,7 +1676,7 @@ export const KINDS = [
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals', 'practices',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
-  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes', 'bankStatements', 'bankLines', 'safeguarding',
+  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes', 'bankStatements', 'bankLines', 'safeguarding', 'courses', 'courseEnrollments',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
   'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns', 'calendarFeeds',
 ] as const satisfies readonly Kind[];
