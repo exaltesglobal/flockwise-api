@@ -1189,3 +1189,22 @@ Due date = last meeting (or start) + `everyDays`; overdue after 3 more days. Dai
 Member app: `GET /me/mentoring` → `MyMentoring {mentees (with recent topics), mentors}`; `POST /me/mentoring/:id/meetings` `{date?, topic?, note?}` (mentor only, active pairs).
 
 Web: Care › Discipleship (`src/admin/pages/discipleship.tsx`) and the member page `/app/mentoring`.
+
+## Church library (People › Library)
+
+Books in the church office that members can borrow. Module `core/modules/library.ts`, collections `libraryBooks` (`{title, author, language, category, copies, isbn, note}`) and `libraryLoans` (`{bookId, personId, status requested|out|returned|cancelled, requestedAt, borrowedOn, dueOn, returnedOn, remindedFor, via}`); lending period in meta `library:loanDays` (default 21). Grow+.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/admin/library` (people.view) | `LibraryHub {books (+out, available, requested, timesBorrowed), loans (out, overdue first), requests, settings {loanDays}, counts, categories}` |
+| PATCH | `/admin/library/settings` (people.edit) | `{loanDays}` 1–120 |
+| POST | `/admin/library/books` | One book, or `{books: [...]}` (up to 500) |
+| PATCH / DELETE | `/admin/library/books/:id` | Delete refuses (409) while a copy is out |
+| POST | `/admin/library/loans` | `{bookId, personId}`: hand a book over (takes up their request if any); 409 when no copy is free |
+| POST | `/admin/library/loans/:id/issue\|ready\|return\|renew\|cancel` | issue a request; ready = tell the member it is waiting at the office; renew from the due date (or today if overdue) |
+
+Member app: `GET /me/library` → `MyLibrary {books (available, mine), loans, loanDays}`; `POST /me/library/:bookId/request` (keepers with people.edit get `library.request`; up to 5 at a time); `DELETE /me/library/:bookId/request`.
+
+Reminders: daily `libraryReminders` sends `library.due` the day before the due date and once when overdue.
+
+Web: People › Library (`src/admin/pages/library.tsx`) and the member page `/app/library`.

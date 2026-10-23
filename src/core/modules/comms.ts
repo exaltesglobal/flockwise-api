@@ -13,6 +13,7 @@ import { assetReminders } from './assets.js';
 import { readingReminders } from './reading.js';
 import { vigilReminders } from './vigils.js';
 import { mentorNudges } from './discipleship.js';
+import { libraryReminders } from './library.js';
 import { practiceReminders } from './practice.js';
 import { verseReminders } from './verses.js';
 import { videoGreetingsDue } from './video-greetings.js';
@@ -208,6 +209,7 @@ export async function runDue(ctx: Ctx) {
   await assetReminders(ctx, today);
   await readingReminders(ctx, today);
   await mentorNudges(ctx);
+  await libraryReminders(ctx, today);
   await practiceReminders(ctx, today);
   await verseReminders(ctx, today);
   await videoGreetingsDue(ctx);
