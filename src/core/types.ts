@@ -887,9 +887,9 @@ export type Celebration = {
   greeted: boolean;
   wishes: number;
 };
-export type Greeting = { id: string; personId: string; kind: CelebrationKind; year: number; fromId: string | null; fromName: string; message: string; channel: Channel | 'wall'; at: string };
+export type Greeting = { id: string; personId: string; kind: CelebrationKind; year: number; fromId: string | null; fromName: string; message: string; channel: Channel | 'wall' | 'video'; at: string };
 export type MemberCelebration = { personId: string; name: string; kind: CelebrationKind; date: string; daysAway: number; isMe: boolean; wishedByMe: boolean; wishes: number };
-export type MemberCelebrations = { upcoming: MemberCelebration[]; myWishes: { kind: CelebrationKind; fromName: string; message: string; at: string }[] };
+export type MemberCelebrations = { upcoming: MemberCelebration[]; myWishes: { kind: CelebrationKind; fromName: string; message: string; at: string }[]; /** The pastor's video greeting for me (or my child) this week, if one was sent. */ videoGreetings: { token: string; firstName: string; kind: CelebrationKind; fromName: string; forMe: boolean }[] };
 
 // ---------- presentation ----------
 
@@ -1119,7 +1119,7 @@ export type CanvaDesign = { id: string; title: string; editUrl: string; viewUrl:
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
 /** Things Flockwise can tell people about on its own. The office picks the channels for each. */
-export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder' | 'verse.week' | 'election.open' | 'election.result' | 'recap.ready';
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder' | 'verse.week' | 'election.open' | 'election.result' | 'recap.ready' | 'greeting.video';
 
 // ---------- Christmas carol rounds ----------
 
@@ -1362,6 +1362,8 @@ export type Collections = {
   verseGames: VerseGame;
   elections: Election;
   recaps: Recap;
+  videoGreetings: VideoGreeting;
+  greetingLinks: GreetingLink;
   ballots: Ballot;
   ballotStubs: BallotStub;
   missionaries: Missionary;
@@ -1449,7 +1451,7 @@ export const KINDS = [
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals', 'practices',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
-  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps',
+  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
   'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns', 'calendarFeeds',
 ] as const satisfies readonly Kind[];
@@ -1912,6 +1914,56 @@ export type ElectionResultRow = { candidateId: string; name: string; note: strin
 export type ElectionResults = { rows: ElectionResultRow[]; ballots: number; invalid: number; tie: boolean; passed: boolean | null };
 export type ElectionTurnout = { eligible: number; app: number; paper: number; voted: number; percent: number };
 export type ElectionView = Election & { turnout: ElectionTurnout; results: ElectionResults | null };
+
+// ---------- Pastor's video greeting: recorded once, sent personalised on every birthday ----------
+
+export type VideoGreetingKind = 'birthday' | 'child' | 'anniversary';
+/** One recording per kind. The link each person gets wraps it with their own name and a reply box. */
+export type VideoGreeting = {
+  id: VideoGreetingKind;
+  enabled: boolean;
+  /** A file in the media library, a YouTube link, or any video URL. */
+  videoUrl: string;
+  mediaId: string | null;
+  posterUrl: string | null;
+  /** "Pastor Samuel Raj" */
+  fromName: string;
+  /** A line under the video. {{firstName}} is filled in. */
+  message: string;
+  recordedAt: string | null;
+  updatedBy: string;
+};
+/** One person's personalised greeting link. The token is the id, so it is not guessable. */
+export type GreetingLink = {
+  id: string;
+  personId: string;
+  kind: CelebrationKind;
+  videoKind: VideoGreetingKind;
+  year: number;
+  /** Who was told: the person, or the parents of a child. */
+  sentTo: string[];
+  createdAt: string;
+  views: number;
+  watchedAt: string | null;
+  reply: string | null;
+  repliedAt: string | null;
+  test: boolean;
+};
+export type GreetingLinkView = GreetingLink & { name: string; url: string };
+export type VideoGreetingView = VideoGreeting & { sentThisYear: number; watched: number; replies: number; /** Celebrations of this kind in the next 7 days. */ upcoming: number };
+export type VideoGreetingsHub = { greetings: VideoGreetingView[]; recent: GreetingLinkView[]; /** Whether recordings can be stored (Google Cloud Storage connected). */ storage: boolean; webUrl: string };
+/** What the greeting page shows. No contact details, no other people. */
+export type PublicGreeting = {
+  firstName: string;
+  kind: CelebrationKind;
+  years: number | null;
+  videoUrl: string;
+  posterUrl: string | null;
+  fromName: string;
+  message: string;
+  reply: string | null;
+  church: { name: string; logoUrl: string | null; brand: BrandKit | null };
+};
 
 // ---------- "Sunday in 60 seconds": AI recap card and reel ----------
 

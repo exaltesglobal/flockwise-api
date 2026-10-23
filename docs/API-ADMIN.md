@@ -985,3 +985,21 @@ After the service, one button writes the week up: the facts come from the record
 | GET | `/public/recaps/:id` (public) | The same, for the share page |
 
 Web: office Sundays & events › "Sunday in 60 seconds" (pick the Sunday, language and whether to include giving, see the facts, write, edit the headline, caption and slides with a live card and slide preview, copy the caption, download the card and slide PNGs, record the reel, publish); member `/app/recap` (home quick link, six languages) and the story player `/app/recap/:id` (progress bars, ten seconds a slide, tap to move, pause, share, save the card); public `/r/:id`. Demo: last Sunday's recap `rc_1` is already published.
+
+## Pastor's video greeting, recorded once, personalised per birthday (Thrive+)
+
+The pastor records one short greeting per kind (adults' birthdays, children's birthdays, wedding anniversaries), in the browser with the camera and mic (stored in the church's own Google Cloud Storage bucket through the media library) or as a link (an unlisted YouTube video or any video URL). From then on, the morning tick gives everyone celebrating that day a personal link `/g/<token>`: a page in the church's colours with their first name, the recording, a line from the pastor (`{{firstName}}` filled in) and a box to write back. A child's link goes to the adults in the household. The send is recorded as a greeting (channel `video`), so the Celebrations page shows them as greeted and the plain birthday automation still runs alongside. Never twice in a year per person and kind. Lives in `core/modules/video-greetings.ts`; collections `videoGreetings` (one per kind) and `greetingLinks` (the token is the id, 12 random characters).
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/admin/video-greetings` (comms) | `VideoGreetingsHub`: the three greetings with `enabled`, `videoUrl`, `fromName`, `message`, `sentThisYear`, `watched`, `replies`, `upcoming` (next 7 days); the 30 most recent links with name, URL, views, reply; `storage` (bucket connected) |
+| PUT | `/admin/video-greetings/:kind` | `{videoUrl? \| mediaId?, posterUrl?, fromName?, message?, enabled?}`; 422 when switching on without a video or with a link that is not a URL |
+| DELETE | `/admin/video-greetings/:kind` | Removes the recording and switches it off |
+| POST | `/admin/video-greetings/:kind/test` | `{personId?}` sends a test link to the staff member's own person record (or the person given); test links are not counted |
+| GET | `/admin/video-greetings/links` | Up to 200 links, newest first |
+| GET | `/public/greetings/:token` (public) | `PublicGreeting`: first name, kind, years, video, poster, from, message, reply, church name/logo/brand. Nothing else about the person |
+| POST | `/public/greetings/:token/watched` | Counts a view and sets `watchedAt` the first time |
+| POST | `/public/greetings/:token/reply` | `{message}` up to 500 characters, within 60 days; shown to the office on the hub |
+| GET | `/celebrations` | Now also returns `videoGreetings[]` (token, first name, kind, from, `forMe`) for the member and their household this week, so the app's home can show "watch it" |
+
+Notification kind `greeting.video` (email, push and WhatsApp by default): "Happy birthday, Priya!" with the personal link; "A birthday greeting for Joel" to the parents. Web: office People › "Video greetings" (record with review and a 60-second cap, or paste a link; from, message, on/off; send yourself a test; who was sent, watched, wrote back); public `/g/:token`; member home card with the link.

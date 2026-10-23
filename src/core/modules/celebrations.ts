@@ -139,7 +139,12 @@ export function registerCelebrations(r: Router) {
       .filter((g) => g.personId === me.id && g.channel === 'wall' && g.at >= weekAgo)
       .sort((x, y) => y.at.localeCompare(x.at))
       .map((g) => ({ kind: g.kind, fromName: g.fromName, message: g.message, at: g.at }));
-    return { upcoming, myWishes };
+    const household = new Set(ctx.db.all('people').filter((p) => me.householdName && p.householdName === me.householdName).map((p) => p.id));
+    const videoGreetings = ctx.db.all('greetingLinks')
+      .filter((l) => !l.test && l.createdAt >= weekAgo && (l.personId === me.id || l.sentTo.includes(me.id) || household.has(l.personId)))
+      .sort((x, y) => y.createdAt.localeCompare(x.createdAt))
+      .map((l) => { const p = ctx.db.get('people', l.personId); const v = ctx.db.get('videoGreetings', l.videoKind); return { token: l.id, firstName: p?.firstName ?? '', kind: l.kind, fromName: v?.fromName ?? '', forMe: l.personId === me.id }; });
+    return { upcoming, myWishes, videoGreetings };
   });
 
   r.post('/celebrations/:personId/wish', {}, (ctx) => {
