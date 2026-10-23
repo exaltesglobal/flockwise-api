@@ -59,6 +59,8 @@ export function personData(ctx: Ctx, p: Collections['people']) {
     registers: ctx.db.all('registers').filter((x) => x.personId === id || x.spouseId === id).map((x) => ({ register: x.kind, number: x.number, date: x.date })),
     whatsapp: ctx.db.all('botMessages').filter((m) => m.personId === id || (p.phone && normPhone(m.phone) === normPhone(p.phone))).map((m) => ({ at: m.at, message: m.text })),
     helpRequests: ctx.db.all('aidRequests').filter((a) => a.personId === id).map((a) => ({ at: a.requestedAt, kind: a.kind, asked: a.amount / 100, approved: a.approved === null ? null : a.approved / 100, status: a.status })),
+    readingPlans: ctx.db.all('readingProgress').filter((r) => r.personId === id).map((r) => ({ plan: ctx.db.get('readingPlans', r.planId)?.name ?? r.planId, joinedAt: r.joinedAt, daysRead: r.done.length })),
+
     pastoralCare: ctx.db.all('care').filter((c) => c.personId === id && !c.confidential).map((c) => ({ title: c.title, status: c.status, openedAt: c.createdAt })),
   };
 }
@@ -68,7 +70,7 @@ export function personData(ctx: Ctx, p: Collections['people']) {
 export function erasePerson(ctx: Ctx, p: Collections['people']) {
   const id = p.id;
   removePerson(ctx, id);
-  for (const kind of ['checkins', 'consentLog', 'formResponses', 'prayer'] as const) for (const x of ctx.db.all(kind)) if (x.personId === id) ctx.db.del(kind, x.id);
+  for (const kind of ['checkins', 'consentLog', 'formResponses', 'prayer', 'readingProgress'] as const) for (const x of ctx.db.all(kind)) if (x.personId === id) ctx.db.del(kind, x.id);
   for (const c of ctx.db.all('care')) if (c.personId === id) ctx.db.put('care', { ...c, personId: null, personName: 'Erased person', notes: [] });
   for (const d of ctx.db.all('donations')) if (d.donorId === id) ctx.db.put('donations', { ...d, donorId: null, donorEmail: null, donorPhone: null });
   for (const g of ctx.db.all('recurring')) if (g.donorId === id) ctx.db.put('recurring', { ...g, donorId: `erased:${id}` });

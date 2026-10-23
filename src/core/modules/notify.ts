@@ -25,6 +25,7 @@ export const CATALOG: Record<NotificationKind, Entry> = {
   'ride.update': { label: 'Sunday lift arranged or changed', description: 'A household is matched to a driver, a driver drops out, or the day-before reminder.', audience: 'The household and the driver', rule: { email: false, push: true, whatsapp: true } },
   'aid.new': { label: 'Request for help', description: 'A member asks the benevolence fund for help. Names and amounts stay on the Benevolence page.', audience: 'Pastors and care team', rule: { email: true, push: true, whatsapp: false } },
   'aid.update': { label: 'Help request decided or paid', description: 'The member is told when their request is approved, declined or paid.', audience: 'The member who asked', rule: { email: true, push: true, whatsapp: false } },
+  'reading.today': { label: 'Today’s Bible reading', description: 'Each morning, the day’s passage from a reading plan the member joined, in their language.', audience: 'Members who joined a reading plan', rule: { email: false, push: true, whatsapp: false } },
   'asset.due': { label: 'Asset service or AMC due', description: 'A week before an asset is due a service, and a month before an AMC or warranty ends.', audience: 'Staff who keep the asset register', rule: { email: true, push: true, whatsapp: false } },
   'task.assigned': { label: 'Task given', description: 'A task on the team hub is given to someone.', audience: 'The person it is given to', rule: { email: true, push: true, whatsapp: false } },
 };

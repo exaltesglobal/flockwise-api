@@ -1081,7 +1081,7 @@ export type CanvaDesign = { id: string; title: string; editUrl: string; viewUrl:
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
 /** Things Flockwise can tell people about on its own. The office picks the channels for each. */
-export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due';
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today';
 
 // ---------- Christmas carol rounds ----------
 
@@ -1343,6 +1343,8 @@ export type Collections = {
   rideOffers: RideOffer;
   aidRequests: AidRequest;
   assets: Asset;
+  readingPlans: ReadingPlan;
+  readingProgress: ReadingProgress;
   rooms: Room;
   checkins: Checkin;
   teams: Team;
@@ -1386,7 +1388,7 @@ export const KINDS = [
   'funds', 'donations', 'pledges', 'plans', 'announcements', 'staff', 'rooms', 'checkins', 'teams', 'assignments', 'blockouts',
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
-  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets',
+  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
   'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
@@ -2181,3 +2183,25 @@ export type Asset = {
 };
 export type AssetView = Asset & { nextServiceOn: string | null; serviceDueInDays: number | null; amcDueInDays: number | null; warrantyDueInDays: number | null };
 export type AssetsHub = { assets: AssetView[]; summary: { count: number; value: number; serviceDue: number; amcExpiring: number; needsRepair: number }; categories: AssetCategory[] };
+
+// ---- Bible reading plan ----
+export type ReadingTemplate = 'bible365' | 'nt90' | 'gospels30' | 'psalms31' | 'custom';
+export type ReadingPlan = {
+  id: string; name: string; description: string; template: ReadingTemplate;
+  /** First day of the plan, YYYY-MM-DD in church time. */
+  startsOn: string;
+  /** One entry per day, English references like "Genesis 1-3; Psalms 1". Shown to each member in their language. */
+  readings: string[];
+  status: 'active' | 'archived'; createdAt: string; createdBy: string;
+};
+export type ReadingProgress = { id: string; planId: string; personId: string; joinedAt: string; done: number[]; lastDoneAt: string | null };
+export type ReadingPlanView = ReadingPlan & { totalDays: number; endsOn: string; today: number | null; participants: number; readToday: number; percent: number };
+export type ReadingHub = { plans: ReadingPlanView[]; templates: { id: ReadingTemplate; name: string; days: number; description: string }[] };
+export type ReadingReader = { personId: string; name: string; joinedAt: string; doneCount: number; streak: number; todayDone: boolean };
+export type MyReadingPlan = {
+  id: string; name: string; description: string; startsOn: string; endsOn: string; totalDays: number; today: number | null;
+  readings: { day: number; on: string; ref: string; local: string }[];
+  joined: boolean; done: number[]; doneCount: number; streak: number; todayDone: boolean;
+  church: { participants: number; readToday: number; percent: number };
+};
+export type MyReading = { plans: MyReadingPlan[] };
