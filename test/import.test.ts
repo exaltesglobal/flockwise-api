@@ -38,8 +38,9 @@ test('Planning Center headings are matched and US dates read correctly', () => {
   assert.equal(m[3], ''); // Nickname: first name already taken
   assert.equal(m[5], 'birthDate');
   assert.equal(m[7], 'child');
-  assert.equal(m[8], 'status');
+  assert.equal(m[8], 'inactive'); // Status (active/inactive) loses to Membership and becomes the inactive flag
   assert.equal(m[9], 'inactive');
+  assert.equal(m[10], 'status');
   assert.equal(m[12], 'campus');
   assert.equal(m[13], 'householdName');
   assert.equal(m[14], 'householdRole');
@@ -110,6 +111,8 @@ test('an Elvanto export links the family, creates department groups and archives
   assert.equal(m[7], 'phone');
   assert.equal(m[2], ''); // Preferred Name loses to Firstname
   const fixed = m;
+  assert.equal(fixed[11], 'inactive'); // Elvanto Status: Active/Archived/Contact
+  assert.equal(fixed[12], 'status'); // Elvanto Category: Member/Visitor…
   assert.equal(fixed[13], 'householdKey');
   assert.equal(fixed[14], 'householdRole');
   assert.equal(fixed[15], 'campus');

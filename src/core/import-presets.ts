@@ -21,8 +21,8 @@ export const PEOPLE_TARGETS: TargetInfo<PeopleTarget>[] = [
   { value: 'fullName', label: 'Full name (split)', synonyms: ['name', 'full name', 'member name', 'naam', 'person', 'person name'] },
   { value: 'phone', label: 'Mobile', synonyms: ['mobile', 'phone', 'mobile number', 'mobile phone number', 'mobile phone', 'contact', 'contact number', 'whatsapp', 'cell', 'phone number', 'home phone number', 'home phone'] },
   { value: 'email', label: 'Email', synonyms: ['email', 'e-mail', 'email address', 'home email', 'primary email', 'work email'] },
-  { value: 'status', label: 'Status', synonyms: ['status', 'membership', 'member status', 'category', 'membership type', 'member type', 'type'] },
-  { value: 'inactive', label: 'Inactive flag (Yes/No)', synonyms: ['archived', 'deceased', 'inactive', 'inactive reason', 'inactive date', 'left'] },
+  { value: 'status', label: 'Status', synonyms: ['membership', 'member status', 'membership type', 'member type', 'category', 'status', 'type'] },
+  { value: 'inactive', label: 'Inactive flag (Yes/No)', synonyms: ['archived', 'deceased', 'inactive', 'inactive reason', 'inactive date', 'left', 'status'], hint: 'Yes, Archived, Inactive, Moved or Deceased marks the person inactive.' },
   { value: 'gender', label: 'Gender', synonyms: ['gender', 'sex'] },
   { value: 'birthDate', label: 'Birth date', synonyms: ['birthdate', 'birth date', 'date of birth', 'dob', 'birthday', 'born'] },
   { value: 'anniversary', label: 'Wedding anniversary', synonyms: ['anniversary', 'wedding anniversary', 'marriage date', 'wedding date'] },
@@ -73,35 +73,50 @@ const REPEATABLE = new Set(['addressPart', 'inactive', 'notes', 'tags', 'groups'
 /** Too generic to match inside a longer heading ("Nickname", "Household Name"). */
 const EXACT_ONLY = new Set(['name', 'first', 'last', 'cell', 'type', 'id', 'ref', 'rs', 'inr', 'head', 'how']);
 
-/** Lower is better: the synonym's position (exact match) or 100 + position (heading contains the synonym). */
-function rank<T extends string>(targets: TargetInfo<T>[], header: string): { target: T; score: number } | null {
+/** Every target a heading could mean, best first: the synonym's position (exact match) or 100 + position (heading contains the synonym). */
+function candidates<T extends string>(targets: TargetInfo<T>[], header: string): { target: T; score: number }[] {
   const h = norm(header);
-  if (!h) return null;
-  let best: { target: T; score: number } | null = null;
+  if (!h) return [];
+  const out: { target: T; score: number }[] = [];
   for (const t of targets) {
+    let best = -1;
     t.synonyms.forEach((syn, i) => {
       const score = syn === h ? i : syn.length > 3 && !EXACT_ONLY.has(syn) && h.includes(syn) ? 100 + i : -1;
-      if (score >= 0 && (!best || score < best.score)) best = { target: t.value, score };
+      if (score >= 0 && (best < 0 || score < best)) best = score;
     });
+    if (best >= 0) out.push({ target: t.value, score: best });
   }
-  return best;
+  return out.sort((a, b) => a.score - b.score);
 }
 
 /**
  * One guess per heading. A field that only makes sense once (first name, mobile, email…) goes to
- * the heading that names it best, so Elvanto's "Mobile" beats its "Phone" and Planning Center's
- * "Home Email" beats "Work Email"; the losers are left unmatched for the office to decide.
+ * the heading that names it best, so Elvanto's "Mobile" beats its "Phone", Planning Center's
+ * "Membership" (Member/Visitor) beats its "Status" (active/inactive) and "Home Email" beats
+ * "Work Email"; a loser takes its next meaning ("Status" becomes the inactive flag) or is left
+ * unmatched for the office to decide.
  */
 export function guessColumns(kind: ImportKind, headers: string[]): (PeopleTarget | GiftTarget)[] {
   const targets = (kind === 'people' ? PEOPLE_TARGETS : GIFT_TARGETS) as TargetInfo<string>[];
-  const ranked = headers.map((h) => rank(targets, h));
+  const ranked = headers.map((h) => candidates(targets, h));
   const winner = new Map<string, number>();
-  ranked.forEach((r, i) => {
-    if (!r || REPEATABLE.has(r.target)) return;
-    const have = winner.get(r.target);
-    if (have === undefined || ranked[have]!.score > r.score) winner.set(r.target, i);
+  ranked.forEach((cs, i) => {
+    const c = cs[0];
+    if (!c || REPEATABLE.has(c.target)) return;
+    const have = winner.get(c.target);
+    if (have === undefined || ranked[have]![0]!.score > c.score) winner.set(c.target, i);
   });
-  const out = ranked.map((r, i) => (!r ? '' : REPEATABLE.has(r.target) || winner.get(r.target) === i ? r.target : ''));
+  const out = ranked.map((cs, i) => {
+    for (const c of cs) {
+      if (REPEATABLE.has(c.target)) return c.target;
+      if (!winner.has(c.target)) {
+        winner.set(c.target, i);
+        return c.target;
+      }
+      if (winner.get(c.target) === i) return c.target;
+    }
+    return '';
+  });
   // "Full name" is pointless once first or last name is matched.
   if (out.includes('firstName') || out.includes('lastName')) return out.map((t) => (t === 'fullName' ? '' : t)) as (PeopleTarget | GiftTarget)[];
   return out as (PeopleTarget | GiftTarget)[];
@@ -234,7 +249,7 @@ export function rowsToPeople(source: ImportSource, mapping: (PeopleTarget | '')[
         case 'phone': p.phone ??= normalisePhone(raw); break;
         case 'email': p.email ??= raw.split(/[;,]/)[0]?.trim().toLowerCase(); break;
         case 'status': p.status = normaliseStatus(raw); break;
-        case 'inactive': if (yes(raw) || /moved|deceased|new church|\d{4}/.test(raw)) inactive = true; break;
+        case 'inactive': if (yes(raw) || /^(inactive|archived|moved|deceased|left|new church)|\d{4}/i.test(raw.trim())) inactive = true; break;
         case 'gender': p.gender = /^f/i.test(raw) ? 'female' : /^m/i.test(raw) ? 'male' : null; break;
         case 'birthDate': p.birthDate = normaliseDate(raw, source); break;
         case 'anniversary': p.anniversary = normaliseDate(raw, source); break;
