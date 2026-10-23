@@ -466,6 +466,23 @@ export function seedDemo(db: Db, env: Env) {
       [14, 'Daniel in the lions\' den', 'Daniel 6:10-23', 'My God sent his angel, and he shut the mouths of the lions. Daniel 6:22'],
     ];
     lessons.forEach(([d, title, scripture, memoryVerse], i) => db.put('ssLessons', { id: `ssl_${i + 1}`, classId: null, date: at(toSunday + d, 9).slice(0, 10), title, scripture, memoryVerse, notes: '' }));
+    // This week's memory verse game: about half of each class has started, a few are word perfect.
+    const taught = at(toSunday - 7, 9).slice(0, 10);
+    const verseText = 'Be kind and compassionate to one another, forgiving each other.';
+    for (const c of cls)
+      for (const pid of c.studentIds) {
+        // Priya's children: Joel has not started (so the demo can play), Anna has only read it.
+        const roll = pid === 'p_joel' ? 1 : pid === 'p_anna' ? 0.5 : rs();
+        if (roll > 0.55) continue;
+        const read = roll < 0.55, blanks = roll < 0.4, recite = roll < 0.22;
+        const when = (h: number) => at(toSunday - 6, h);
+        db.put('verseGames', {
+          id: `${pid}:ssl_1`, personId: pid, classId: c.id, lessonId: 'ssl_1', week: taught, verse: verseText, reference: 'Ephesians 4:32',
+          done: { read: read ? when(17) : null, blanks: blanks ? when(18) : null, recite: recite ? when(19) : null },
+          scores: { read: read ? 10 : 0, blanks: blanks ? 20 : 0, recite: recite ? (rs() < 0.6 ? 30 : 20) : 0 },
+          attempts: (read ? 1 : 0) + (blanks ? 1 : 0) + (recite ? 2 : 0), bestAccuracy: recite ? 90 + Math.floor(rs() * 10) : blanks ? null : null, updatedAt: when(19),
+        });
+      }
     db.put('ssExams', { id: 'sse_1', name: 'Half-yearly exam', date: at(-110, 0).slice(0, 10), maxMarks: 100, classIds: cls.map((c) => c.id), status: 'published', createdAt: at(-120, 10) });
     for (const c of cls) for (const pid of c.studentIds) db.put('ssMarks', { id: `sse_1:${pid}`, examId: 'sse_1', personId: pid, classId: c.id, marks: rs() < 0.08 ? null : Math.round(48 + rs() * 50) });
     db.put('ssExams', { id: 'sse_2', name: 'Annual exam', date: at(toSunday + 35, 0).slice(0, 10), maxMarks: 100, classIds: cls.map((c) => c.id), status: 'open', createdAt: at(-3, 10) });

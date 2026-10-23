@@ -18,7 +18,7 @@ const DEFAULT_CLASSES: [string, number, number][] = [
 ];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-const addDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * DAY).toISOString().slice(0, 10);
+export const addDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * DAY).toISOString().slice(0, 10);
 /** The most recent Sunday, or today when it is Sunday. */
 export function lastSunday(ctx: Ctx) {
   const today = localDate(ctx, ctx.now);
@@ -31,7 +31,7 @@ function person(ctx: Ctx, id: string): SsPerson | null {
   return p ? { id: p.id, name: fullName(p), age: age(p.birthDate, ctx.now) } : null;
 }
 const people = (ctx: Ctx, ids: string[]) => ids.map((id) => person(ctx, id)).filter((p): p is SsPerson => !!p).sort((a, b) => a.name.localeCompare(b.name));
-const classes = (ctx: Ctx) => ctx.db.all('ssClasses').sort((a, b) => a.order - b.order || a.minAge - b.minAge);
+export const classes = (ctx: Ctx) => ctx.db.all('ssClasses').sort((a, b) => a.order - b.order || a.minAge - b.minAge);
 const sessionsOf = (ctx: Ctx, classId: string) => ctx.db.all('ssAttendance').filter((a) => a.classId === classId).sort((a, b) => b.date.localeCompare(a.date));
 
 export function grade(percent: number): SsGrade {
@@ -73,7 +73,7 @@ function classDetail(ctx: Ctx, c: SsClass): SsClassDetail {
   };
 }
 
-function lessonFor(ctx: Ctx, classId: string | null, date: string) {
+export function lessonFor(ctx: Ctx, classId: string | null, date: string) {
   const all = ctx.db.all('ssLessons').filter((l) => l.date === date);
   return all.find((l) => l.classId === classId) ?? all.find((l) => l.classId === null) ?? null;
 }

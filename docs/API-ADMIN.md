@@ -914,3 +914,17 @@ One text a week for the members who are not on the app: the Sunday service time 
 - `POST /admin/messages/sms-digest/send` sends now to everyone due, one text per person in their language, and records one `messages` row (`source: 'automation'`, subject "Weekly digest").
 - The daily tick checks it on every run (not only the once-a-day 8 am block): on the chosen weekday once the hour has passed, once per day (`meta smsdigest:<date>`).
 - Web: Messages › Automations › "Weekly text in their own language" card with day/hour, audience, channel, office line, recipient count by language, a phone-width preview in any of the six languages with the segment count, and "Send now".
+
+## Kids' memory verse game with a class leaderboard (Grow+)
+
+The memory verse on a Sunday school lesson (`SsLesson.memoryVerse`, "verse text … Book 1:2") becomes a game in the parent's app for the week after it is taught. Three rounds, scored on the server: read it together (10), put the missing words back (20, every third long word is a gap with two distractor chips), say it from memory (30 at ≥90% of the words in order, 20 at ≥70%, typed or spoken through the browser's speech recognition). The teacher's "said the verse" tick in that Sunday's or the next Sunday's register adds 40. Stars: 1 at 10 points, 2 at 30, 3 at 60. Boards reset every Sunday. Lives in `core/modules/verses.ts`; collection `verseGames` (id `${personId}:${lessonId}`).
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/me/verses` | `MemberVerses`: the household's children who are in a class, each with this week's `VerseGameView` (`verse`, `reference`, `title`, `done`, `scores`, `recitedInClass`, `points`, `stars`, `nextLevel`, `puzzle {words, options}`), `rank`, `totalStars`, `weeksPlayed`; and the class `boards` (first name + initial, `mine`) |
+| POST | `/me/verses/:childId/answer` | `{level: 'read' \| 'blanks' \| 'recite', answers?: string[], text?: string}` → `VerseAnswerResult {ok, accuracy, earned, message, game}`. Rounds go in order (409 `order`), each once (409 `done`); 404 for a child outside your household |
+| GET | `/admin/sunday-school/verses?week=` (checkin) | `SsVerseBoards`: every class's board for the week with full names, the weeks that have play, and `stars` (the term's star table for annual day) |
+
+Notification kind `verse.week` (push only): Monday morning, parents of each enrolled child get the verse and a link to `/app/verses`, once per class per week. Privacy export includes `memoryVerses`.
+
+Web: member `/app/verses` (home quick link "Memory verse", six languages, child switcher, gap chips, mic button where the browser supports it, class board); office Sunday school › "Memory verse board" tab (week picker, per-class table, stars this term).

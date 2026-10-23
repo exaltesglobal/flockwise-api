@@ -1110,7 +1110,7 @@ export type CanvaDesign = { id: string; title: string; editUrl: string; viewUrl:
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
 /** Things Flockwise can tell people about on its own. The office picks the channels for each. */
-export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder';
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder' | 'verse.week';
 
 // ---------- Christmas carol rounds ----------
 
@@ -1344,6 +1344,7 @@ export type Collections = {
   ssAttendance: SsAttendance;
   ssExams: SsExam;
   ssMarks: SsMark;
+  verseGames: VerseGame;
   missionaries: Missionary;
   missionSupport: MissionSupport;
   missionReports: MissionReport;
@@ -1429,7 +1430,7 @@ export const KINDS = [
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals', 'practices',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
-  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks',
+  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
   'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns', 'calendarFeeds',
 ] as const satisfies readonly Kind[];
@@ -1804,6 +1805,55 @@ export type MemberSundaySchool = {
     results: { exam: string; date: string; marks: number | null; maxMarks: number; grade: SsGrade | null; rank: number | null }[];
   }[];
 };
+
+// ---------- kids' memory verse game ----------
+
+export type VerseLevel = 'read' | 'blanks' | 'recite';
+/** One child's play on one week's memory verse. id is `${personId}:${lessonId}`. */
+export type VerseGame = {
+  id: string;
+  personId: string;
+  classId: string;
+  lessonId: string;
+  /** The Sunday the verse was taught; the leaderboard week. */
+  week: string;
+  verse: string;
+  reference: string;
+  /** When each step was passed. */
+  done: Record<VerseLevel, string | null>;
+  scores: Record<VerseLevel, number>;
+  attempts: number;
+  /** Best recite accuracy in percent. */
+  bestAccuracy: number | null;
+  updatedAt: string;
+};
+/** The fill-the-blanks round: words with null where a word is missing, and the chips to pick from. */
+export type VersePuzzle = { words: (string | null)[]; options: string[] };
+export type VerseGameView = {
+  id: string;
+  lessonId: string;
+  week: string;
+  title: string;
+  verse: string;
+  reference: string;
+  done: Record<VerseLevel, string | null>;
+  scores: Record<VerseLevel, number>;
+  /** Teacher ticked "said the verse" in the register (40 points). */
+  recitedInClass: boolean;
+  points: number;
+  stars: number;
+  nextLevel: VerseLevel | null;
+  puzzle: VersePuzzle;
+  bestAccuracy: number | null;
+};
+export type VerseBoardRow = { id: string; name: string; points: number; stars: number; levels: VerseLevel[]; recitedInClass: boolean; mine: boolean };
+export type VerseBoard = { classId: string; className: string; week: string; verse: string; reference: string; players: number; of: number; rows: VerseBoardRow[] };
+export type MemberVerses = {
+  children: { id: string; name: string; classId: string; className: string; game: VerseGameView | null; rank: number | null; totalStars: number; weeksPlayed: number }[];
+  boards: VerseBoard[];
+};
+export type VerseAnswerResult = { ok: boolean; accuracy: number; earned: number; message: string; game: VerseGameView };
+export type SsVerseBoards = { week: string; weeks: string[]; boards: VerseBoard[]; stars: { id: string; name: string; className: string; stars: number; weeks: number }[] };
 
 // ---------- missions support ----------
 

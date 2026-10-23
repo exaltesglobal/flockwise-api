@@ -12,6 +12,7 @@ import { notify } from './notify.js';
 import { assetReminders } from './assets.js';
 import { readingReminders } from './reading.js';
 import { practiceReminders } from './practice.js';
+import { verseReminders } from './verses.js';
 import { smsDigestDue } from './sms-digest.js';
 import { rideReminders } from './rides.js';
 import { titheReminders } from './tithe.js';
@@ -201,6 +202,7 @@ export async function runDue(ctx: Ctx) {
   await assetReminders(ctx, today);
   await readingReminders(ctx, today);
   await practiceReminders(ctx, today);
+  await verseReminders(ctx, today);
   if (a.welcome.enabled) {
     const welcomed = new Set((ctx.db.get('meta', 'automations:welcomed')?.value ?? '').split(',').filter(Boolean));
     const fresh = people.filter((p) => p.status === 'visitor' && !welcomed.has(p.id) && ctx.now.getTime() - new Date(p.joinedAt).getTime() < 7 * DAY);
