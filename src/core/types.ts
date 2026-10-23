@@ -1079,7 +1079,7 @@ export type CanvaDesign = { id: string; title: string; editUrl: string; viewUrl:
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
 /** Things Flockwise can tell people about on its own. The office picks the channels for each. */
-export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder';
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update';
 
 // ---------- Christmas carol rounds ----------
 
@@ -1337,6 +1337,8 @@ export type Collections = {
   carolSeasons: CarolSeason;
   carolNights: CarolNight;
   carolRequests: CarolRequest;
+  rideRequests: RideRequest;
+  rideOffers: RideOffer;
   rooms: Room;
   checkins: Checkin;
   teams: Team;
@@ -1380,7 +1382,7 @@ export const KINDS = [
   'funds', 'donations', 'pledges', 'plans', 'announcements', 'staff', 'rooms', 'checkins', 'teams', 'assignments', 'blockouts',
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
-  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests',
+  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
   'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
@@ -2117,3 +2119,14 @@ export type SongLicenceStatus = {
 };
 /** Words for a copyrighted song from a licensed lyrics service. */
 export type LicensedLyrics = { lyrics: string; chordChart?: string; copyright?: string; defaultKey?: string; feedId: string; feedName: string };
+
+// ---------- Sunday transport matcher ----------
+
+/** A household that needs a lift to the Sunday service: one row per Sunday, or weekly from `date` on. */
+export type RideRequest = { id: string; date: string; weekly: boolean; personId: string; familyKey: string; familyName: string; phone: string | null; address: string | null; zoneId: string | null; people: number; note: string; offerId: string | null; status: 'waiting' | 'matched' | 'cancelled'; createdAt: string; createdBy: string };
+/** A member who can drive that Sunday (or every Sunday) with the seats they have spare. */
+export type RideOffer = { id: string; date: string; weekly: boolean; personId: string; driverName: string; phone: string | null; address: string | null; zoneId: string | null; seats: number; note: string; status: 'open' | 'cancelled'; createdAt: string; createdBy: string };
+export type RideRequestView = RideRequest & { zoneName: string | null; driver: { id: string; name: string; phone: string | null; address: string | null } | null };
+export type RideOfferView = RideOffer & { zoneName: string | null; seatsLeft: number; riders: { id: string; familyName: string; people: number; phone: string | null; address: string | null; zoneName: string | null; note: string }[] };
+export type RidesHub = { sunday: string; sundays: string[]; serviceTime: string | null; requests: RideRequestView[]; offers: RideOfferView[]; zones: { id: string; name: string }[]; waiting: number; matched: number; seatsLeft: number };
+export type MyRides = { sunday: string; sundays: string[]; serviceTime: string | null; request: RideRequestView | null; offer: RideOfferView | null };

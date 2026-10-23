@@ -22,6 +22,7 @@ export const CATALOG: Record<NotificationKind, Entry> = {
   'team.message': { label: 'Team hub mention or thread message', description: 'Someone is named with @ or gets a message in a small thread.', audience: 'The people named or in the thread', rule: { email: false, push: true, whatsapp: false } },
   'carol.visit': { label: 'Carol singers tomorrow', description: 'The night before the carol team comes, the home is told roughly when.', audience: 'Everyone in that household', rule: { email: true, push: true, whatsapp: true } },
   'tithe.reminder': { label: 'Salary-day tithe reminder', description: 'On the day a member picked as their salary day, a nudge to give; skipped while a monthly gift is active.', audience: 'Members who set a salary day in the app', rule: { email: false, push: true, whatsapp: true } },
+  'ride.update': { label: 'Sunday lift arranged or changed', description: 'A household is matched to a driver, a driver drops out, or the day-before reminder.', audience: 'The household and the driver', rule: { email: false, push: true, whatsapp: true } },
   'task.assigned': { label: 'Task given', description: 'A task on the team hub is given to someone.', audience: 'The person it is given to', rule: { email: true, push: true, whatsapp: false } },
 };
 export const KINDS = Object.keys(CATALOG) as NotificationKind[];
