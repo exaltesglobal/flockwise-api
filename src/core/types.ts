@@ -293,6 +293,43 @@ export type OfferingQrHub = {
   codes: OfferingQrView[];
   funds: { id: string; name: string }[];
 };
+// ----- bank reconciliation: statement lines against gifts, batch deposits and vouchers -----
+export type BankAccountId = 'main' | 'fcra';
+export type BankMatchKind = 'gift' | 'expense' | 'batch' | 'settlement' | 'charges' | 'interest' | 'ignored';
+export type BankStatement = { id: string; account: BankAccountId; bankName: string; from: string; to: string; lines: number; uploadedAt: string; uploadedBy: string };
+export type BankLine = {
+  id: string;
+  statementId: string;
+  account: BankAccountId;
+  /** YYYY-MM-DD */
+  date: string;
+  narration: string;
+  ref: string | null;
+  /** Minor units; credits positive, debits negative. */
+  amount: number;
+  balance: number | null;
+  /** Same line uploaded twice is skipped by this key. */
+  key: string;
+  match: { kind: BankMatchKind; id: string | null; label: string; by: 'auto' | 'manual'; note: string | null } | null;
+  createdAt: string;
+};
+export type BankSuggestion = { kind: 'gift' | 'expense' | 'batch'; id: string; label: string; date: string; amount: number; why: string };
+export type BankLineView = BankLine & { kind: 'razorpay' | 'upi' | 'cheque' | 'cash' | 'neft' | 'charges' | 'interest' | 'other'; suggestions: BankSuggestion[] };
+export type BankView = {
+  accounts: { id: BankAccountId; label: string }[];
+  account: BankAccountId;
+  from: string;
+  to: string;
+  statements: BankStatement[];
+  lines: BankLineView[];
+  totals: { credits: number; debits: number; matchedCredits: number; matchedDebits: number; unmatched: number; lines: number };
+  /** Recorded in Flockwise with a bank method but not seen on any statement line in the period. */
+  missing: { gifts: { id: string; date: string; label: string; amount: number }[]; expenses: { id: string; date: string; label: string; amount: number }[] };
+  funds: { id: string; name: string }[];
+  heads: { id: string; name: string }[];
+};
+export type BankUploadResult = { statement: BankStatement; added: number; skipped: number; matched: number };
+
 export type PublicOfferingQr = { id: string; name: string; fundName: string; churchName: string; logoUrl: string | null; imageUrl: string | null; payload: string | null; status: OfferingQr['status']; currency: Currency };
 
 export type AdminDonation = Donation & {
@@ -1470,6 +1507,8 @@ export type Collections = {
   annualReturns: AnnualReturn;
   missedCalls: MissedCall;
   qrCodes: OfferingQr;
+  bankStatements: BankStatement;
+  bankLines: BankLine;
   captions: CaptionsLog;
   ballots: Ballot;
   ballotStubs: BallotStub;
@@ -1567,7 +1606,7 @@ export const KINDS = [
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals', 'practices',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
-  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes',
+  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes', 'bankStatements', 'bankLines',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
   'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns', 'calendarFeeds',
 ] as const satisfies readonly Kind[];
