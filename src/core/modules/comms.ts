@@ -9,6 +9,7 @@ import { carolReminders } from './carols.js';
 import { sendStaffDigest } from './celebrations.js';
 import { channelStatus, deliverAll } from './integrations.js';
 import { notify } from './notify.js';
+import { assetReminders } from './assets.js';
 import { rideReminders } from './rides.js';
 import { titheReminders } from './tithe.js';
 import { setBotState } from './whatsapp-bot.js';
@@ -192,6 +193,7 @@ export async function runDue(ctx: Ctx) {
   await carolReminders(ctx, today);
   await titheReminders(ctx, today);
   await rideReminders(ctx, today);
+  await assetReminders(ctx, today);
   if (a.welcome.enabled) {
     const welcomed = new Set((ctx.db.get('meta', 'automations:welcomed')?.value ?? '').split(',').filter(Boolean));
     const fresh = people.filter((p) => p.status === 'visitor' && !welcomed.has(p.id) && ctx.now.getTime() - new Date(p.joinedAt).getTime() < 7 * DAY);

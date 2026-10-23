@@ -1081,7 +1081,7 @@ export type CanvaDesign = { id: string; title: string; editUrl: string; viewUrl:
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
 /** Things Flockwise can tell people about on its own. The office picks the channels for each. */
-export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update';
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due';
 
 // ---------- Christmas carol rounds ----------
 
@@ -1342,6 +1342,7 @@ export type Collections = {
   rideRequests: RideRequest;
   rideOffers: RideOffer;
   aidRequests: AidRequest;
+  assets: Asset;
   rooms: Room;
   checkins: Checkin;
   teams: Team;
@@ -1385,7 +1386,7 @@ export const KINDS = [
   'funds', 'donations', 'pledges', 'plans', 'announcements', 'staff', 'rooms', 'checkins', 'teams', 'assignments', 'blockouts',
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
-  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests',
+  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
   'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
@@ -2156,3 +2157,27 @@ export type AidRequest = {
 export type AidSummary = { fundId: string | null; fundName: string | null; received: number; paid: number; balance: number; open: number; approvedUnpaid: number };
 export type BenevolenceHub = { summary: AidSummary; requests: AidRequest[]; funds: { id: string; name: string }[]; kinds: AidKind[] };
 export type MyAid = { requests: Pick<AidRequest, 'id' | 'kind' | 'amount' | 'approved' | 'currency' | 'reason' | 'status' | 'requestedAt' | 'decisionNote' | 'paidAt'>[]; kinds: AidKind[] };
+
+// ---------- asset register ----------
+
+export type AssetCategory = 'furniture' | 'sound' | 'av' | 'instrument' | 'electrical' | 'vehicle' | 'kitchen' | 'building' | 'it' | 'other';
+export type AssetCondition = 'good' | 'needs_repair' | 'retired';
+export type AssetLogEntry = { at: string; on: string; by: string; kind: 'service' | 'repair' | 'note' | 'moved' | 'retired'; text: string; cost: number | null };
+/** Something the church owns: where it is, who keeps it, what it cost, and when it is next due a service. */
+export type Asset = {
+  id: string;
+  /** Short code on the sticker, A-0001 unless the office types its own. */
+  tag: string;
+  name: string; category: AssetCategory; quantity: number; location: string; serial: string; vendor: string;
+  purchasedOn: string | null;
+  /** Per unit, in minor units. */
+  cost: number | null;
+  warrantyUntil: string | null;
+  /** Annual maintenance contract, if any. */
+  amc: { vendor: string; phone: string; until: string | null; note: string } | null;
+  serviceEveryMonths: number | null; lastServicedOn: string | null;
+  condition: AssetCondition; custodianId: string | null; custodianName: string; notes: string; photoUrl: string | null;
+  status: 'active' | 'retired'; createdAt: string; createdBy: string; log: AssetLogEntry[];
+};
+export type AssetView = Asset & { nextServiceOn: string | null; serviceDueInDays: number | null; amcDueInDays: number | null; warrantyDueInDays: number | null };
+export type AssetsHub = { assets: AssetView[]; summary: { count: number; value: number; serviceDue: number; amcExpiring: number; needsRepair: number }; categories: AssetCategory[] };
