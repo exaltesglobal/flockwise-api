@@ -1046,3 +1046,7 @@ The media desk's browser listens to the preacher with the browser's own speech r
 | GET | `/admin/services/:eventId/presentation`, `/screens/:eventId?key=` | `PresentationView.captions` (`CaptionsView`: the settings, `lines` (last 40 for staff, 3 for screens), `count`) |
 
 Settings live on `PresentationState.captions`; lines in collection `captions` (id = event id). Web: the presenter page (`/present/:eventId`) has a "Live captions" card (on/off, preaching language → screen language, what to show, Listen to the preacher, type a line, the last lines, Clear); the projector draws `.pres-captions` at the foot of the slide and the OBS overlay shows the line when no lyrics bar is up.
+
+## Team app logins per plan
+
+Plans now cap how many volunteers may have a Team app login: Seed 10, Grow 50, Thrive 200, Cathedral unlimited (founding churches unlimited). `POST /admin/team-logins` answers 402 `plan_limit` past the cap (disabled logins do not count); `GET /admin/billing` reports `usage.teamLogins` and `limits.teamLogins`, and the plans page shows the row.

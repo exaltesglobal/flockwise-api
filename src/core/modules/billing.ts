@@ -20,7 +20,7 @@ export function billingView(ctx: Ctx) {
     plan,
     currency,
     trialDaysLeft: sub.status === 'trial' && sub.trialEndsAt ? Math.max(0, Math.ceil((new Date(sub.trialEndsAt).getTime() - ctx.now.getTime()) / 86_400_000)) : null,
-    usage: { people: activePeople(ctx.db), staff: ctx.db.count('staff'), campuses: Math.max(1, ctx.db.count('campuses')), aiCredits: Number(ctx.db.get('meta', `ai:${month}`)?.value ?? 0) },
+    usage: { people: activePeople(ctx.db), staff: ctx.db.count('staff'), teamLogins: ctx.db.all('teamLogins').filter((l) => !l.disabled).length, campuses: Math.max(1, ctx.db.count('campuses')), aiCredits: Number(ctx.db.get('meta', `ai:${month}`)?.value ?? 0) },
     limits,
     plans: PLAN_ORDER.map((id) => ({ ...PLANS[id], prices: { monthly: priceFor(id, currency, 'monthly').amount, yearly: priceFor(id, currency, 'yearly').amount } })),
     online: !!ctx.env.billing,

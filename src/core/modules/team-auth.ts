@@ -2,6 +2,7 @@
 // login and the person gets a temporary password by email; at sign-in they pick the team they
 // are on, and the app then shows only that person's own assignments.
 import { ApiError } from '../errors.js';
+import { checkLimit } from '../plans.js';
 import type { Ctx, Router } from '../engine.js';
 import type { Collections, Permission, Session, TeamLoginView } from '../types.js';
 import { find, normEmail, requireFields, settings } from '../util.js';
@@ -138,6 +139,7 @@ export function registerTeamAuth(r: Router) {
     if (ctx.db.all('teamLogins').some((l) => l.email === email && l.personId !== p.id)) throw new ApiError(409, 'email_taken', 'Another person already uses this email for the team app.');
     const existing = ctx.db.get('teamLogins', p.id);
     if (existing && !existing.disabled) throw new ApiError(409, 'already_exists', `${p.firstName} already has a login. Reset the password instead.`);
+    checkLimit(ctx.db, ctx.now, 'teamLogins', ctx.db.all('teamLogins').filter((l) => !l.disabled && l.personId !== p.id).length);
     const password = ctx.env.random(12, TEMP_ALPHABET);
     const l: Login = { id: p.id, personId: p.id, email, passwordHash: ctx.env.hashPassword(password), mustChangePassword: true, disabled: false, createdAt: ctx.now.toISOString(), lastSignInAt: null, failedAt: [], resetCodeHash: null, resetExpiresAt: null, resetAttempts: 0 };
     ctx.db.put('teamLogins', l);
