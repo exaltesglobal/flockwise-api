@@ -842,3 +842,29 @@ A member picks the day their salary lands and that morning the app nudges them t
 - Writes need `events` or `volunteers`: `POST /admin/feasts { eventId, template, name?, extraHeads? }` (409 if the event has one); `GET /admin/feasts/:id`; `PATCH /admin/feasts/:id { name?, menu? (dishes with ingredients and cookId; ids kept when sent), extraHeads?, headsOverride? (null follows the RSVPs), split?: church|per_head|per_family, notes? }`; `DELETE /admin/feasts/:id`.
 - `GET /admin/feasts/:id/list.csv` (any staff) returns the shopping list as CSV (raw response).
 - Web: `/admin/feasts` "Love feasts & kitchen" under Sundays & events: table, Plan a feast (event picker with RSVP counts, menu template, extra guests), wide side panel with the four tiles, headcount and who-pays controls, the shopping list with Download list, the per-head menu editor with a cook per dish, and kitchen notes. Tests: `test/feasts.test.ts`.
+
+## Hall and ground rental (Thrive+)
+
+Outsiders hire the hall, ground or a room from the church's public page and pay through the church's own Razorpay. Module `core/modules/rentals.ts`; collections `rentalOffers` (one per resource, keyed by the resource id) and `rentals`. A request creates a **pending booking** on the calendar; approval sends a payment link; a paid hire turns the booking **approved**, so nothing else can be put in that slot. The money is a donation record against the hidden, non-80G fund `fd_rentals` ("Hall rentals") with `rentalId` set and no receipt number. Routes under `/admin/rentals` need the `events` or `settings` permission to change anything; any signed-in staff can read.
+
+| Method | Path | What |
+|---|---|---|
+| GET | `/admin/rentals?status=open\|paid\|closed` | `RentalsHub`: `rentals` (`RentalView` with `total`, `payUrl`, `bookingStatus`, `conflicts`), `spaces` (`{resource, offer}` for every room/other resource), `summary` (`open`, `awaitingPayment`, `paidThisYear`, `depositsHeld`), `publicUrl` |
+| PUT | `/admin/rentals/spaces/:resourceId` | Set the `RentalOffer`: `enabled`, `ratePerHour`, `minHours` (1–24), `deposit`, `blurb`, `terms`, `photoUrl`. 422 if enabled without a rate |
+| POST | `/admin/rentals/:id/approve` | `{amount?, deposit?, note?, force?}` → `awaiting_payment`; emails and WhatsApps the renter the pay link. 409 `closed` if decided; 409 `conflict` if an approved booking overlaps (send `force: true` to double-book) |
+| POST | `/admin/rentals/:id/decline` | `{note}` → `declined`, booking declined, renter told |
+| POST | `/admin/rentals/:id/paid` | `{via: cash\|bank_transfer\|cheque\|upi, reference?}`: paid outside Razorpay; records the donation and confirms the booking |
+| POST | `/admin/rentals/:id/refund` | `{note}` on a paid rental → `refunded`, booking cancelled, donation marked refunded (the refund itself is made in Razorpay or the bank) |
+| POST | `/admin/rentals/:id/notes` | `{text}` appended to the office notes |
+
+Public, no sign-in (`/rent` on the web):
+
+| Method | Path | What |
+|---|---|---|
+| GET | `/public/rentals` | `{church: {name, phone, email}, spaces: PublicRentalSpace[]}` (enabled offers only). The church page (`/public/church`) carries the same list as `hire` |
+| POST | `/public/rentals` | `{resourceId, name, phone, email?, organisation?, purpose, guests?, startsAt, endsAt}` → `PublicRental` with a 24-character `token`. 422 with `fields`; 404 if not for hire; 409 `taken` if an approved booking overlaps. Hours round to the half hour; `amount = ratePerHour × hours`. The office is notified (`rental.new`) and the renter emailed the follow link `/rent/pay/:token` |
+| GET | `/public/rentals/:token` | The renter's view: status, amounts, `paidAt`; no phone or office notes |
+| POST | `/public/rentals/:token/pay` | Only when `awaiting_payment`: creates the pending donation and `{checkoutUrl, rental}`. Razorpay returns to `/rent/return?rental=…&payment=success`; the webhook or demo checkout marks it paid |
+| POST | `/public/rentals/:token/cancel` | Renter withdraws an open request; the booking is cancelled and the office told |
+
+Statuses: `requested → awaiting_payment → paid → refunded`, or `declined` / `cancelled`. Notification kind `rental.new` (email + push to staff with `events`). Web: office page `/admin/rentals` "Hall hire" (requests, side panel with approve/decline/paid offline/refund/notes and the copyable pay link; "Spaces for hire" tab for rates); public `/rent`, `/rent/pay/:token`, `/rent/return`; the church page shows "Hire our hall" when a space is enabled.

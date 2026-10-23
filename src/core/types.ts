@@ -253,6 +253,8 @@ export type DonationRecord = {
   receiptNumber: string | null;
   /** Set when this payment is for a registration form response. */
   formResponseId?: string | null;
+  /** Set when the payment is for a hall or ground hire (see modules/rentals.ts). */
+  rentalId?: string | null;
   /** Deposit batch for cash and cheque counted together. */
   batchId?: string | null;
 };
@@ -839,6 +841,8 @@ export type PublicChurch = {
   groups: PublicGroup[];
   forms: { id: string; title: string; description: string }[];
   campaigns?: PublicCampaign[];
+  /** Halls, grounds and rooms the church hires out (see modules/rentals.ts). */
+  hire?: PublicRentalSpace[];
 };
 
 // ---------- celebrations ----------
@@ -1081,7 +1085,7 @@ export type CanvaDesign = { id: string; title: string; editUrl: string; viewUrl:
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
 /** Things Flockwise can tell people about on its own. The office picks the channels for each. */
-export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today';
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new';
 
 // ---------- Christmas carol rounds ----------
 
@@ -1346,6 +1350,8 @@ export type Collections = {
   readingPlans: ReadingPlan;
   readingProgress: ReadingProgress;
   feasts: Feast;
+  rentalOffers: RentalOffer;
+  rentals: Rental;
   rooms: Room;
   checkins: Checkin;
   teams: Team;
@@ -1389,7 +1395,7 @@ export const KINDS = [
   'funds', 'donations', 'pledges', 'plans', 'announcements', 'staff', 'rooms', 'checkins', 'teams', 'assignments', 'blockouts',
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
-  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts',
+  'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
   'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
@@ -2228,3 +2234,30 @@ export type FeastView = Feast & {
 };
 export type FeastTemplate = { id: string; name: string; description: string; dishes: Omit<FeastDish, 'id' | 'cookId' | 'cookName'>[] };
 export type FeastsHub = { feasts: FeastView[]; templates: FeastTemplate[]; units: FeastUnit[]; events: { id: string; title: string; startsAt: string; going: number }[] };
+
+// ---- Hall and ground rental ----
+/** Rental terms for a resource, keyed by the resource id. */
+export type RentalOffer = { id: string; enabled: boolean; ratePerHour: number; minHours: number; deposit: number; blurb: string; terms: string; photoUrl: string | null };
+export type RentalStatus = 'requested' | 'awaiting_payment' | 'paid' | 'declined' | 'cancelled' | 'refunded';
+export type Rental = {
+  id: string;
+  /** Unguessable key in the renter's link. */
+  token: string;
+  resourceId: string; resourceName: string;
+  renterName: string; renterPhone: string; renterEmail: string; organisation: string; purpose: string; guests: number;
+  startsAt: string; endsAt: string; hours: number; ratePerHour: number;
+  /** Hire charge and refundable deposit, in minor units. */
+  amount: number; deposit: number; currency: Currency;
+  status: RentalStatus; bookingId: string | null; donationId: string | null; notes: string; source: 'public' | 'office';
+  createdAt: string; decidedBy: string | null; decidedAt: string | null; paidAt: string | null;
+};
+export type RentalView = Rental & { total: number; payUrl: string; bookingStatus: BookingStatus | null; conflicts: BookingConflict[] };
+export type RentalsHub = {
+  rentals: RentalView[];
+  spaces: { resource: Resource; offer: RentalOffer }[];
+  summary: { open: number; awaitingPayment: number; paidThisYear: number; depositsHeld: number };
+  publicUrl: string;
+};
+export type PublicRentalSpace = { id: string; name: string; kind: ResourceKind; capacity: number | null; description: string; blurb: string; terms: string; photoUrl: string | null; ratePerHour: number; minHours: number; deposit: number; currency: Currency };
+export type PublicRentals = { church: { name: string; phone: string; email: string }; spaces: PublicRentalSpace[] };
+export type PublicRental = { id: string; token: string; church: { name: string; phone: string; email: string }; resourceName: string; renterName: string; purpose: string; startsAt: string; endsAt: string; hours: number; amount: number; deposit: number; total: number; currency: Currency; status: RentalStatus; paidAt: string | null };

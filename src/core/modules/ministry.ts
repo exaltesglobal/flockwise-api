@@ -6,6 +6,7 @@ import type { Batch, BatchView, CcliRow, Collections, GroupDetailMember, LiveSta
 import { adminDonation, bySoonest, church, DAY, eventView, find, fullName, giftDate, matchOrCreatePerson, memberGroup, pick, requireFields, settings, upcoming } from '../util.js';
 import { formForEvent } from './forms.js';
 import { liveCampaigns, publicCampaign } from './offerings.js';
+import { spacesForHire } from './rentals.js';
 
 // ----- deposit batches -----
 
@@ -392,6 +393,7 @@ export function registerMinistry(r: Router) {
       groups: page.showGroups ? ctx.db.all('groups').filter((g) => g.isOpen).map((g) => publicGroup(ctx, g)) : [],
       forms: ctx.db.all('forms').filter((f) => f.isPublic && f.status === 'open' && !f.eventId).map((f) => ({ id: f.id, title: f.title, description: f.description })),
       campaigns: liveCampaigns(ctx).map((c) => publicCampaign(ctx, c)),
+      hire: spacesForHire(ctx),
     };
   });
   r.get('/public/sermons', { public: true }, (ctx) => {

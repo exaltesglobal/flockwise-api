@@ -21,6 +21,7 @@ import {
 } from '../util.js';
 import { onTicketPaid } from './church.js';
 import { onFormPaid } from './forms.js';
+import { onRentalPaid } from './rentals.js';
 import { monthsLeft, startRecurring } from './recurring.js';
 
 const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
@@ -39,8 +40,9 @@ const publicDonation = (d: Collections['donations']): Donation => ({
 /** Called once when a gift is confirmed (webhook, demo checkout, or office entry). */
 export function onDonationSucceeded(ctx: Ctx, d: Collections['donations']) {
   let next = d;
-  if (!d.receiptNumber && !d.eventId && !d.formResponseId) next = ctx.db.put('donations', { ...d, receiptNumber: nextReceiptNumber(ctx) });
-  if (next.formResponseId) onFormPaid(ctx, next);
+  if (!d.receiptNumber && !d.eventId && !d.formResponseId && !d.rentalId) next = ctx.db.put('donations', { ...d, receiptNumber: nextReceiptNumber(ctx) });
+  if (next.rentalId) onRentalPaid(ctx, next);
+  else if (next.formResponseId) onFormPaid(ctx, next);
   else onTicketPaid(ctx, next);
   return next;
 }

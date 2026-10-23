@@ -131,6 +131,7 @@ const GATES: [RegExp, PlanId][] = [
   [/^\/admin\/benevolence/, 'thrive'],
   [/^\/admin\/assets/, 'grow'],
   [/^\/admin\/feasts/, 'grow'],
+  [/^\/admin\/rentals/, 'thrive'],
   [/^\/admin\/livestream/, 'grow'],
 ];
 

@@ -35,7 +35,8 @@ export function givingRoutes(hub: Hub) {
 }
 
 /** Where the payer lands after checkout: the registration, the event, or giving. */
-export function returnPath(d: { eventId: string | null; formResponseId?: string | null } | null | undefined) {
+export function returnPath(d: { eventId: string | null; formResponseId?: string | null; rentalId?: string | null } | null | undefined) {
+  if (d?.rentalId) return `/rent/return?rental=${d.rentalId}&`;
   if (d?.formResponseId) return `/forms/return?response=${d.formResponseId}&`;
   return `${d?.eventId ? `/app/events/${d.eventId}` : '/app/give'}?`;
 }

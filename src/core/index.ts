@@ -35,6 +35,7 @@ import { registerBenevolence } from './modules/benevolence.js';
 import { registerAssets } from './modules/assets.js';
 import { registerReading } from './modules/reading.js';
 import { registerFeasts } from './modules/feasts.js';
+import { registerRentals } from './modules/rentals.js';
 import { registerTeamHub } from './modules/team-hub.js';
 import { registerRecurring } from './modules/recurring.js';
 import { registerWhatsAppBot } from './modules/whatsapp-bot.js';
@@ -50,7 +51,7 @@ import { registerNetworkLink } from './modules/network-link.js';
 import { ApiError } from './errors.js';
 import { atLeast, effectivePlan, getSubscription } from './plans.js';
 
-export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerSongCatalog, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry, registerCelebrations, registerPresent, registerIntegrations, registerAi, registerBilling, registerPayments, registerRegisters, registerZones, registerAccounts, registerRazorpaySetup, registerRecurring, registerWhatsAppBot, registerOfferings, registerPrivacy, registerPager, registerBulletin, registerSundaySchool, registerMissions, registerLivestream, registerFamily, registerNetworkLink, registerTeamAuth, registerDoor, registerNotify, registerConnections, registerTeamHub, registerCarols, registerCalendarFeeds, registerRides, registerBenevolence, registerAssets, registerReading, registerFeasts];
+export const MODULES = [registerAuth, registerPeople, registerChurch, registerGiving, registerCheckin, registerServing, registerSongCatalog, registerComms, registerCare, registerForms, registerCalendar, registerWorkflows, registerMinistry, registerCelebrations, registerPresent, registerIntegrations, registerAi, registerBilling, registerPayments, registerRegisters, registerZones, registerAccounts, registerRazorpaySetup, registerRecurring, registerWhatsAppBot, registerOfferings, registerPrivacy, registerPager, registerBulletin, registerSundaySchool, registerMissions, registerLivestream, registerFamily, registerNetworkLink, registerTeamAuth, registerDoor, registerNotify, registerConnections, registerTeamHub, registerCarols, registerCalendarFeeds, registerRides, registerBenevolence, registerAssets, registerReading, registerFeasts, registerRentals];
 
 export function createChurchEngine(db: Db, env: Env) {
   const engine = createEngine(db, env, MODULES);
