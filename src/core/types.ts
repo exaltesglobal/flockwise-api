@@ -351,6 +351,20 @@ export type LibraryLoanView = LibraryLoan & { title: string; author: string; nam
 export type LibraryHub = { books: LibraryBookView[]; loans: LibraryLoanView[]; requests: LibraryLoanView[]; settings: { loanDays: number }; counts: { titles: number; copies: number; out: number; overdue: number; requests: number }; categories: string[] };
 export type MyLibrary = { books: { id: string; title: string; author: string; language: string; category: string; available: boolean; mine: LibraryLoanStatus | null }[]; loans: { id: string; bookId: string; title: string; status: LibraryLoanStatus; dueOn: string | null; overdue: boolean }[]; loanDays: number };
 
+// ----- pastoral services: weddings, funerals, dedications, house blessings -----
+export type OccasionKind = 'wedding' | 'funeral' | 'dedication' | 'house_blessing' | 'baptism' | 'other';
+export type OccasionStatus = 'requested' | 'scheduled' | 'done' | 'cancelled';
+export type OccasionTask = { id: string; label: string; done: boolean };
+export type Occasion = {
+  id: string; kind: OccasionKind; title: string; personIds: string[]; contactName: string; contactPhone: string;
+  date: string | null; time: string | null; place: string; pastorId: string | null; status: OccasionStatus;
+  checklist: OccasionTask[]; notes: string; requestNote: string; requestedBy: string | null; via: 'office' | 'app';
+  remindedFor: string | null; createdAt: string;
+};
+export type OccasionView = Occasion & { people: { id: string; name: string }[]; pastorName: string | null; requestedByName: string | null; done: number; total: number };
+export type OccasionsHub = { upcoming: OccasionView[]; requests: OccasionView[]; past: OccasionView[]; counts: { requests: number; thisMonth: number; thisYear: Record<OccasionKind, number> }; pastors: { id: string; name: string }[] };
+export type MyOccasion = { id: string; kind: OccasionKind; title: string; status: OccasionStatus; date: string | null; time: string | null; place: string; pastorName: string | null };
+
 // ----- safeguarding: police verification, training and declarations for people who work with children -----
 export type SafeguardKind = 'police' | 'training' | 'declaration' | 'reference';
 export type SafeguardCheck = { id: string; kind: SafeguardKind; issuedOn: string; expiresOn: string | null; reference: string | null; note: string | null; recordedBy: string; recordedAt: string };
@@ -1360,7 +1374,7 @@ export type CanvaExportResult = { design: CanvaDesign; media: MediaItem[]; urls:
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
 /** Things Flockwise can tell people about on its own. The office picks the channels for each. */
-export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder' | 'verse.week' | 'election.open' | 'election.result' | 'recap.ready' | 'greeting.video' | 'vigil.reminder' | 'mentor.nudge' | 'library.due' | 'library.request';
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder' | 'verse.week' | 'election.open' | 'election.result' | 'recap.ready' | 'greeting.video' | 'vigil.reminder' | 'mentor.nudge' | 'library.due' | 'library.request' | 'occasion.request' | 'occasion.scheduled' | 'occasion.reminder';
 
 // ---------- Christmas carol rounds ----------
 
@@ -1619,6 +1633,7 @@ export type Collections = {
   mentorMeetings: MentorMeeting;
   libraryBooks: LibraryBook;
   libraryLoans: LibraryLoan;
+  occasions: Occasion;
   captions: CaptionsLog;
   ballots: Ballot;
   ballotStubs: BallotStub;
@@ -1716,7 +1731,7 @@ export const KINDS = [
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals', 'practices',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
-  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes', 'bankStatements', 'bankLines', 'safeguarding', 'courses', 'courseEnrollments', 'vigils', 'vigilSignups', 'mentorships', 'mentorMeetings', 'libraryBooks', 'libraryLoans',
+  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes', 'bankStatements', 'bankLines', 'safeguarding', 'courses', 'courseEnrollments', 'vigils', 'vigilSignups', 'mentorships', 'mentorMeetings', 'libraryBooks', 'libraryLoans', 'occasions',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
   'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns', 'calendarFeeds',
 ] as const satisfies readonly Kind[];

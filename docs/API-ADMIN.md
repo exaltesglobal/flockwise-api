@@ -1208,3 +1208,15 @@ Member app: `GET /me/library` → `MyLibrary {books (available, mine), loans, lo
 Reminders: daily `libraryReminders` sends `library.due` the day before the due date and once when overdue.
 
 Web: People › Library (`src/admin/pages/library.tsx`) and the member page `/app/library`.
+
+## Pastoral services (weddings, funerals, dedications, house blessings)
+
+Grow plan and up. Kinds: `wedding`, `funeral`, `dedication`, `house_blessing`, `baptism`, `other`. Each new service gets a checklist that fits its kind (counselling sessions and banns for a wedding, burial ground and register for a funeral).
+
+- `GET /admin/occasions` (care or people.view): `{ requests, upcoming, past, counts: { requests, thisMonth, thisYear }, pastors }`. Pastors are active staff with the care permission.
+- `POST /admin/occasions` (care): `{ kind, personIds?, title?, date?, time?, place?, pastorId?, contactName?, contactPhone?, notes? }`. With a date it is scheduled straight away.
+- `PATCH /admin/occasions/:id` (care): any of the fields above plus `status` (`requested|scheduled|done|cancelled`). A request becomes scheduled once it has a date and a pastor. Scheduling, or moving the date, time or pastor, tells the member who asked and the pastor (`occasion.scheduled`).
+- `POST /admin/occasions/:id/checklist` (care): `{ toggle: taskId }`, `{ remove: taskId }` or `{ label }` to add (up to 30).
+- `DELETE /admin/occasions/:id` (care).
+- `GET /me/occasions`, `POST /me/occasions` `{ kind, date?, time?, place?, phone?, title?, note? }` (up to 3 waiting requests; notifies pastors with `occasion.request`), `DELETE /me/occasions/:id` withdraws a waiting request.
+- Daily: the pastor gets `occasion.reminder` the day before, listing open checklist items.
