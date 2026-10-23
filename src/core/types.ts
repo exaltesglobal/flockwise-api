@@ -171,6 +171,10 @@ export type Person = {
   zoneId?: string | null;
   /** Joined the prayer chain: gets prayer requests the office sends out, and replies PRAYED. */
   prayerChain?: boolean;
+  /** Salary day (1–31; 31 also means the last day of a short month): the morning reminder to tithe. Null = off. */
+  titheDay?: number | null;
+  /** What they set aside each month, in minor units, shown in the reminder. */
+  titheAmount?: number | null;
 };
 
 export type PersonInput = Partial<Omit<Person, 'id' | 'joinedAt' | 'lastAttendedAt' | 'groups' | 'checkinCode'>> & { firstName: string; lastName: string };
@@ -471,7 +475,7 @@ export type PrayerView = Omit<PrayerRequest, 'prayedBy'> & { prayedCount: number
 // ---------- directory ----------
 
 export type DirectoryEntry = { householdName: string; area: string | null; people: { id: string; name: string; phone: string | null; email: string | null }[] };
-export type MemberPreferences = { consent: Consent; checkinCode: string; campusId: string | null; prayerChain: boolean };
+export type MemberPreferences = { consent: Consent; checkinCode: string; campusId: string | null; prayerChain: boolean; titheDay: number | null; titheAmount: number | null };
 
 // ---------- dashboards ----------
 
@@ -1075,7 +1079,7 @@ export type CanvaDesign = { id: string; title: string; editUrl: string; viewUrl:
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
 /** Things Flockwise can tell people about on its own. The office picks the channels for each. */
-export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit';
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder';
 
 // ---------- Christmas carol rounds ----------
 

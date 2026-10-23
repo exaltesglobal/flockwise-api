@@ -178,7 +178,7 @@ export function registerPeople(r: Router) {
   });
   r.get('/me/preferences', {}, (ctx) => {
     const p = find(ctx, 'people', ctx.me(), 'Profile');
-    return { consent: p.consent, checkinCode: p.checkinCode, campusId: p.campusId, prayerChain: !!p.prayerChain };
+    return { consent: p.consent, checkinCode: p.checkinCode, campusId: p.campusId, prayerChain: !!p.prayerChain, titheDay: p.titheDay ?? null, titheAmount: p.titheAmount ?? null };
   });
   r.patch('/me/preferences', {}, (ctx) => {
     const p = find(ctx, 'people', ctx.me(), 'Profile');
@@ -186,10 +186,25 @@ export function registerPeople(r: Router) {
     for (const k of ['email', 'sms', 'whatsapp', 'directory'] as const) if (typeof ctx.body.consent?.[k] === 'boolean') consent[k] = ctx.body.consent[k];
     const campusId = ctx.body.campusId !== undefined && (ctx.body.campusId === null || ctx.db.get('campuses', ctx.body.campusId)) ? ctx.body.campusId : p.campusId;
     const prayerChain = typeof ctx.body.prayerChain === 'boolean' ? ctx.body.prayerChain : !!p.prayerChain;
-    const next = ctx.db.put('people', { ...p, consent, campusId, prayerChain });
+    let titheDay = p.titheDay ?? null;
+    if (ctx.body.titheDay === null) titheDay = null;
+    else if (ctx.body.titheDay !== undefined) {
+      const d = Number(ctx.body.titheDay);
+      if (!Number.isInteger(d) || d < 1 || d > 31) throw new ApiError(422, 'validation', 'titheDay must be 1–31');
+      titheDay = d;
+    }
+    let titheAmount = p.titheAmount ?? null;
+    if (ctx.body.titheAmount === null) titheAmount = null;
+    else if (ctx.body.titheAmount !== undefined) {
+      const a = Number(ctx.body.titheAmount);
+      if (!Number.isInteger(a) || a < 0) throw new ApiError(422, 'validation', 'titheAmount must be a whole number of paise');
+      titheAmount = a || null;
+    }
+    const next = ctx.db.put('people', { ...p, consent, campusId, prayerChain, titheDay, titheAmount });
     logConsent(ctx, p.id, p.consent, next.consent, 'member');
     if (prayerChain !== !!p.prayerChain) ctx.audit(prayerChain ? 'joined' : 'left', 'person', p.id, `${fullName(p)} ${prayerChain ? 'joined' : 'left'} the prayer chain`);
-    return { consent: next.consent, checkinCode: next.checkinCode, campusId: next.campusId, prayerChain };
+    if (titheDay !== (p.titheDay ?? null)) ctx.audit(titheDay ? 'set' : 'cleared', 'person', p.id, `${fullName(p)} ${titheDay ? `set salary day ${titheDay} for the tithe reminder` : 'turned the tithe reminder off'}`);
+    return { consent: next.consent, checkinCode: next.checkinCode, campusId: next.campusId, prayerChain, titheDay, titheAmount };
   });
   r.get('/campuses', {}, (ctx) => ctx.db.all('campuses'));
   r.get('/directory', {}, (ctx) => {

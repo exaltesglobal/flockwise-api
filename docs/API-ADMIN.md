@@ -794,3 +794,11 @@ A deposit batch can carry a count sheet (`Batch.sheet: CountSheet`): notes by de
 - `POST /admin/giving/batches/:id/sign { name? }` adds a signature (default: the signed-in staff's name; 422 `no_count`, 409 `committed`, `signed` when two already signed, `same_person` when the same name signs twice). `DELETE .../sign` clears them.
 - `POST /admin/giving/batches/:id/commit { force?, looseFundId? }` refuses with 409 `unsigned` while a count sheet has fewer than two signatures unless `force` is true; the audit line names the counters.
 - `BatchView` adds `sheet`, `loose` and `signed`. Web: the batch page has a "Counting room" card (denomination grid for INR/USD/GBP/EUR, live total, camera button, Save count, sign as first/second counter, loose-cash fund picker beside Commit). Tests: `test/counting-room.test.ts`.
+
+## Salary-day tithe reminder
+
+A member picks the day their salary lands and that morning the app nudges them to give. Nothing is charged: it is a reminder, and it stays quiet while they have an active monthly gift.
+
+- `Person.titheDay` (1–31; 29–31 also fire on the last day of a shorter month) and `Person.titheAmount` (minor units, optional, shown in the nudge). `GET /me/preferences` returns both; `PATCH /me/preferences { titheDay?: 1–31 | null, titheAmount?: paise | null }` sets them (422 outside the range; audited).
+- `core/modules/tithe.ts` → `titheReminders(ctx, today)` runs from the daily tick (`comms.ts` `runDue`, after 8 am church time) and sends notification kind `tithe.reminder` (catalog default: push + WhatsApp, no email; the office can change it under Settings › Notifications) with link `/app/give`. People marked inactive, or with a `recurring` gift in status `active`, are skipped.
+- Web: member Give page → "Salary-day reminder" card (day picker with "Last day of the month", optional amount, Change / Turn off) in all six languages. Tests: `test/tithe-reminder.test.ts`.
