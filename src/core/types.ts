@@ -321,6 +321,15 @@ export type CourseDetail = CourseView & { roster: CourseRosterRow[] };
 export type CoursesHub = { courses: CourseView[]; templates: { id: CourseTemplate; name: string; sessions: number; minAttendance: number }[] };
 export type MyCourse = { id: string; name: string; description: string; leaderName: string; location: string; sessions: CourseSession[]; minAttendance: number; full: boolean; mine: { status: CourseEnrollment['status']; attended: number } | null };
 
+// ----- prayer vigils and fasting chains: members take a slot so the whole time is covered -----
+export type VigilKind = 'prayer' | 'fasting';
+export type Vigil = { id: string; name: string; kind: VigilKind; purpose: string; startsAt: string; endsAt: string; slotMinutes: number; perSlot: number | null; location: string; status: 'open' | 'closed'; createdAt: string; createdBy: string };
+export type VigilSignup = { id: string; vigilId: string; personId: string; slotStart: string; via: 'office' | 'app'; reminded: boolean; createdAt: string };
+export type VigilSlot = { start: string; end: string; people: { signupId: string; personId: string; name: string }[] };
+export type VigilView = Vigil & { slots: number; covered: number; people: number; nextGap: string | null };
+export type VigilDetail = VigilView & { slotList: VigilSlot[] };
+export type MyVigil = { id: string; name: string; kind: VigilKind; purpose: string; startsAt: string; endsAt: string; slotMinutes: number; location: string; covered: number; slots: { start: string; end: string; count: number; full: boolean; mine: boolean }[] };
+
 // ----- safeguarding: police verification, training and declarations for people who work with children -----
 export type SafeguardKind = 'police' | 'training' | 'declaration' | 'reference';
 export type SafeguardCheck = { id: string; kind: SafeguardKind; issuedOn: string; expiresOn: string | null; reference: string | null; note: string | null; recordedBy: string; recordedAt: string };
@@ -1326,7 +1335,7 @@ export type CanvaDesign = { id: string; title: string; editUrl: string; viewUrl:
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
 /** Things Flockwise can tell people about on its own. The office picks the channels for each. */
-export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder' | 'verse.week' | 'election.open' | 'election.result' | 'recap.ready' | 'greeting.video';
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder' | 'verse.week' | 'election.open' | 'election.result' | 'recap.ready' | 'greeting.video' | 'vigil.reminder';
 
 // ---------- Christmas carol rounds ----------
 
@@ -1579,6 +1588,8 @@ export type Collections = {
   safeguarding: SafeguardRecord;
   courses: Course;
   courseEnrollments: CourseEnrollment;
+  vigils: Vigil;
+  vigilSignups: VigilSignup;
   captions: CaptionsLog;
   ballots: Ballot;
   ballotStubs: BallotStub;
@@ -1676,7 +1687,7 @@ export const KINDS = [
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals', 'practices',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
-  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes', 'bankStatements', 'bankLines', 'safeguarding', 'courses', 'courseEnrollments',
+  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes', 'bankStatements', 'bankLines', 'safeguarding', 'courses', 'courseEnrollments', 'vigils', 'vigilSignups',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
   'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns', 'calendarFeeds',
 ] as const satisfies readonly Kind[];

@@ -1139,3 +1139,23 @@ Completion: attended ≥ `minAttendance` sessions completes the enrolment, adds 
 Member app: `GET /me/courses` → `{courses: MyCourse[]}` (courses the member is in, plus open ones taking sign-ups, with `full` and `mine {status, attended}`); `POST /me/courses/:id/enroll` (409 `closed` when sign-up is off or the course is finished, 409 `full`); `DELETE /me/courses/:id` leaves a course they have not completed.
 
 Web: People › Courses (`src/admin/pages/courses.tsx`) and the member page `/app/courses`.
+
+## Prayer vigils and fasting chains (Care › Prayer vigils)
+
+A 24-hour prayer chain, an all-night watch, 21 days of fasting: the time is cut into slots and members take one so every slot is covered. Module `core/modules/vigils.ts`, collections `vigils` (`Vigil {name, kind prayer|fasting, purpose, startsAt, endsAt (ISO), slotMinutes 15|30|60|120|180|360|720|1440, perSlot|null, location, status open|closed}`) and `vigilSignups` (`{vigilId, personId, slotStart, via office|app, reminded}`). All plans. Up to 500 slots.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/admin/vigils` (care) | `{vigils: VigilView[]}` (+slots, covered, people, nextGap = first uncovered slot not yet over) |
+| POST | `/admin/vigils` | `{name, kind?, purpose?, startsAt, endsAt, slotMinutes? (60 for prayer, 1440 for fasting), perSlot?, location?}` → `VigilDetail` (+slotList [{start, end, people}]) |
+| GET | `/admin/vigils/:id` | `VigilDetail` |
+| PATCH | `/admin/vigils/:id` | Any field, `status: closed`; sign-ups on slots that no longer exist are removed |
+| DELETE | `/admin/vigils/:id` | Removes it and its sign-ups |
+| POST | `/admin/vigils/:id/signups` | `{personId, slotStart}`; 409 `full` past `perSlot` |
+| DELETE | `/admin/vigils/:id/signups/:sid` | |
+
+Member app: `GET /me/vigils` → `{vigils: MyVigil[]}` (open vigils not yet over, plus any the member is in; per slot `count`, `full`, `mine`); `POST /me/vigils/:id/slots` `{slotStart}` (409 `closed`, `past`, `full`); `DELETE /me/vigils/:id/slots?slotStart=`.
+
+Reminders (`vigilReminders`, every tick): notification `vigil.reminder` 30 minutes before a prayer slot, 12 hours before a slot of 12 hours or more (fasting days), once per sign-up.
+
+Web: Care › Prayer vigils (`src/admin/pages/vigils.tsx`) and the member page `/app/vigils`.
