@@ -472,7 +472,17 @@ export type PrayerRequest = {
   /** When the office sent it to the prayer chain, and to how many people. */
   chainSentAt?: string | null;
   chainCount?: number;
+  /** Where it came from: the member app (default), the public /pray page from a QR card, the lobby kiosk, or WhatsApp. */
+  source?: 'app' | 'card' | 'kiosk' | 'whatsapp';
+  /** A phone number a visitor left for follow-up, when they are not a member. */
+  contact?: string | null;
 };
+/** A request as the lobby kiosk shows it. */
+export type WallRequest = { id: string; name: string; text: string; prayedCount: number; iPrayed: boolean; createdAt: string; status: 'open' | 'answered'; answeredNote: string | null };
+export type PrayerWallStats = { open: number; requestsThisWeek: number; prayedThisWeek: number };
+export type PublicPrayerInfo = { church: { name: string; logoUrl: string | null; phone: string }; enabled: boolean; stats: PrayerWallStats };
+export type PrayerWall = PublicPrayerInfo & { requests: WallRequest[] };
+export type PrayerKiosk = { enabled: boolean; publicUrl: string; kioskUrl: string; key: string; stats: PrayerWallStats & { fromCards: number; fromKiosk: number } };
 export type PrayerChain = { members: number; people: { id: string; name: string; phone: string | null }[] };
 export type PrayerView = Omit<PrayerRequest, 'prayedBy'> & { prayedCount: number; iPrayed: boolean; mine: boolean };
 
@@ -529,6 +539,10 @@ export type ChurchSettings = Church & {
   obs?: Partial<ObsSettings>;
   /** Secret in the projector, stage and OBS overlay links so those screens need no sign-in. */
   screenKey?: string;
+  /** Secret in the lobby prayer-wall kiosk link (see modules/prayer-wall.ts). */
+  prayerKioskKey?: string;
+  /** Whether anyone can send a prayer request from /pray (QR cards, kiosk). Default on. */
+  publicPrayer?: boolean;
   /** AI requests allowed each month (the plan's allowance). */
   aiMonthlyLimit?: number;
   /** The giving fund that pays benevolence (help) requests; null = guess from the fund names. */
@@ -845,6 +859,8 @@ export type PublicChurch = {
   campaigns?: PublicCampaign[];
   /** Halls, grounds and rooms the church hires out (see modules/rentals.ts). */
   hire?: PublicRentalSpace[];
+  /** Whether /pray takes prayer requests from anyone. */
+  prayer?: boolean;
 };
 
 // ---------- celebrations ----------

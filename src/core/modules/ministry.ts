@@ -394,6 +394,7 @@ export function registerMinistry(r: Router) {
       forms: ctx.db.all('forms').filter((f) => f.isPublic && f.status === 'open' && !f.eventId).map((f) => ({ id: f.id, title: f.title, description: f.description })),
       campaigns: liveCampaigns(ctx).map((c) => publicCampaign(ctx, c)),
       hire: spacesForHire(ctx),
+      prayer: s.publicPrayer !== false,
     };
   });
   r.get('/public/sermons', { public: true }, (ctx) => {

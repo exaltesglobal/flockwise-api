@@ -888,3 +888,17 @@ Module `core/modules/practice.ts`; collection `practices` (one per rehearsal of 
 | PATCH | `/me/practice/:id` | Team leader only |
 
 The musicians' view (`BandItem.parts`) carries the recordings of each song. The daily tick sends `practice.reminder` (push + WhatsApp by default) to the rehearsing teams the day before and the day of `rehearsalAt` (once per day, meta key `practice:<eventId>:<date>`), naming the songs and marking those with recordings ♪. Rehearsing teams are those with a practice recorded for the event, else teams whose name sounds like singing, else teams rostered for the event. The privacy export lists practices the member attended. Web: `/admin/practice` "Choir practice" (Practices, Attendance with CSV, Part recordings tabs; record modal with the roster as tick boxes), member `/app/practice` in six languages (audio players for direct audio links, otherwise a Listen button; leaders get "Mark who came"), and a Listen row in `/present/:eventId/band`.
+
+## Prayer wall kiosk and QR prayer cards (Grow+)
+
+Module `core/modules/prayer-wall.ts`. Anyone can send a prayer request from `/pray` (the QR on printed prayer cards); a tablet in the lobby opens `/pray/wall?k=<key>` and shows the shared requests with an "I prayed" button and an "Add a prayer request" form that clears itself. Requests are ordinary `prayer` records with `source` `card` or `kiosk`, so they appear with the pastors like any other and `prayer.new` fires. Settings: `publicPrayer` (default on) and `prayerKioskKey`.
+
+| Method | Path | What |
+|---|---|---|
+| GET | `/public/prayer` | `{church: {name, logoUrl, phone}, enabled, stats: {open, requestsThisWeek, prayedThisWeek}}`. `/public/church` carries `prayer: boolean` too |
+| POST | `/public/prayer` | `{text (5+ chars), name?, phone?, share?, source?: 'card'\|'kiosk'}`. A phone that matches a person links the request to them; otherwise the number is kept in `contact` for follow-up. `share` puts it on the wall (`visibility: church`); otherwise pastors only. 404 when `publicPrayer` is off |
+| GET | `/public/prayer/wall?k=&device=` | `PrayerWall`: shared open requests (and answered ones from the last two weeks) as `WallRequest` (`name` is "Priya T." or "A friend", `prayedCount`, `iPrayed` for this device). 403 without the key |
+| POST | `/public/prayer/wall/:id/pray?k=` | `{device}`: counts once per device (`prayedBy` gets `kiosk:<device>`) |
+| GET/POST | `/admin/prayer/kiosk` (care) | `PrayerKiosk`: `enabled`, `publicUrl`, `kioskUrl`, `key`, stats incl. `fromCards`/`fromKiosk`. POST `{enabled?, rotate?}`; the first call mints the key |
+
+Web: Care & prayer › Prayer requests › "Lobby kiosk & QR cards" (the public link as a QR, the kiosk link with copy/open/new link, the on/off switch, and "Print 8 cards (A4)" with the QR, writing lines and tick boxes); prayer rows show a Prayer card / Lobby kiosk badge and the contact number. Public `/pray` (with `?kiosk=1` for a plain large-type form) and `/pray/wall`; the church page shows "Ask for prayer".
