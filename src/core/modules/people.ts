@@ -4,6 +4,8 @@ import type { Db } from '../db.js';
 import type { Ctx, Router } from '../engine.js';
 import { checkLimit } from '../plans.js';
 import type { Collections, Consent, DirectoryEntry, ImportResult, PersonInput, PersonTimeline } from '../types.js';
+import type { ImportPersonRow } from '../import-presets.js';
+import { addMember } from './church.js';
 
 /** A scoped login (zone, group or team leader) only opens people in its scope. */
 export function inScope<T extends { id: string }>(ctx: Ctx, p: T): T {
@@ -43,7 +45,7 @@ function countExisting(ctx: Ctx, rows: Record<string, unknown>[]) {
 
 const EDITABLE: (keyof PersonInput)[] = [
   'firstName', 'lastName', 'phone', 'email', 'gender', 'birthDate', 'status', 'householdName', 'address', 'language', 'tags', 'notes',
-  'campusId', 'baptismDate', 'anniversary', 'allergies', 'medicalNotes', 'consent', 'zoneId', 'prayerChain',
+  'campusId', 'baptismDate', 'anniversary', 'allergies', 'medicalNotes', 'consent', 'zoneId', 'prayerChain', 'externalId',
 ];
 
 function cleanInput(body: Record<string, unknown>) {
@@ -77,18 +79,69 @@ export function searchPeople(ctx: Ctx, q: string) {
   return ctx.db.all('people').filter((p) => matches(p, needle));
 }
 
-function importPeople(ctx: Ctx, rows: PersonInput[], dedupeBy: 'phone' | 'email'): ImportResult {
-  const result: ImportResult = { created: 0, updated: 0, skipped: 0, errors: [] };
+const LANG_CODES: Record<string, string> = { english: 'en', hindi: 'hi', tamil: 'ta', telugu: 'te', malayalam: 'ml', kannada: 'kn', en: 'en', hi: 'hi', ta: 'ta', te: 'te', ml: 'ml', kn: 'kn' };
+
+/**
+ * Adds or updates people from a spreadsheet. Matching order: the old system's id, then the
+ * mobile number or email (dedupeBy). Rows sharing a household key become one household named
+ * after the primary contact; group names are created when missing; campuses are matched by name.
+ */
+function importPeople(ctx: Ctx, rows: ImportPersonRow[], dedupeBy: 'phone' | 'email'): ImportResult {
+  const result: ImportResult = { created: 0, updated: 0, skipped: 0, errors: [], households: 0, groups: [], campuses: [] };
   const norm = (v: string | null | undefined) => (dedupeBy === 'phone' ? normPhone(v) : normEmail(v));
   const index = new Map<string, Collections['people']>();
+  const byExternal = new Map<string, Collections['people']>();
   for (const p of ctx.db.all('people')) {
     const k = norm(dedupeBy === 'phone' ? p.phone : p.email);
     if (k) index.set(k, p);
+    if (p.externalId) byExternal.set(p.externalId, p);
   }
+  // Household names: the primary contact's surname, else the first row's with that key.
+  const householdNames = new Map<string, string>();
+  for (const r of rows) {
+    if (!r.householdKey) continue;
+    const key = r.householdKey.trim().toLowerCase();
+    const name = r.householdName || `${(r.lastName || r.firstName).trim()} family`;
+    if (!householdNames.has(key) || r.householdRole === 'primary') householdNames.set(key, name);
+  }
+  result.households = householdNames.size;
+  const groupsByName = new Map(ctx.db.all('groups').map((g) => [g.name.trim().toLowerCase(), g]));
+  const campusesByName = new Map(ctx.db.all('campuses').map((c) => [c.name.trim().toLowerCase(), c]));
+  const groupFor = (name: string) => {
+    const key = name.trim().toLowerCase();
+    let g = groupsByName.get(key);
+    if (!g) {
+      g = ctx.db.put('groups', { id: ctx.id('gr'), name: name.trim(), description: '', meetingSchedule: '', location: '', leaderName: '', isOpen: false, type: 'other', zone: '', leaderId: null });
+      groupsByName.set(key, g);
+      result.groups!.push(g.name);
+    }
+    return g;
+  };
+  const campusFor = (name: string) => {
+    const key = name.trim().toLowerCase();
+    let c = campusesByName.get(key);
+    if (!c) {
+      try {
+        checkLimit(ctx.db, ctx.now, 'campuses', ctx.db.count('campuses'));
+      } catch {
+        return null; // the plan has no room for another campus: leave the person on the main campus
+      }
+      c = ctx.db.put('campuses', { id: ctx.id('cp'), name: name.trim(), city: '', address: '', serviceTimes: '' });
+      campusesByName.set(key, c);
+      result.campuses!.push(c.name);
+    }
+    return c;
+  };
   rows.slice(0, 20000).forEach((raw, i) => {
+    const { householdKey, householdRole: _role, groups, campus, language, externalId, ...rest } = raw;
+    const body: Record<string, unknown> = { ...rest };
+    if (householdKey && !body.householdName) body.householdName = householdNames.get(householdKey.trim().toLowerCase());
+    if (language) body.language = LANG_CODES[language.trim().toLowerCase()];
+    if (externalId) body.externalId = externalId.trim();
+    if (campus) body.campusId = campusFor(campus)?.id;
     let row: Partial<PersonInput>;
     try {
-      row = cleanInput(raw as Record<string, unknown>);
+      row = cleanInput(body);
     } catch (e) {
       result.errors.push({ row: i + 1, message: (e as Error).message });
       return;
@@ -98,19 +151,26 @@ function importPeople(ctx: Ctx, rows: PersonInput[], dedupeBy: 'phone' | 'email'
       return;
     }
     const key = norm(dedupeBy === 'phone' ? row.phone : row.email);
-    const existing = key ? index.get(key) : undefined;
+    const existing = (row.externalId && byExternal.get(row.externalId)) || (key ? index.get(key) : undefined);
+    let person: Collections['people'];
     if (existing) {
-      const patch = Object.fromEntries(Object.entries(row).filter(([, v]) => v !== undefined && v !== null && v !== ''));
-      if (Object.keys(patch).length <= 2) result.skipped++;
-      else {
-        index.set(key, ctx.db.put('people', { ...existing, ...patch }));
+      const patch = Object.fromEntries(Object.entries(row).filter(([, v]) => v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)));
+      if (row.tags) patch.tags = [...new Set([...existing.tags, ...row.tags])];
+      const changed = Object.entries(patch).some(([k, v]) => JSON.stringify((existing as Record<string, unknown>)[k]) !== JSON.stringify(v));
+      if (!changed) {
+        result.skipped++;
+        person = existing;
+      } else {
+        person = ctx.db.put('people', { ...existing, ...patch });
         result.updated++;
       }
-      return;
+    } else {
+      person = ctx.db.put('people', newPerson(ctx, { lastName: '', ...row, firstName: row.firstName }));
+      result.created++;
     }
-    const p = ctx.db.put('people', newPerson(ctx, { lastName: '', ...row, firstName: row.firstName }));
-    if (key) index.set(key, p);
-    result.created++;
+    if (key) index.set(key, person);
+    if (person.externalId) byExternal.set(person.externalId, person);
+    for (const g of groups ?? []) addMember(ctx, groupFor(g).id, person.id);
   });
   return result;
 }
@@ -256,7 +316,7 @@ export function registerPeople(r: Router) {
   r.post('/admin/people/import', { perm: 'people.edit' }, (ctx) => {
     if (Array.isArray(ctx.body.rows)) checkLimit(ctx.db, ctx.now, 'people', activePeople(ctx.db), Math.max(0, ctx.body.rows.length - countExisting(ctx, ctx.body.rows)));
     const result = importPeople(ctx, Array.isArray(ctx.body.rows) ? ctx.body.rows : [], ctx.body.dedupeBy === 'email' ? 'email' : 'phone');
-    ctx.audit('imported', 'person', null, `Imported people from ${ctx.body.source ?? 'a file'}: ${result.created} added, ${result.updated} updated`);
+    ctx.audit('imported', 'person', null, `Imported people from ${ctx.body.source ?? 'a file'}: ${result.created} added, ${result.updated} updated${result.groups?.length ? `, ${result.groups.length} groups created` : ''}`);
     return result;
   });
   r.get('/admin/people/:id', { perm: 'people.view' }, (ctx) => personView(ctx, inScope(ctx, find(ctx, 'people', ctx.params[0], 'Person'))));

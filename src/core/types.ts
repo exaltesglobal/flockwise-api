@@ -175,13 +175,17 @@ export type Person = {
   titheDay?: number | null;
   /** What they set aside each month, in minor units, shown in the reminder. */
   titheAmount?: number | null;
+  /** The person's id in the system they were imported from (Elvanto, Planning Center, an old register), so a second import updates rather than duplicates. */
+  externalId?: string | null;
 };
 
 export type PersonInput = Partial<Omit<Person, 'id' | 'joinedAt' | 'lastAttendedAt' | 'groups' | 'checkinCode'>> & { firstName: string; lastName: string };
 export type PeopleQuery = { q?: string; status?: PersonStatus | ''; campusId?: string; zoneId?: string; tag?: string; cursor?: string };
 export type PeoplePage = { data: Person[]; nextCursor: string | null; total: number };
 export type ImportSource = 'excel' | 'csv' | 'elvanto' | 'planning_center';
-export type ImportResult = { created: number; updated: number; skipped: number; errors: { row: number; message: string }[] };
+export type ImportResult = { created: number; updated: number; skipped: number; errors: { row: number; message: string }[]; households?: number; groups?: string[]; campuses?: string[] };
+/** Result of POST /admin/giving/import. */
+export type GiftImportResult = { created: number; duplicates: number; matched: number; unmatched: number; total: number; funds: string[]; errors: { row: number; message: string }[] };
 
 /** Everything the office sees on one person's page. */
 export type PersonTimeline = {

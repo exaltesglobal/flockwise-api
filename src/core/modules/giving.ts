@@ -2,7 +2,8 @@
 // env.checkout (Razorpay on the server); the payment webhook calls onDonationSucceeded.
 import { ApiError } from '../errors.js';
 import type { Ctx, Router } from '../engine.js';
-import type { Collections, Donation, GivingStatement, PaymentMethod, PledgeView } from '../types.js';
+import type { Collections, Donation, GiftImportResult, GivingStatement, PaymentMethod, PledgeView } from '../types.js';
+import type { ImportGiftRow } from '../import-presets.js';
 import {
   adminDonation,
   dateOnly,
@@ -14,6 +15,8 @@ import {
   fundView,
   giftDate,
   nextReceiptNumber,
+  normEmail,
+  normPhone,
   page,
   pick,
   requireFields,
@@ -239,6 +242,7 @@ export function registerGiving(r: Router) {
     return { ...res, data: res.data.map(adminDonation), totalAmount };
   });
   r.post('/admin/giving/donations', { perm: 'giving.edit' }, (ctx) => adminDonation(recordGift(ctx, ctx.body)));
+  r.post('/admin/giving/import', { perm: 'giving.edit' }, (ctx) => importGifts(ctx, Array.isArray(ctx.body.rows) ? ctx.body.rows : [], String(ctx.body.source ?? 'a file')));
   r.post('/admin/giving/donations/:id/refund', { perm: 'giving.edit' }, (ctx) => {
     const d = find(ctx, 'donations', ctx.params[0], 'Gift');
     if (d.status !== 'succeeded') throw new ApiError(422, 'invalid', 'Only completed gifts can be marked refunded.');
@@ -294,4 +298,91 @@ export function registerGiving(r: Router) {
     ctx.audit('deleted', 'pledge', p.id, `Removed pledge from ${p.personName}`);
     return undefined;
   });
+}
+
+const METHODS: PaymentMethod[] = ['upi', 'card', 'netbanking', 'wallet', 'cash', 'cheque', 'bank_transfer'];
+
+/**
+ * Brings past gifts across from Planning Center Giving, Elvanto or a treasurer's spreadsheet.
+ * Funds are created by name, donors are matched (old-system id, email, mobile, then an exact
+ * unique name) but never created, and a gift seen before (same old id, or same donor, date,
+ * amount and fund) is skipped. Receipt numbers are not issued: the old system already did that,
+ * and the file's own receipt or reference number is kept.
+ */
+export function importGifts(ctx: Ctx, rows: ImportGiftRow[], source: string): GiftImportResult {
+  const result: GiftImportResult = { created: 0, duplicates: 0, matched: 0, unmatched: 0, total: 0, funds: [], errors: [] };
+  const people = ctx.db.all('people');
+  const byExternal = new Map(people.filter((p) => p.externalId).map((p) => [p.externalId!, p]));
+  const byEmail = new Map(people.filter((p) => p.email).map((p) => [normEmail(p.email), p]));
+  const byPhone = new Map(people.filter((p) => normPhone(p.phone)).map((p) => [normPhone(p.phone), p]));
+  const byName = new Map<string, Collections['people'] | null>();
+  for (const p of people) {
+    const k = fullName(p).trim().toLowerCase();
+    byName.set(k, byName.has(k) ? null : p); // null = ambiguous
+  }
+  const fundsByName = new Map(ctx.db.all('funds').map((f) => [f.name.trim().toLowerCase(), f]));
+  const fundFor = (name: string) => {
+    const key = name.trim().toLowerCase();
+    let f = fundsByName.get(key);
+    if (!f) {
+      f = ctx.db.put('funds', { id: ctx.id('fd'), name: name.trim(), description: `Imported from ${source}.`, taxDeductible: true, active: true, goal: null });
+      fundsByName.set(key, f);
+      result.funds.push(f.name);
+    }
+    return f;
+  };
+  const existing = ctx.db.all('donations');
+  const seenIds = new Set(existing.map((d) => d.providerPaymentId).filter(Boolean));
+  const seenKeys = new Set(existing.map((d) => `${d.donorId ?? d.donorName.toLowerCase()}|${d.paidAt?.slice(0, 10)}|${d.amount}|${d.fundId}`));
+  rows.slice(0, 20000).forEach((r, i) => {
+    const amount = Math.round(Number(r.amount));
+    if (!(amount > 0)) return result.errors.push({ row: i + 1, message: 'No amount' });
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(r.date ?? ''))) return result.errors.push({ row: i + 1, message: 'Date should be YYYY-MM-DD' });
+    const externalId = r.externalId ? `import:${r.externalId.trim()}` : null;
+    if (externalId && seenIds.has(externalId)) return result.duplicates++;
+    const donor =
+      (r.externalId && byExternal.get(r.externalId.trim())) ||
+      (r.donorEmail && byEmail.get(normEmail(r.donorEmail))) ||
+      (r.donorPhone && byPhone.get(normPhone(r.donorPhone))) ||
+      byName.get(String(r.donorName ?? '').trim().toLowerCase()) ||
+      null;
+    const fund = fundFor(String(r.fundName || 'Tithes & Offerings'));
+    const donorName = String(r.donorName || (donor ? fullName(donor) : 'Anonymous')).trim();
+    const key = `${donor?.id ?? donorName.toLowerCase()}|${r.date}|${amount}|${fund.id}`;
+    if (seenKeys.has(key)) return result.duplicates++;
+    const at = new Date(`${r.date}T06:30:00.000Z`).toISOString(); // noon in India
+    ctx.db.put('donations', {
+      id: ctx.id('dn'),
+      donorId: donor?.id ?? null,
+      donorName,
+      donorEmail: donor?.email ?? r.donorEmail ?? null,
+      donorPhone: donor?.phone ?? r.donorPhone ?? null,
+      fundId: fund.id,
+      fundName: fund.name,
+      amount,
+      currency: settings(ctx).currency,
+      frequency: 'once',
+      status: 'succeeded',
+      method: METHODS.includes(r.method) ? r.method : 'cash',
+      pan: null,
+      donorCitizenship: 'IN',
+      fcra: false,
+      provider: 'offline',
+      providerRef: r.reference ? String(r.reference).trim() : null,
+      providerPaymentId: externalId,
+      createdAt: at,
+      paidAt: at,
+      eventId: null,
+      receiptNumber: r.reference ? String(r.reference).trim() : null,
+      batchId: null,
+    });
+    if (externalId) seenIds.add(externalId);
+    seenKeys.add(key);
+    result.created++;
+    result.total += amount;
+    if (donor) result.matched++;
+    else result.unmatched++;
+  });
+  ctx.audit('imported', 'donation', null, `Imported ${result.created} gifts from ${source}${result.funds.length ? `, created funds ${result.funds.join(', ')}` : ''}`);
+  return result;
 }
