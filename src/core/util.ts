@@ -6,7 +6,7 @@ import type { AdminDonation, AdminEvent, AdminFund, AdminGroup, Church, ChurchEv
 export const DAY = 86_400_000;
 export const PAGE = 50;
 
-export const fullName = (p: { firstName: string; lastName: string }) => `${p.firstName} ${p.lastName}`.trim();
+export const fullName = (p: { firstName: string; lastName: string }) => `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim();
 
 export function age(birthDate: string | null | undefined, now: Date): number | null {
   if (!birthDate) return null;
@@ -196,6 +196,10 @@ export function nextReceiptNumber(ctx: Ctx) {
   return `${fy}/${String(n).padStart(5, '0')}`;
 }
 
+/** Surname, then first name; tolerates a missing surname on older records. */
+export const byName = (x: { firstName: string; lastName: string }, y: { firstName: string; lastName: string }) =>
+  (x.lastName ?? '').localeCompare(y.lastName ?? '') || (x.firstName ?? '').localeCompare(y.firstName ?? '');
+
 export function newPerson(ctx: Ctx, input: Partial<Collections['people']> & { firstName: string; lastName: string }): Collections['people'] {
   return {
     phone: null,
@@ -218,6 +222,8 @@ export function newPerson(ctx: Ctx, input: Partial<Collections['people']> & { fi
     consent: { email: true, sms: true, whatsapp: true, directory: false, ...(input.consent ?? {}) },
     id: ctx.id('p'),
     joinedAt: ctx.now.toISOString(),
+    firstName: String(input.firstName ?? '').trim(),
+    lastName: String(input.lastName ?? '').trim(),
     checkinCode: ctx.env.random(8, 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'),
   };
 }

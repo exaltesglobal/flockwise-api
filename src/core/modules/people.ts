@@ -17,6 +17,7 @@ import {
   dateOnly,
   DAY,
   find,
+  byName,
   fiscalYearStart,
   fullName,
   giftDate,
@@ -52,6 +53,8 @@ function cleanInput(body: Record<string, unknown>) {
   const input = pick<PersonInput>(body, EDITABLE);
   for (const k of ['phone', 'email', 'birthDate', 'householdName', 'address', 'notes', 'baptismDate', 'anniversary', 'allergies', 'medicalNotes', 'zoneId'] as const)
     if (input[k] === '') input[k] = null;
+  // A blank surname arrives as null from some forms; store it as '' so name sorting never breaks.
+  for (const k of ['firstName', 'lastName'] as const) if (k in input) input[k] = String(input[k] ?? '').trim();
   if (input.email) input.email = normEmail(input.email);
   if (input.birthDate && !/^\d{4}-\d{2}-\d{2}$/.test(input.birthDate)) throw new ApiError(422, 'invalid', 'Birth date should be a date.', { birthDate: 'Use YYYY-MM-DD' });
   return input;
@@ -293,7 +296,7 @@ export function registerPeople(r: Router) {
       .filter((p) => !tag || p.tags.includes(tag))
       .filter((p) => !campusId || p.campusId === campusId)
       .filter((p) => !ctx.query.zoneId || (ctx.query.zoneId === 'none' ? !p.zoneId : p.zoneId === ctx.query.zoneId))
-      .sort((x, y) => x.lastName.localeCompare(y.lastName) || x.firstName.localeCompare(y.firstName));
+      .sort(byName);
     const res = page(list, ctx.query.cursor);
     return { ...res, data: res.data.map((p) => personView(ctx, p)) };
   });

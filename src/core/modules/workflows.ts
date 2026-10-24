@@ -3,7 +3,7 @@
 import { ApiError } from '../errors.js';
 import type { Ctx, Router } from '../engine.js';
 import type { Collections, CustomField, ListRule, SmartList, SmartListView, Workflow, WorkflowCard, WorkflowCardView, WorkflowStep, WorkflowView } from '../types.js';
-import { age, DAY, find, fullName, giftDate, page, personView, pick, requireFields } from '../util.js';
+import { age, byName, DAY, find, fullName, giftDate, page, personView, pick, requireFields } from '../util.js';
 
 // ----- custom fields -----
 
@@ -273,7 +273,7 @@ export function registerWorkflows(r: Router) {
   });
   r.get('/admin/lists/:id/people', { perm: 'people.view' }, (ctx) => {
     const l = find(ctx, 'smartLists', ctx.params[0], 'List');
-    const people = listMembers(ctx, l).sort((x, y) => x.lastName.localeCompare(y.lastName) || x.firstName.localeCompare(y.firstName));
+    const people = listMembers(ctx, l).sort(byName);
     const res = page(people, ctx.query.cursor, 100);
     return { ...res, data: res.data.map((p) => personView(ctx, p)), list: listView(ctx, l) };
   });

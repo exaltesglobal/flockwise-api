@@ -78,7 +78,7 @@ function view(ctx: Ctx, g: VerseGame, title: string): VerseGameView {
   return { id: g.id, lessonId: g.lessonId, week: g.week, title, verse: g.verse, reference: g.reference, done: g.done, scores: g.scores, recitedInClass: inClass, points, stars, nextLevel: LEVELS.find((l) => !g.done[l]) ?? null, puzzle: puzzleOf(g.verse, g.id), bestAccuracy: g.bestAccuracy };
 }
 
-const shortName = (p: Collections['people']) => `${p.firstName} ${p.lastName.trim().charAt(0)}${p.lastName.trim() ? '.' : ''}`.trim();
+const shortName = (p: Collections['people']) => `${p.firstName} ${(p.lastName ?? '').trim().charAt(0)}${(p.lastName ?? '').trim() ? '.' : ''}`.trim();
 
 /** The class's week: everyone enrolled, most points first, ties by who got there first. */
 export function board(ctx: Ctx, c: SsClass, week: string, me: Set<string>, full = false): VerseBoard | null {

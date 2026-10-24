@@ -53,7 +53,7 @@ export function bulletinView(ctx: Ctx, b: Bulletin, forPublic = false): Bulletin
       const p = ctx.db.get('people', a.personId);
       if (!p) continue;
       const team = teams.get(a.teamId) ?? 'Team';
-      byTeam.set(team, (byTeam.get(team) ?? new Set()).add(`${p.firstName} ${p.lastName.slice(0, 1)}`.trim()));
+      byTeam.set(team, (byTeam.get(team) ?? new Set()).add(`${p.firstName} ${(p.lastName ?? '').slice(0, 1)}`.trim()));
     }
     for (const [team, names] of byTeam) serving.push({ team, names: [...names] });
   }
