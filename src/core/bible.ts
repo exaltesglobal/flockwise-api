@@ -84,7 +84,8 @@ export function localizeReading(ref: string, lang: LanguageCode): string {
     const m = part.trim().match(/^(.+?)\s+(\d[\d\-–:,\s]*)$/);
     const book = m ? byName.get(m[1].trim().toLowerCase()) : byName.get(part.trim().toLowerCase());
     if (!book) return part.trim();
-    return m ? `${book[lang]} ${m[2].trim()}` : book[lang];
+    const name = (book as unknown as Record<string, string | undefined>)[lang] ?? book.en;
+    return m ? `${name} ${m[2].trim()}` : name;
   }).join('; ');
 }
 

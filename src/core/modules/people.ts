@@ -1,4 +1,5 @@
 // People, households, campuses, the member's own profile and the opt-in directory.
+import { languageFromText } from '../languages.js';
 import { ApiError } from '../errors.js';
 import type { Db } from '../db.js';
 import type { Ctx, Router } from '../engine.js';
@@ -90,7 +91,6 @@ export function searchPeople(ctx: Ctx, q: string) {
   return ctx.db.all('people').filter((p) => matches(p, needle));
 }
 
-const LANG_CODES: Record<string, string> = { english: 'en', hindi: 'hi', tamil: 'ta', telugu: 'te', malayalam: 'ml', kannada: 'kn', en: 'en', hi: 'hi', ta: 'ta', te: 'te', ml: 'ml', kn: 'kn' };
 
 /**
  * Adds or updates people from a spreadsheet. Matching order: the old system's id, then the
@@ -147,7 +147,7 @@ function importPeople(ctx: Ctx, rows: ImportPersonRow[], dedupeBy: 'phone' | 'em
     const { householdKey, householdRole: _role, groups, campus, language, externalId, ...rest } = raw;
     const body: Record<string, unknown> = { ...rest };
     if (householdKey && !body.householdName) body.householdName = householdNames.get(householdKey.trim().toLowerCase());
-    if (language) body.language = LANG_CODES[language.trim().toLowerCase()];
+    if (language) body.language = languageFromText(language);
     if (externalId) body.externalId = externalId.trim();
     if (campus) body.campusId = campusFor(campus)?.id;
     let row: Partial<PersonInput>;

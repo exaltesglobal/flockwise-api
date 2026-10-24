@@ -2,6 +2,7 @@
 // translation into Indian languages, an assistant that answers questions from church data, a
 // weekly briefing, sermon helpers and a worship set suggester. Switched off unless the host has
 // an AI provider; each church has a monthly allowance.
+import { LANGUAGES } from '../languages.js';
 import type { AiBlock, AiImageType, AiMessage, AiRequest, Ctx, Request, Router } from '../engine.js';
 import type { Db } from '../db.js';
 import { ApiError } from '../errors.js';
@@ -10,7 +11,7 @@ import { TOOLS, trim } from '../mcp.js';
 import type { AiAnswer, AiDraft, AiPurpose, AiRecap, AiScannedSong, AiSermonKind, AiSetlist, AiSongScan, AiStatus, AiVisitNotes, RecapFacts, VisitPurpose } from '../types.js';
 import { settings } from '../util.js';
 
-const LANGS: Record<string, string> = { en: 'English', hi: 'Hindi', te: 'Telugu', ta: 'Tamil', ml: 'Malayalam', kn: 'Kannada', mr: 'Marathi', bn: 'Bengali', gu: 'Gujarati', pa: 'Punjabi', or: 'Odia', as: 'Assamese', ur: 'Urdu', kok: 'Konkani', mni: 'Manipuri', lus: 'Mizo', kha: 'Khasi', ne: 'Nepali' };
+const LANGS: Record<string, string> = { ...Object.fromEntries(LANGUAGES.map((l) => [l.code, l.english])), en: 'English', hi: 'Hindi', te: 'Telugu', ta: 'Tamil', ml: 'Malayalam', kn: 'Kannada', mr: 'Marathi', bn: 'Bengali', gu: 'Gujarati', pa: 'Punjabi', or: 'Odia', as: 'Assamese', ur: 'Urdu', kok: 'Konkani', mni: 'Manipuri', lus: 'Mizo', kha: 'Khasi', ne: 'Nepali' };
 
 // The assistant calls the same endpoints as the office, as the signed-in staff member. The engine
 // hands over its request handler once it is built.

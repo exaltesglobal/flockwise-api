@@ -33,7 +33,7 @@ export function serviceNow(ctx: Ctx) {
 
 // ----- what the caller hears back -----
 type ReplyKind = Exclude<MissedCallAction, 'duplicate' | 'off'>;
-const REPLIES: Record<LanguageCode, Record<ReplyKind, string>> = {
+const REPLIES: Partial<Record<LanguageCode, Record<ReplyKind, string>>> & { en: Record<ReplyKind, string> } = {
   en: {
     checked_in: 'Welcome, {name}! You are marked present at {service}. {others}– {church}',
     already: 'You are already marked present today, {name}. God bless you. – {church}',
@@ -83,15 +83,16 @@ const REPLIES: Record<LanguageCode, Record<ReplyKind, string>> = {
     unknown: 'ಈ ಸಂಖ್ಯೆ ನಮ್ಮ ದಾಖಲೆಗಳಲ್ಲಿ ಇಲ್ಲ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಹೆಸರನ್ನು ಚರ್ಚ್ ಕಚೇರಿಗೆ ತಿಳಿಸಿ. – {church}',
   },
 };
-const OTHERS: Record<LanguageCode, string> = { en: 'With {n} more from your home. ', hi: 'आपके घर के {n} और लोग भी। ', ta: 'உங்கள் வீட்டிலிருந்து மேலும் {n} பேர். ', te: 'మీ ఇంటి నుండి మరో {n} మంది. ', ml: 'നിങ്ങളുടെ വീട്ടിൽ നിന്ന് {n} പേർ കൂടി. ', kn: 'ನಿಮ್ಮ ಮನೆಯಿಂದ ಇನ್ನೂ {n} ಜನ. ' };
+const OTHERS: Partial<Record<LanguageCode, string>> & { en: string } = { en: 'With {n} more from your home. ', hi: 'आपके घर के {n} और लोग भी। ', ta: 'உங்கள் வீட்டிலிருந்து மேலும் {n} பேர். ', te: 'మీ ఇంటి నుండి మరో {n} మంది. ', ml: 'നിങ്ങളുടെ വീട്ടിൽ നിന്ന് {n} പേർ കൂടി. ', kn: 'ನಿಮ್ಮ ಮನೆಯಿಂದ ಇನ್ನೂ {n} ಜನ. ' };
 
 export function replyText(ctx: Ctx, kind: ReplyKind, lang: LanguageCode | null | undefined, vars: { name?: string | null; service?: string | null; others?: number }) {
-  const l: LanguageCode = lang && REPLIES[lang] ? lang : (settings(ctx).languages?.[0] ?? 'en');
-  const t = REPLIES[l][kind];
+  const want: LanguageCode = lang && REPLIES[lang] ? lang : (settings(ctx).languages?.[0] ?? 'en');
+  const l: LanguageCode = REPLIES[want] ? want : 'en';
+  const t = (REPLIES[l] ?? REPLIES.en)[kind];
   return t
     .replace('{name}', (vars.name ?? '').split(' ')[0] || (l === 'en' ? 'friend' : ''))
     .replace('{service}', vars.service ?? '')
-    .replace('{others}', vars.others ? OTHERS[l].replace('{n}', String(vars.others)) : '')
+    .replace('{others}', vars.others ? (OTHERS[l] ?? OTHERS.en).replace('{n}', String(vars.others)) : '')
     .replace('{church}', settings(ctx).name)
     .replace(/\s+,/g, ',').replace(/\s{2,}/g, ' ').trim();
 }

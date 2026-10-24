@@ -71,7 +71,7 @@ export const normEmail = (v: string | null | undefined) => (v ?? '').trim().toLo
 
 export function church(ctx: Ctx): Church {
   const s = settings(ctx);
-  return { id: churchId(ctx), name: s.name, city: s.city, country: s.country, currency: s.currency, logoUrl: s.logoUrl, brand: s.brand ?? null, paymentProvider: s.paymentProvider };
+  return { id: churchId(ctx), name: s.name, city: s.city, country: s.country, currency: s.currency, logoUrl: s.logoUrl, brand: s.brand ?? null, paymentProvider: s.paymentProvider, features: s.features ?? {} };
 }
 
 /** Where a person's photo can be loaded from, or null when they have none. */

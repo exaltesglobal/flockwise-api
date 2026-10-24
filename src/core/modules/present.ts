@@ -1,5 +1,6 @@
 // Presentation: turns a service plan into projector slides (song lyrics by section, readings,
 // announcements), keeps every screen on the same slide, and adds song usage stats for worship teams.
+import { LANGUAGE_CODES } from '../languages.js';
 import { ApiError } from '../errors.js';
 import { hasIndic, transliterateLines } from '../transliterate.js';
 import type { Ctx, Router } from '../engine.js';
@@ -189,7 +190,7 @@ const cleanLower = (v: unknown, id: string): LowerThird | null => {
   return title ? { id: String(o.id ?? id).slice(0, 40), title, subtitle: String(o.subtitle ?? '').trim().slice(0, 120) } : null;
 };
 
-const CAPTION_LANGS: LanguageCode[] = ['en', 'hi', 'te', 'ta', 'ml', 'kn'];
+const CAPTION_LANGS: LanguageCode[] = LANGUAGE_CODES;
 const MAX_CAPTION_LINES = 400;
 /** Off, preaching in the church's first language, shown in English (or the church's second language when English is preached). */
 function defaultCaptions(ctx: Ctx): CaptionsSettings {

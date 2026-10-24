@@ -7,12 +7,13 @@ import type { Ctx, Router } from '../engine.js';
 import { ApiError } from '../errors.js';
 import type { Collections, LanguageCode, SmsDigestPreview, SmsDigestSettings, SmsDigestStatus } from '../types.js';
 import { DAY, fullName, localDate, localHour, settings } from '../util.js';
+import { languageInfo } from '../languages.js';
 import { automations } from './comms.js';
 import { channelStatus, deliverAll } from './integrations.js';
 import { publicPageOf } from './ministry.js';
 
 type Strings = { week: string; service: string; events: string; verse: string; prayer: string; bless: string; nothing: string };
-const T: Record<LanguageCode, Strings> = {
+const T: Partial<Record<LanguageCode, Strings>> & { en: Strings } = {
   en: { week: 'This week at {church}', service: 'Sunday service', events: 'This week', verse: 'Verse', prayer: 'Prayer requests: call {phone}', bless: 'God bless you!', nothing: 'No other events this week.' },
   hi: { week: '{church} में इस सप्ताह', service: 'रविवार आराधना', events: 'इस सप्ताह', verse: 'वचन', prayer: 'प्रार्थना के लिए कॉल करें: {phone}', bless: 'परमेश्वर आपको आशीष दे!', nothing: 'इस सप्ताह और कोई कार्यक्रम नहीं।' },
   ta: { week: '{church} - இந்த வாரம்', service: 'ஞாயிறு ஆராதனை', events: 'இந்த வாரம்', verse: 'வசனம்', prayer: 'ஜெப வேண்டுதலுக்கு அழைக்கவும்: {phone}', bless: 'கர்த்தர் உங்களை ஆசீர்வதிப்பாராக!', nothing: 'இந்த வாரம் வேறு நிகழ்ச்சிகள் இல்லை.' },
@@ -20,7 +21,7 @@ const T: Record<LanguageCode, Strings> = {
   ml: { week: '{church} - ഈ ആഴ്ച', service: 'ഞായറാഴ്ച ആരാധന', events: 'ഈ ആഴ്ച', verse: 'വചനം', prayer: 'പ്രാർത്ഥനാ അപേക്ഷയ്ക്ക് വിളിക്കുക: {phone}', bless: 'ദൈവം നിങ്ങളെ അനുഗ്രഹിക്കട്ടെ!', nothing: 'ഈ ആഴ്ച മറ്റ് പരിപാടികളില്ല.' },
   kn: { week: '{church} ನಲ್ಲಿ ಈ ವಾರ', service: 'ಭಾನುವಾರ ಆರಾಧನೆ', events: 'ಈ ವಾರ', verse: 'ವಚನ', prayer: 'ಪ್ರಾರ್ಥನೆಗಾಗಿ ಕರೆ ಮಾಡಿ: {phone}', bless: 'ದೇವರು ನಿಮ್ಮನ್ನು ಆಶೀರ್ವದಿಸಲಿ!', nothing: 'ಈ ವಾರ ಬೇರೆ ಕಾರ್ಯಕ್ರಮಗಳಿಲ್ಲ.' },
 };
-const LOCALE: Record<LanguageCode, string> = { en: 'en-IN', hi: 'hi-IN', ta: 'ta-IN', te: 'te-IN', ml: 'ml-IN', kn: 'kn-IN' };
+const LOCALE = (l: LanguageCode) => languageInfo(l).locale;
 const GSM = /^[A-Za-z0-9 @£$¥èéùìòÇØøÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ!"#¤%&'()*+,\-./:;<=>?¡ÄÖÑÜ§¿äöñüà\n\r^{}\\[~\]|€]*$/;
 
 export const digestSettings = (ctx: Ctx): SmsDigestSettings => automations(ctx).smsDigest ?? { enabled: false, day: 6, hour: 17, audience: 'no_app', channel: 'sms', note: '' };
@@ -47,7 +48,7 @@ export function digestText(ctx: Ctx, p: Pick<Collections['people'], 'language' |
   const l: LanguageCode = lang ?? p?.language ?? s.languages?.[0] ?? 'en';
   const t = T[l] ?? T.en;
   const tz = s.timezone || 'Asia/Kolkata';
-  const fmt = (iso: string) => { try { return new Intl.DateTimeFormat(LOCALE[l], { timeZone: tz, weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(iso)); } catch { return new Date(iso).toISOString().slice(5, 16); } };
+  const fmt = (iso: string) => { try { return new Intl.DateTimeFormat(LOCALE(l), { timeZone: tz, weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(iso)); } catch { return new Date(iso).toISOString().slice(5, 16); } };
   const campus = p?.campusId ? ctx.db.get('campuses', p.campusId) : null;
   const times = campus?.serviceTimes || publicPageOf(ctx).serviceTimes.split('\n').filter(Boolean).join('; ');
   const week = ctx.now.getTime() + 7 * DAY;
