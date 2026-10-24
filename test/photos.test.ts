@@ -38,6 +38,9 @@ test('a member sets a photo and an avatar; the office can too; the public link s
   const person = (await call(owner, 'GET', `/admin/people/${me.id}`));
   assert.equal(person.photoUrl, r.photoUrl);
   assert.equal(person.avatar, 42);
+  const faces = await call(owner, 'GET', '/admin/faces');
+  assert.equal(faces[me.id].a, 42);
+  assert.equal(faces[me.id].p, r.photoUrl);
   const key = db.get('people', me.id)!.photoKey!;
   const raw = await engine.handle({ method: 'GET', path: `/public/photos/${me.id}/${key}`, auth: null, query: {} }) as any;
   assert.equal(raw.contentType, 'image/png');

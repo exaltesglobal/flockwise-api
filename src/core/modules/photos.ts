@@ -54,6 +54,13 @@ export function registerPhotos(r: Router) {
   r.del('/admin/people/:id/photo', { perm: 'people.edit' }, (ctx) => reply(ctx, removePhoto(ctx, find(ctx, 'people', ctx.params[0], 'Person'))));
   r.put('/admin/people/:id/avatar', { perm: 'people.edit' }, (ctx) => { const p = find(ctx, 'people', ctx.params[0], 'Person'); return reply(ctx, ctx.db.put('people', { ...p, avatar: cleanAvatar(ctx.body.avatar) })); });
 
+  // Every face the office screens may need, in one small reply: people with a photo or a chosen avatar.
+  r.get('/admin/faces', { staff: true }, (ctx) => {
+    const out: Record<string, { p: string | null; a: number | null }> = {};
+    for (const p of ctx.db.all('people')) if (p.photoKey || p.avatar != null) out[p.id] = { p: photoUrlOf(ctx, p), a: p.avatar ?? null };
+    return out;
+  });
+
   // The photo itself. The key in the link changes with each upload, so it can be cached for good.
   r.get('/public/photos/:id/:key', { public: true }, (ctx): RawResult => {
     const p = ctx.db.get('people', ctx.params[0]);

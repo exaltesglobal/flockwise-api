@@ -1257,3 +1257,13 @@ Grow plan and up. A camp has dates, place, fee (₹ per person), optional capaci
 Slides carry `bg` (the item's background) and `added` (true for items added live). The theme has `transition: 'fade' | 'cut'`. `imageUrl` may also be a video link.
 
 `GET /admin/bible?ref=John 3:16-18&tr=kjv|web` returns `{ reference, translation, verses: [{ verse, text }] }`, using public-domain English translations from bible-api.com. A few well-loved passages are built in for offline use. Short book names work, e.g. "Ps 23" or "jn 3:16".
+
+## Names, photos and avatars
+
+First name and last name are required when adding a person (`POST /admin/people`, the MCP `add_person` tool, spreadsheet import). An edit may leave them out but cannot blank them. Older records with a null name are cleaned up when the server starts.
+
+- `PUT /me/photo` and `PUT /admin/people/:id/photo` `{ image }`: a data URL (JPEG, PNG or WebP, up to 300 KB) that the browser has already cropped to a square. `DELETE` removes the photo.
+- `PUT /me/avatar` and `PUT /admin/people/:id/avatar` `{ avatar: 0–99 | null }`: which drawn avatar to show when there is no photo. Null means one is picked from the person's id.
+- People, members, family members and directory entries carry `photoUrl` and `avatar`.
+- `GET /admin/faces` returns `{ [personId]: { p: photoUrl, a: avatar } }` for everyone with a photo or a chosen avatar, so office screens can show faces by id.
+- `GET /public/photos/:personId/:key` serves the picture. The key changes with each upload, so it is cached for good.
