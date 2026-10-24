@@ -20,8 +20,10 @@ const call = (auth: any, method: string, path: string, body?: unknown, query: Re
 
 test('the people list loads when someone has no surname', async () => {
   const owner = await signIn('pastor@gracechurch.in');
-  const added = await call(owner, 'POST', '/admin/people', { firstName: 'Ravi', lastName: null });
-  assert.equal(added.lastName, '');
+  await assert.rejects(call(owner, 'POST', '/admin/people', { firstName: 'Ravi', lastName: null }), (e: any) => e.status === 422 && e.fields?.lastName === 'Required');
+  const added = await call(owner, 'POST', '/admin/people', { firstName: ' Ravi ', lastName: ' Kumar ' });
+  assert.equal(added.lastName, 'Kumar');
+  await assert.rejects(call(owner, 'PATCH', `/admin/people/${added.id}`, { lastName: '  ' }), (e: any) => e.status === 422);
   // An older record saved with a null surname straight in the database.
   const old = db.all('people')[0];
   db.put('people', { ...old, lastName: null as unknown as string });

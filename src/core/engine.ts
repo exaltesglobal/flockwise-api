@@ -39,7 +39,7 @@ export type AiRequest = {
 };
 export type AiResponse = { content: AiBlock[]; stopReason: string };
 /** A handler result the server sends as-is instead of JSON (an .ics feed, a CSV). */
-export type RawResult = { __raw: true; contentType: string; body: string; filename?: string };
+export type RawResult = { __raw: true; contentType: string; body: string; filename?: string; /** Binary body (images); used instead of body when present. */ bytes?: Uint8Array; /** Cache-Control header, when not the default private five minutes. */ cache?: string };
 export const isRaw = (v: unknown): v is RawResult => !!v && typeof v === 'object' && (v as RawResult).__raw === true;
 
 /** Everything the engine needs from its host. */

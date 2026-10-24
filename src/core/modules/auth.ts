@@ -34,7 +34,7 @@ export function issueSession(ctx: Ctx, person: Collections['people'], staff: Col
     accessToken: access.token,
     refreshToken: `${rec.id}.${raw}`,
     expiresAt: access.expiresAt,
-    member: memberProfile(person),
+    member: memberProfile(ctx, person),
     church: church(ctx),
     staff: scope === 'admin' && staff ? { role: staff.role, permissions: permsOf(ctx.db, staff), roleName: staff.role === 'custom' ? ctx.db.get('roles', staff.roleId ?? '')?.name ?? 'Custom role' : ROLE_LABELS[staff.role], scope: (() => { const sc = scopeOf(ctx.db, staff); return sc ? { kind: sc.kind, ids: sc.ids } : null; })() } : null,
   };

@@ -106,7 +106,7 @@ test('mcp: initialize, list tools, call read and write tools', async () => {
   const unknown: any = await engine.mcp({ jsonrpc: '2.0', id: 8, method: 'nope' }, ro);
   assert.equal(unknown.error.code, -32601);
   for (const t of rwTools.result.tools) {
-    const r: any = await engine.mcp({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: t.name, arguments: { eventId: 'ev_1', personId: 'p_samuel', title: 'T', body: 'B', channel: 'email', subject: 'S', audienceType: 'people', audienceIds: ['p_samuel'], firstName: 'Z' } } }, rw);
+    const r: any = await engine.mcp({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: t.name, arguments: { eventId: 'ev_1', personId: 'p_samuel', title: 'T', body: 'B', channel: 'email', subject: 'S', audienceType: 'people', audienceIds: ['p_samuel'], firstName: 'Z', lastName: 'Y' } } }, rw);
     assert.ok(!r.result.isError, `${t.name}: ${r.result.content[0].text}`);
   }
 });

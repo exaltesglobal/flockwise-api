@@ -43,7 +43,7 @@ export const TOOLS: Tool[] = [
   {
     name: 'add_person', title: 'Add a person', description: 'Add a new member or visitor to the church database.', write: true,
     props: { firstName: str('First name'), lastName: str('Last name'), email: str('Email'), phone: str('Mobile number'), status: str('visitor (default), regular or member', { enum: ['visitor', 'regular', 'member'] }) },
-    required: ['firstName'],
+    required: ['firstName', 'lastName'],
     call: (a) => ({ method: 'POST', path: '/admin/people', body: { status: 'visitor', ...a } }),
   },
   {

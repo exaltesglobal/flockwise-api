@@ -74,14 +74,27 @@ export function church(ctx: Ctx): Church {
   return { id: churchId(ctx), name: s.name, city: s.city, country: s.country, currency: s.currency, logoUrl: s.logoUrl, brand: s.brand ?? null, paymentProvider: s.paymentProvider };
 }
 
+/** Where a person's photo can be loaded from, or null when they have none. */
+export function photoUrlOf(ctx: Ctx, p: Pick<Collections['people'], 'id' | 'photoKey'>): string | null {
+  if (!p.photoKey) return null;
+  const base = ctx.env.apiUrl;
+  if (!base || ctx.env.demo) {
+    // No public address (the demo runs in the browser): hand the picture over inline.
+    const ph = ctx.db.get('photos', p.id);
+    return ph ? `data:${ph.contentType};base64,${ph.data}` : null;
+  }
+  const slug = /\/c\/([^/?#]+)/.exec(ctx.env.webUrl)?.[1];
+  return `${base}/public/photos/${p.id}/${p.photoKey}${slug ? `?church=${encodeURIComponent(slug)}` : ''}`;
+}
+
 export function personView(ctx: Ctx, p: Collections['people']): Person {
   const memberOf = new Set(ctx.db.all('groupMembers').filter((m) => m.personId === p.id).map((m) => m.groupId));
   const groups = ctx.db.all('groups').filter((g) => memberOf.has(g.id)).map((g) => ({ id: g.id, name: g.name }));
-  return { ...p, groups };
+  return { ...p, firstName: p.firstName ?? '', lastName: p.lastName ?? '', groups, photoUrl: photoUrlOf(ctx, p), avatar: p.avatar ?? null };
 }
 
-export function memberProfile(p: Collections['people']): Member {
-  return { id: p.id, firstName: p.firstName, lastName: p.lastName, phone: p.phone, email: p.email, language: p.language, householdName: p.householdName, photoUrl: null };
+export function memberProfile(ctx: Ctx, p: Collections['people']): Member {
+  return { id: p.id, firstName: p.firstName ?? '', lastName: p.lastName ?? '', phone: p.phone, email: p.email, language: p.language, householdName: p.householdName, photoUrl: photoUrlOf(ctx, p), avatar: p.avatar ?? null };
 }
 
 export const rsvpsFor = (ctx: Ctx, eventId: string) => ctx.db.all('rsvps').filter((r) => r.eventId === eventId);

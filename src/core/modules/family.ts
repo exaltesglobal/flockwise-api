@@ -5,7 +5,7 @@
 import type { Ctx, Router } from '../engine.js';
 import { ApiError } from '../errors.js';
 import type { Collections, FamilyCheckinEvent, FamilyCheckinResult, FamilyMember, FamilyView } from '../types.js';
-import { age, checkinsFor, find, fullName, isChild, newPerson, settings } from '../util.js';
+import { age, checkinsFor, find, fullName, isChild, newPerson, photoUrlOf, settings } from '../util.js';
 import { checkIn, roomFor } from './checkin.js';
 
 type Person = Collections['people'];
@@ -33,6 +33,8 @@ function member(ctx: Ctx, me: Person, p: Person): FamilyMember {
     id: p.id,
     firstName: p.firstName,
     lastName: p.lastName,
+    photoUrl: photoUrlOf(ctx, p),
+    avatar: p.avatar ?? null,
     name: fullName(p),
     age: age(p.birthDate, ctx.now),
     birthDate: p.birthDate,

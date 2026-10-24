@@ -86,7 +86,7 @@ export function createApp(hub: Hub) {
     const { engine } = hub.platform.resolve(ref);
     const result = await engine.handle({ method: c.req.method, path, query: c.req.query(), body, auth, apiKey, ip });
     if (result === undefined) return c.body(null, 204);
-    if (isRaw(result)) return c.body(result.body, 200, { 'Content-Type': result.contentType, 'Cache-Control': 'private, max-age=300', ...(result.filename ? { 'Content-Disposition': `inline; filename="${result.filename}"` } : {}) });
+    if (isRaw(result)) return c.body((result.bytes as unknown as ArrayBuffer) ?? result.body, 200, { 'Content-Type': result.contentType, 'Cache-Control': result.cache ?? 'private, max-age=300', ...(result.filename ? { 'Content-Disposition': `inline; filename="${result.filename}"` } : {}) });
     return c.json(result as object, c.req.method === 'POST' && /\/(intents|ticket)$/.test(path) ? 201 : 200);
   });
 

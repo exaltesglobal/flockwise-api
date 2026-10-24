@@ -27,6 +27,7 @@ import {
   normPhone,
   page,
   personView,
+  photoUrlOf,
   pick,
   requireFields,
 } from '../util.js';
@@ -58,6 +59,13 @@ function cleanInput(body: Record<string, unknown>) {
   if (input.email) input.email = normEmail(input.email);
   if (input.birthDate && !/^\d{4}-\d{2}-\d{2}$/.test(input.birthDate)) throw new ApiError(422, 'invalid', 'Birth date should be a date.', { birthDate: 'Use YYYY-MM-DD' });
   return input;
+}
+
+/** First and last name are required: an edit may leave them out, but never blank them. */
+function namesGiven(body: Record<string, unknown>) {
+  const missing: Record<string, string> = {};
+  for (const k of ['firstName', 'lastName']) if (k in (body ?? {}) && !String(body[k] ?? '').trim()) missing[k] = 'Required';
+  if (Object.keys(missing).length) throw new ApiError(422, 'invalid', 'First name and last name are both required.', missing);
 }
 
 /** Custom field values merge into what the person already has. */
@@ -153,6 +161,10 @@ function importPeople(ctx: Ctx, rows: ImportPersonRow[], dedupeBy: 'phone' | 'em
       result.errors.push({ row: i + 1, message: 'Missing first name' });
       return;
     }
+    if (!row.lastName?.trim()) {
+      result.errors.push({ row: i + 1, message: 'Missing last name' });
+      return;
+    }
     const key = norm(dedupeBy === 'phone' ? row.phone : row.email);
     const existing = (row.externalId && byExternal.get(row.externalId)) || (key ? index.get(key) : undefined);
     let person: Collections['people'];
@@ -232,12 +244,14 @@ function timeline(ctx: Ctx, p: Collections['people']): PersonTimeline {
 
 export function registerPeople(r: Router) {
   // ----- member: profile, preferences, directory -----
-  r.get('/me', {}, (ctx) => memberProfile(find(ctx, 'people', ctx.me(), 'Profile')));
+  r.get('/me', {}, (ctx) => memberProfile(ctx, find(ctx, 'people', ctx.me(), 'Profile')));
   r.patch('/me', {}, (ctx) => {
     const p = find(ctx, 'people', ctx.me(), 'Profile');
+    namesGiven(ctx.body);
     const patch = pick<Collections['people']>(ctx.body, ['firstName', 'lastName', 'email', 'language', 'phone']);
+    for (const k of ['firstName', 'lastName'] as const) if (patch[k] !== undefined) patch[k] = String(patch[k]).trim();
     if (patch.email) patch.email = normEmail(patch.email);
-    return memberProfile(ctx.db.put('people', { ...p, ...patch }));
+    return memberProfile(ctx, ctx.db.put('people', { ...p, ...patch }));
   });
   r.get('/me/preferences', {}, (ctx) => {
     const p = find(ctx, 'people', ctx.me(), 'Profile');
@@ -279,7 +293,7 @@ export function registerPeople(r: Router) {
     for (const p of listed) {
       const key = p.householdName ?? `solo:${p.id}`;
       const entry = byHouse.get(key) ?? { householdName: p.householdName ?? fullName(p), area: p.address?.split(',')[0] ?? null, people: [] };
-      entry.people.push({ id: p.id, name: fullName(p), phone: p.phone, email: p.email });
+      entry.people.push({ id: p.id, name: fullName(p), phone: p.phone, email: p.email, photoUrl: photoUrlOf(ctx, p), avatar: p.avatar ?? null });
       byHouse.set(key, entry);
     }
     return { data: [...byHouse.values()].sort((x, y) => x.householdName.localeCompare(y.householdName)), nextCursor: null };
@@ -306,7 +320,7 @@ export function registerPeople(r: Router) {
     return [...counts].map(([tag, count]) => ({ tag, count })).sort((x, y) => y.count - x.count);
   });
   r.post('/admin/people', { perm: 'people.edit' }, (ctx) => {
-    requireFields(ctx.body, ['firstName']);
+    requireFields(ctx.body, ['firstName', 'lastName']);
     checkLimit(ctx.db, ctx.now, 'people', activePeople(ctx.db));
     const p = ctx.db.put('people', newPerson(ctx, { lastName: '', ...cleanInput(ctx.body), ...withCustom(ctx, ctx.body), firstName: String(ctx.body.firstName) }));
     ctx.audit('created', 'person', p.id, `Added ${fullName(p)}`);
@@ -326,6 +340,7 @@ export function registerPeople(r: Router) {
   r.get('/admin/people/:id/timeline', { perm: 'people.view' }, (ctx) => timeline(ctx, find(ctx, 'people', ctx.params[0], 'Person')));
   r.patch('/admin/people/:id', { perm: 'people.edit' }, (ctx) => {
     inScope(ctx, find(ctx, 'people', ctx.params[0], 'Person'));
+    namesGiven(ctx.body);
     const p = find(ctx, 'people', ctx.params[0], 'Person');
     const next = ctx.db.put('people', { ...p, ...cleanInput(ctx.body), ...withCustom(ctx, ctx.body, p) });
     if (ctx.body.consent) logConsent(ctx, p.id, p.consent, next.consent, 'staff');

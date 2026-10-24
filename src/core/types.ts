@@ -41,6 +41,8 @@ export type Member = {
   phone?: string | null;
   email?: string | null;
   photoUrl?: string | null;
+  /** Which of the 100 drawn avatars to show when there is no photo (null: picked from the id). */
+  avatar?: number | null;
   language: LanguageCode;
   householdName?: string | null;
 };
@@ -177,7 +179,15 @@ export type Person = {
   titheAmount?: number | null;
   /** The person's id in the system they were imported from (Elvanto, Planning Center, an old register), so a second import updates rather than duplicates. */
   externalId?: string | null;
+  /** Changes with every new profile photo, so links to an old photo stop working (stored). */
+  photoKey?: string | null;
+  /** Link to the profile photo (worked out for each reply, never stored). */
+  photoUrl?: string | null;
+  /** Which of the 100 drawn avatars to show when there is no photo (null: picked from the id). */
+  avatar?: number | null;
 };
+/** A profile photo, kept apart from the person so lists stay light. id = person id. */
+export type PersonPhoto = { id: string; contentType: string; data: string; updatedAt: string };
 
 export type PersonInput = Partial<Omit<Person, 'id' | 'joinedAt' | 'lastAttendedAt' | 'groups' | 'checkinCode'>> & { firstName: string; lastName: string };
 export type PeopleQuery = { q?: string; status?: PersonStatus | ''; campusId?: string; zoneId?: string; tag?: string; cursor?: string };
@@ -751,7 +761,7 @@ export type PrayerView = Omit<PrayerRequest, 'prayedBy'> & { prayedCount: number
 
 // ---------- directory ----------
 
-export type DirectoryEntry = { householdName: string; area: string | null; people: { id: string; name: string; phone: string | null; email: string | null }[] };
+export type DirectoryEntry = { householdName: string; area: string | null; people: { id: string; name: string; phone: string | null; email: string | null; photoUrl?: string | null; avatar?: number | null }[] };
 export type MemberPreferences = { consent: Consent; checkinCode: string; campusId: string | null; prayerChain: boolean; titheDay: number | null; titheAmount: number | null };
 
 // ---------- dashboards ----------
@@ -1698,6 +1708,7 @@ export type Collections = {
   greetings: Greeting;
   presentations: PresentationState;
   people: Omit<Person, 'groups'>;
+  photos: PersonPhoto;
   campuses: Campus;
   events: Omit<AdminEvent, 'goingCount' | 'checkinCount' | 'campusName'>;
   rsvps: RsvpRecord;
@@ -1775,7 +1786,7 @@ export type ExportFile = { name: string; rows: number; csv: string };
 export type ExportSummary = { people: number; gifts: number; attendance: number; files: number; counts: Record<string, number> };
 export type ExportBundle = { generatedAt: string; church: string; readme: string; files: ExportFile[] };
 export const KINDS = [
-  'settings', 'automations', 'people', 'campuses', 'events', 'rsvps', 'groups', 'groupMembers', 'joinRequests', 'groupMeetings',
+  'settings', 'automations', 'people', 'photos', 'campuses', 'events', 'rsvps', 'groups', 'groupMembers', 'joinRequests', 'groupMeetings',
   'funds', 'donations', 'pledges', 'plans', 'announcements', 'staff', 'rooms', 'checkins', 'teams', 'assignments', 'blockouts',
   'songs', 'messages', 'templates', 'care', 'prayer', 'audit', 'otps', 'refreshTokens', 'attendanceHistory', 'meta',
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
@@ -2617,6 +2628,8 @@ export type FamilyMember = {
   id: string;
   firstName: string;
   lastName: string;
+  photoUrl?: string | null;
+  avatar?: number | null;
   name: string;
   age: number | null;
   birthDate: string | null;
