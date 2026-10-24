@@ -6,7 +6,8 @@
 // ---------- member contract (docs/API.md, shared with the mobile app) ----------
 
 export type Currency = 'INR' | 'USD' | 'GBP' | 'AUD' | 'AED' | 'CAD' | 'EUR' | 'SGD';
-export type LanguageCode = 'en' | 'hi' | 'ta' | 'te' | 'ml' | 'kn';
+export type { LanguageCode } from './languages.js';
+import type { LanguageCode } from './languages.js';
 
 export type Church = {
   id: string;

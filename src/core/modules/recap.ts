@@ -3,6 +3,7 @@
 // WhatsApp status caption and five short slides. The web draws the card and the reel from them in
 // the church's colours. Members get it in the app once it is published; anyone with the link can
 // watch the share page. Money only appears when the office ticks "include giving".
+import { LANGUAGE_CODES } from '../languages.js';
 import type { Ctx, Router } from '../engine.js';
 import { ApiError } from '../errors.js';
 import type { Collections, LanguageCode, MemberRecap, Recap, RecapFacts, RecapSlide, RecapStats, RecapSunday } from '../types.js';
@@ -11,7 +12,7 @@ import { writeRecap } from './ai.js';
 import { upcomingCelebrations } from './celebrations.js';
 import { notify } from './notify.js';
 
-const LANG_CODES: LanguageCode[] = ['en', 'hi', 'ta', 'te', 'ml', 'kn'];
+const LANG_CODES: LanguageCode[] = LANGUAGE_CODES;
 
 /** Past Sunday services, latest first. */
 export const pastServices = (ctx: Ctx) => ctx.db.all('events').filter((e) => e.kind === 'service' && Date.parse(e.endsAt) <= ctx.now.getTime()).sort((a, b) => b.startsAt.localeCompare(a.startsAt));
