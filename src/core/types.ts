@@ -19,6 +19,8 @@ export type Church = {
   /** Colours and type from Settings › Church › Brand kit, so every screen matches the logo. */
   brand?: BrandKit | null;
   paymentProvider: 'razorpay' | 'stripe';
+  /** Settings › Features choices, so the member app shows only what the church uses (core/features.ts). */
+  features?: Partial<Record<string, boolean>>;
 };
 
 /** The church's brand kit. The logo (Church.logoUrl) always appears beside the name; these go with it. */
