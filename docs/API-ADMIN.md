@@ -1267,3 +1267,14 @@ First name and last name are required when adding a person (`POST /admin/people`
 - People, members, family members and directory entries carry `photoUrl` and `avatar`.
 - `GET /admin/faces` returns `{ [personId]: { p: photoUrl, a: avatar } }` for everyone with a photo or a chosen avatar, so office screens can show faces by id.
 - `GET /public/photos/:personId/:key` serves the picture. The key changes with each upload, so it is cached for good.
+
+## Online registration
+
+A public link and QR code where a family registers everyone in the house. Nothing reaches People until the office approves it.
+
+- `GET /public/registration` (public, `?church=slug`): church name and logo, whether the form is open, the intro, which optional questions to ask, and the privacy notice.
+- `POST /public/registration` (public): `{ householdName?, phone, email, address, area, previousChurch, howHeard, note, wantsMembership, agree: true, consent: {whatsapp, email, directory}, members: [{ firstName*, lastName*, relation: head|spouse|child|parent|other, gender, birthDate, phone, email, baptised }] }`. 1 to 12 people, a phone or an email, and the privacy tick are required. A filled `website` field (hidden from people) is accepted silently and dropped. Sends `registration.new` to office staff who can edit People.
+- `GET /admin/registrations` (people.view): `{ settings, pending, recent }`. Pending entries carry `matches`: people already in People with the same phone, email or name.
+- `POST /admin/registrations/:id/approve` (people.edit): `{ status?: visitor|regular|member, link?: { [memberIndex]: personId }, note? }`. Creates the household (linked members are updated, not duplicated), tags everyone with the settings tag, and records consent.
+- `POST /admin/registrations/:id/decline` (people.edit): `{ note? }`. `DELETE /admin/registrations/:id` removes it.
+- `PUT /admin/registration-settings` (people.edit): `{ enabled, intro, askBaptism, askPreviousChurch, askHowHeard, defaultStatus, tag }`.

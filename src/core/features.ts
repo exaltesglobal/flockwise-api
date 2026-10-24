@@ -33,6 +33,7 @@ export const FEATURES: FeatureInfo[] = [
   { key: 'zones', label: 'Area visits', body: 'Zones or prayer cells with leaders and home visits.', group: 'people', on: true },
   { key: 'registers', label: 'Registers', body: 'Baptism, marriage and membership registers with certificates.', group: 'people', on: true },
   { key: 'safeguarding', label: 'Safeguarding', body: 'Checks and training for people who work with children.', group: 'people', on: true },
+  { key: 'registration', label: 'Online registration', body: 'A link and QR code where families register themselves; the office approves them into People.', group: 'people', on: true },
   { key: 'import', label: 'Import', body: 'Bring people in from Excel, Google Sheets or another system.', group: 'people', on: true, core: true },
   // Care and growth
   { key: 'care', label: 'Care & prayer', body: 'Care cases, prayer requests and who has not been seen.', group: 'care', on: true, core: true },

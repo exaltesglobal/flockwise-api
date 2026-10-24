@@ -1430,7 +1430,7 @@ export type CanvaExportResult = { design: CanvaDesign; media: MediaItem[]; urls:
 export type Device = { id: string; personId: string; token: string; platform: 'android' | 'ios' | 'web'; app: 'member' | 'team'; createdAt: string; lastSeenAt: string };
 
 /** Things Flockwise can tell people about on its own. The office picks the channels for each. */
-export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder' | 'verse.week' | 'election.open' | 'election.result' | 'recap.ready' | 'greeting.video' | 'vigil.reminder' | 'mentor.nudge' | 'library.due' | 'library.request' | 'occasion.request' | 'occasion.scheduled' | 'occasion.reminder' | 'camp.signup';
+export type NotificationKind = 'rota.assigned' | 'event.changed' | 'announcement.published' | 'prayer.new' | 'prayer.chain' | 'care.assigned' | 'visitor.new' | 'door.scanned' | 'team.notice' | 'team.message' | 'task.assigned' | 'carol.visit' | 'tithe.reminder' | 'ride.update' | 'aid.new' | 'aid.update' | 'asset.due' | 'reading.today' | 'rental.new' | 'practice.reminder' | 'verse.week' | 'election.open' | 'election.result' | 'recap.ready' | 'greeting.video' | 'vigil.reminder' | 'mentor.nudge' | 'library.due' | 'library.request' | 'occasion.request' | 'occasion.scheduled' | 'occasion.reminder' | 'camp.signup' | 'registration.new';
 
 // ---------- Christmas carol rounds ----------
 
@@ -1694,6 +1694,7 @@ export type Collections = {
   boardPosts: BoardPost;
   camps: Camp;
   campSignups: CampSignup;
+  registrations: Registration;
   captions: CaptionsLog;
   ballots: Ballot;
   ballotStubs: BallotStub;
@@ -1792,7 +1793,7 @@ export const KINDS = [
   'forms', 'formResponses', 'resources', 'bookings', 'customFields', 'smartLists', 'workflows', 'workflowCards', 'live', 'headcounts',
   'batches', 'groupPosts', 'groupResources', 'sermons', 'greetings', 'presentations', 'integrations', 'apiKeys', 'roles', 'hubChannels', 'hubPosts', 'carolSeasons', 'carolNights', 'carolRequests', 'rideRequests', 'rideOffers', 'aidRequests', 'assets', 'readingPlans', 'readingProgress', 'feasts', 'rentalOffers', 'rentals', 'practices',
   'registers', 'zones', 'visits', 'accountHeads', 'expenses', 'kycFiles', 'recurring', 'botMessages', 'campaigns', 'envelopes', 'inKind', 'auctionLots', 'consentLog', 'dataRequests', 'parentPages', 'bulletins',
-  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes', 'bankStatements', 'bankLines', 'safeguarding', 'courses', 'courseEnrollments', 'vigils', 'vigilSignups', 'mentorships', 'mentorMeetings', 'libraryBooks', 'libraryLoans', 'occasions', 'skillProfiles', 'boardPosts', 'camps', 'campSignups',
+  'ssClasses', 'ssLessons', 'ssAttendance', 'ssExams', 'ssMarks', 'verseGames', 'elections', 'ballots', 'ballotStubs', 'recaps', 'videoGreetings', 'greetingLinks', 'annualReturns', 'missedCalls', 'captions', 'qrCodes', 'bankStatements', 'bankLines', 'safeguarding', 'courses', 'courseEnrollments', 'vigils', 'vigilSignups', 'mentorships', 'mentorMeetings', 'libraryBooks', 'libraryLoans', 'occasions', 'skillProfiles', 'boardPosts', 'camps', 'campSignups', 'registrations',
   'missionaries', 'missionSupport', 'missionReports', 'missionPayouts',
   'streams', 'streamViews', 'teamLogins', 'devices', 'media', 'canvaDesigns', 'calendarFeeds',
 ] as const satisfies readonly Kind[];
@@ -2942,3 +2943,36 @@ export type MyPractice = {
   recent: { id: string; at: string; teamName: string; wasPresent: boolean; songs: string[]; presentIds: string[] }[];
   parts: SongPartName[];
 };
+
+// ---------- online registration ----------
+
+export type RegistrationRelation = 'head' | 'spouse' | 'child' | 'parent' | 'other';
+export type RegistrationMember = { firstName: string; lastName: string; gender: 'male' | 'female' | null; birthDate: string | null; relation: RegistrationRelation; phone: string | null; email: string | null; baptised: boolean };
+export type RegistrationStatus = 'pending' | 'approved' | 'declined';
+/** A family that filled in the public registration form, waiting for the office. */
+export type Registration = {
+  id: string; status: RegistrationStatus;
+  householdName: string; address: string; area: string; phone: string; email: string;
+  previousChurch: string; howHeard: string; note: string;
+  members: RegistrationMember[];
+  /** Ask the church to treat them as members (rather than visitors) once approved. */
+  wantsMembership: boolean;
+  consent: { whatsapp: boolean; email: boolean; directory: boolean };
+  createdAt: string; decidedAt: string | null; decidedBy: string | null; decisionNote: string;
+  /** People created (or matched) on approval. */
+  personIds: string[];
+};
+export type RegistrationMatch = { personId: string; name: string; why: 'phone' | 'email' | 'name' };
+export type RegistrationView = Registration & { matches: RegistrationMatch[] };
+export type RegistrationSettings = {
+  enabled: boolean;
+  /** Short welcome shown at the top of the form. */
+  intro: string;
+  askBaptism: boolean; askPreviousChurch: boolean; askHowHeard: boolean;
+  /** Status given to approved families unless they ask for membership. */
+  defaultStatus: 'visitor' | 'regular' | 'member';
+  /** Tag added to everyone approved from the form. */
+  tag: string;
+};
+export type RegistrationsHub = { settings: RegistrationSettings; publicUrl: string; pending: RegistrationView[]; recent: RegistrationView[] };
+export type PublicRegistrationForm = { church: { name: string; logoUrl: string | null }; enabled: boolean; intro: string; askBaptism: boolean; askPreviousChurch: boolean; askHowHeard: boolean; privacyNotice: string };
