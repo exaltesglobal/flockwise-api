@@ -132,3 +132,72 @@ test('song colours: only hex colours are kept and reach the musicians view', asy
   const v = await call(a, 'GET', `/admin/services/${ev.id}/presentation`);
   assert.deepEqual(v.charts[0].colours, { headings: '#1f6b5c' });
 });
+
+test('presenter pro: Bible, songs and text added live, clear, stage timer and backgrounds', async () => {
+  const a = await signIn('admin', 'pastor@gracechurch.in');
+  const ev = await call(a, 'POST', '/admin/events', { title: 'Live add service', kind: 'service', startsAt: new Date(Date.now() + 86_400_000).toISOString(), endsAt: new Date(Date.now() + 90_000_000).toISOString() });
+  await call(a, 'PUT', `/admin/services/${ev.id}`, { theme: '', notes: '', items: [{ kind: 'announcement', title: 'Welcome', minutes: 2, notes: '', person: '', text: 'Welcome to church' }] });
+  const path = `/admin/services/${ev.id}/presentation`;
+
+  // Bible lookup works offline for well-loved passages, with friendly aliases.
+  const john = await call(a, 'GET', '/admin/bible', undefined, { ref: 'jn 3:16–17' });
+  assert.equal(john.reference, 'John 3:16-17');
+  assert.equal(john.verses.length, 2);
+  const ps = await call(a, 'GET', '/admin/bible', undefined, { ref: 'Ps 23' });
+  assert.equal(ps.verses.length, 6);
+  await assert.rejects(call(a, 'GET', '/admin/bible', undefined, { ref: 'John' }), (e: any) => e.status === 422);
+
+  // Put the passage up at once: one verse per slide, the screen jumps to the first verse.
+  const text = ps.verses.map((v: any) => `${v.verse} ${v.text}`).join('\n\n');
+  let v = await call(a, 'POST', path, { action: 'add', added: { kind: 'reading', title: 'Psalm 23 (KJV)', text }, live: true });
+  const on = v.slides[v.state.index];
+  assert.ok(on.added);
+  assert.equal(on.kind, 'text');
+  assert.match(on.lines[0], /^1 The LORD is my shepherd/);
+  assert.equal(v.slides.filter((s: any) => s.added && s.kind === 'text').length, 6);
+
+  // A song from the library goes to the end without changing the screen.
+  const songs = await call(a, 'GET', '/admin/songs');
+  const song = (songs.data ?? songs).find((s: any) => s.lyrics?.trim());
+  const before = v.state.index;
+  v = await call(a, 'POST', path, { action: 'add', added: { kind: 'song', songId: song.id } });
+  assert.equal(v.state.index, before);
+  assert.ok(v.slides.some((s: any) => s.added && s.itemTitle === song.title && s.kind === 'lyrics'));
+  assert.ok(v.charts.some((c: any) => c.title === song.title));
+  await assert.rejects(call(a, 'POST', path, { action: 'add', added: { kind: 'announcement', text: '  ' } }), (e: any) => e.status === 422);
+
+  // Clear words, keep the background.
+  v = await call(a, 'POST', path, { action: 'clear' });
+  assert.equal(v.state.mode, 'clear');
+
+  // Removing the item on screen clears the words.
+  v = await call(a, 'POST', path, { action: 'goto', index: v.slides.findIndex((s: any) => s.itemTitle === 'Psalm 23 (KJV)' && s.kind === 'text') });
+  v = await call(a, 'POST', path, { action: 'removeAdded', id: v.state.added[0].id });
+  assert.equal(v.state.mode, 'clear');
+  assert.ok(!v.slides.some((s: any) => s.itemTitle === 'Psalm 23 (KJV)'));
+
+  // Stage-only note and a countdown for the preacher.
+  v = await call(a, 'POST', path, { action: 'stageMessage', message: 'Wrap up in 5' });
+  assert.equal(v.state.stageMessage, 'Wrap up in 5');
+  v = await call(a, 'POST', path, { action: 'timer', minutes: 30, label: 'Sermon' });
+  assert.equal(v.state.stageTimer.label, 'Sermon');
+  assert.ok(new Date(v.state.stageTimer.endsAt).getTime() > Date.now() + 29 * 60_000);
+  v = await call(a, 'POST', path, { action: 'timer', stopwatch: true });
+  assert.ok(v.state.stageTimer.startedAt);
+  await assert.rejects(call(a, 'POST', path, { action: 'timer', minutes: 0 }), (e: any) => e.status === 422);
+  v = await call(a, 'POST', path, { action: 'timer', clear: true });
+  assert.equal(v.state.stageTimer, null);
+
+  // A moving background for one item; only https links.
+  const itemId = v.charts[0].id;
+  v = await call(a, 'POST', path, { action: 'background', itemId, url: 'https://cdn.example.org/loops/waves.mp4' });
+  assert.equal(v.slides.find((s: any) => s.itemIndex === 0).bg, 'https://cdn.example.org/loops/waves.mp4');
+  await assert.rejects(call(a, 'POST', path, { action: 'background', itemId, url: 'javascript:alert(1)' }), (e: any) => e.status === 422);
+  v = await call(a, 'POST', path, { action: 'background', itemId, url: '' });
+  assert.equal(v.slides.find((s: any) => s.itemIndex === 0).bg, undefined);
+
+  // Transition is part of the slide style.
+  const theme = await call(a, 'PUT', '/admin/presentation-theme', { transition: 'cut', imageUrl: 'http://insecure.example/x.jpg' });
+  assert.equal(theme.transition, 'cut');
+  assert.equal(theme.imageUrl, '');
+});

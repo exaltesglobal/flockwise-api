@@ -1242,3 +1242,18 @@ Grow plan and up. A camp has dates, place, fee (₹ per person), optional capaci
 - `POST /admin/camps/:id/signups` `{ personIds, medical?, needsBus? }` (office sign-up), `PATCH /admin/camps/:id/signups/:sid` `{ roomId?, busId?, paid?, status?, medical?, needsBus? }` (a full room or bus is refused).
 - `POST /admin/camps/:id/assign`: fills empty beds (families into a family room where they fit, everyone else by gender, next to a relative where possible) and bus seats (families together).
 - `GET /me/camps`: open camps with the household and who is signed up. `POST /me/camps/:id` `{ personIds, emergencyName, emergencyPhone (required), needsBus, medical: { personId: text } }` signs up family members and tells organisers (`camp.signup`). `DELETE /me/camps/:id/:personId` cancels an unpaid place.
+
+## Presenter: live additions, clear, stage tools, backgrounds
+
+`POST /admin/services/:eventId/presentation` also takes these actions:
+
+- `clear`: clears the words and keeps the background. Key C in the presenter.
+- `add` `{ added: { kind: 'reading' | 'song' | 'announcement', title?, text?, songId? }, live? }`: adds a Bible passage, a library song or free text after the plan. Up to 40 per service. With `live: true` the screens jump straight to its first words.
+- `removeAdded` `{ id }`: removes an added item. If it was on screen, the words clear.
+- `stageMessage` `{ message }`: a note only the stage display shows.
+- `timer` `{ minutes, label? } | { stopwatch: true } | { clear: true }`: a countdown or stopwatch shown big on the stage display.
+- `background` `{ itemId, url }`: a picture or silent MP4/WebM loop behind one item. The link must be https. An empty `url` goes back to the slide style.
+
+Slides carry `bg` (the item's background) and `added` (true for items added live). The theme has `transition: 'fade' | 'cut'`. `imageUrl` may also be a video link.
+
+`GET /admin/bible?ref=John 3:16-18&tr=kjv|web` returns `{ reference, translation, verses: [{ verse, text }] }`, using public-domain English translations from bible-api.com. A few well-loved passages are built in for offline use. Short book names work, e.g. "Ps 23" or "jn 3:16".

@@ -3,13 +3,13 @@
 import { ApiError } from '../errors.js';
 import { hasIndic, transliterateLines } from '../transliterate.js';
 import type { Ctx, Router } from '../engine.js';
-import type { BandItem, CaptionsSettings, CaptionsView, Collections, LanguageCode, LowerThird, ObsSettings, PlanItem, PresentationState, PresentationTheme, PresentationView, Slide, Song, SongStats } from '../types.js';
+import type { AddedItem, BandItem, CaptionsSettings, CaptionsView, Collections, LanguageCode, LowerThird, ObsSettings, PlanItem, PresentationState, PresentationTheme, PresentationView, Slide, Song, SongStats } from '../types.js';
 import { OBS_MOMENTS } from '../types.js';
 import { church, DAY, find, pick, settings } from '../util.js';
 import { translateCaption } from './ai.js';
 import { liveView } from './ministry.js';
 
-export const DEFAULT_THEME: PresentationTheme = { background: '#0f1f1c', textColor: '#ffffff', imageUrl: '', fontScale: 1, linesPerSlide: 4, showAlt: true, titleSlides: true, uppercase: false, transliterate: false };
+export const DEFAULT_THEME: PresentationTheme = { background: '#0f1f1c', textColor: '#ffffff', imageUrl: '', fontScale: 1, linesPerSlide: 4, showAlt: true, titleSlides: true, uppercase: false, transliterate: false, transition: 'fade' };
 const SECTION = /^(verse|chorus|refrain|bridge|pre-?chorus|intro|outro|tag|interlude|ending|instrumental|vamp|coda)\b/i;
 
 export const themeOf = (ctx: Ctx): PresentationTheme => ({ ...DEFAULT_THEME, ...(settings(ctx).presentation ?? {}) });
@@ -204,11 +204,26 @@ function captionsOf(ctx: Ctx, state: PresentationState, eventId: string, staff: 
   return { ...s, lines: lines.slice(staff ? -40 : -3), count: lines.length };
 }
 
+/** Items the operator added during the service, as plan items that follow the plan. */
+const addedItems = (added: AddedItem[] | undefined): PlanItem[] =>
+  (added ?? []).map((a) => ({ id: a.id, kind: a.kind, title: a.title, songId: a.songId ?? null, key: null, minutes: 0, notes: '', person: '', text: a.text ?? '' }));
+
+/** A background must be a web link (https) or a file on this site; anything else is dropped. */
+const cleanUrl = (v: unknown) => { const u = String(v ?? '').trim().slice(0, 600); return /^(https:\/\/|\/)[^\s"'<>]+$/.test(u) ? u : ''; };
+const MAX_ADDED = 40;
+
 function view(ctx: Ctx, ev: Collections['events'], staff = true): PresentationView {
   const live = liveView(ctx, ev);
   const theme = themeOf(ctx);
-  const slides = buildDeck(ctx, live.plan.items, theme);
   const state = stateFor(ctx, ev.id);
+  const planCount = live.plan.items.length;
+  const items = [...live.plan.items, ...addedItems(state.added)];
+  const bgs = state.backgrounds ?? {};
+  const slides = buildDeck(ctx, items, theme).map((sl) => {
+    const id = items[sl.itemIndex]?.id;
+    const bg = id ? bgs[id] : undefined;
+    return { ...sl, ...(bg ? { bg } : {}), ...(sl.itemIndex >= planCount ? { added: true } : {}) };
+  });
   const c = church(ctx);
   const runningItem = live.live.startedAt && !live.live.endedAt ? live.plan.items[live.live.itemIndex] : undefined;
   return {
@@ -222,7 +237,7 @@ function view(ctx: Ctx, ev: Collections['events'], staff = true): PresentationVi
     timer: { itemTitle: runningItem?.title ?? null, itemEndsAt: live.itemEndsAt, serviceEndsAt: live.serviceEndsAt },
     announcements: ctx.db.all('announcements').filter((a) => a.status === 'published').sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)).slice(0, 6).map((a) => ({ title: a.title, body: a.body.slice(0, 240) })),
     suggestedLowerThirds: suggestLowerThirds(live.plan.items),
-    charts: bandItems(ctx, live.plan.items),
+    charts: bandItems(ctx, items),
     obs: obsOf(ctx),
     ...(staff ? { screenKey: screenKey(ctx) } : {}),
     captions: captionsOf(ctx, state, ev.id, staff),
@@ -287,7 +302,58 @@ export function registerPresent(r: Router) {
         if (i >= 0) { s.index = i; s.mode = 'live'; }
         break;
       }
-      case 'blank': case 'logo': case 'live': s.mode = ctx.body.action; break;
+      case 'blank': case 'logo': case 'live': case 'clear': s.mode = ctx.body.action; break;
+      case 'add': {
+        const a = (ctx.body.added ?? {}) as Partial<AddedItem>;
+        const kind = a.kind === 'song' || a.kind === 'reading' ? a.kind : 'announcement';
+        const song = kind === 'song' ? ctx.db.get('songs', String(a.songId ?? '')) : undefined;
+        if (kind === 'song' && !song) throw new ApiError(404, 'not_found', 'Song not found.');
+        const text = String(a.text ?? '').replace(/\r/g, '').trim().slice(0, 12000);
+        if (kind !== 'song' && !text) throw new ApiError(422, 'invalid', 'Type the words to show.', { text: 'Required' });
+        const title = String(a.title ?? '').trim().slice(0, 120) || song?.title || (kind === 'reading' ? 'Scripture' : 'Text');
+        if ((s.added ?? []).length >= MAX_ADDED) throw new ApiError(422, 'too_many', `Up to ${MAX_ADDED} added items per service. Remove some first.`);
+        const item: AddedItem = { id: ctx.id('ad'), kind, title, ...(song ? { songId: song.id } : { text }) };
+        s.added = [...(s.added ?? []), item];
+        if (ctx.body.live) {
+          ctx.db.put('presentations', { ...s, updatedAt: ctx.now.toISOString() });
+          const deck = view(ctx, ev).slides;
+          // Skip the title slide: the operator wants the words up at once.
+          const first = deck.findIndex((sl) => sl.id.startsWith(`${item.id}:`) && sl.kind !== 'title');
+          const any = deck.findIndex((sl) => sl.id.startsWith(`${item.id}:`));
+          s.index = first >= 0 ? first : Math.max(0, any);
+          s.mode = 'live';
+        }
+        break;
+      }
+      case 'removeAdded': {
+        const id = String(ctx.body.id ?? '');
+        const onIt = v.slides[s.index]?.id.startsWith(`${id}:`);
+        s.added = (s.added ?? []).filter((a) => a.id !== id);
+        if (onIt) s.mode = 'clear';
+        break;
+      }
+      case 'stageMessage': s.stageMessage = String(ctx.body.message ?? '').slice(0, 200); break;
+      case 'timer': {
+        if (ctx.body.clear) { s.stageTimer = null; break; }
+        const label = String(ctx.body.label ?? '').trim().slice(0, 60);
+        if (ctx.body.stopwatch) s.stageTimer = { label: label || 'Stopwatch', endsAt: null, startedAt: ctx.now.toISOString() };
+        else {
+          const minutes = Number(ctx.body.minutes);
+          if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 600) throw new ApiError(422, 'invalid', 'Minutes should be between 1 and 600.', { minutes: '1–600' });
+          s.stageTimer = { label: label || 'Timer', endsAt: new Date(ctx.now.getTime() + minutes * 60_000).toISOString(), startedAt: null };
+        }
+        break;
+      }
+      case 'background': {
+        const itemId = String(ctx.body.itemId ?? '');
+        if (!v.charts.some((c) => c.id === itemId)) throw new ApiError(404, 'not_found', 'That item is not in this service.');
+        const url = cleanUrl(ctx.body.url);
+        if (ctx.body.url && !url) throw new ApiError(422, 'invalid', 'Use a link that starts with https://', { url: 'https:// link to a picture or video' });
+        const next = { ...(s.backgrounds ?? {}) };
+        if (url) next[itemId] = url; else delete next[itemId];
+        s.backgrounds = next;
+        break;
+      }
       case 'countdown': {
         const until = ctx.body.until ? new Date(String(ctx.body.until)) : new Date(ev.startsAt);
         s.countdownTo = Number.isNaN(until.getTime()) ? ev.startsAt : until.toISOString();
@@ -348,7 +414,9 @@ export function registerPresent(r: Router) {
 
   r.get('/admin/presentation-theme', { staff: true }, (ctx) => themeOf(ctx));
   r.put('/admin/presentation-theme', { perm: ['services', 'settings'] }, (ctx) => {
-    const patch = pick<PresentationTheme>(ctx.body, ['background', 'textColor', 'imageUrl', 'fontScale', 'linesPerSlide', 'showAlt', 'titleSlides', 'uppercase', 'transliterate']);
+    const patch = pick<PresentationTheme>(ctx.body, ['background', 'textColor', 'imageUrl', 'fontScale', 'linesPerSlide', 'showAlt', 'titleSlides', 'uppercase', 'transliterate', 'transition']);
+    if (patch.transition !== undefined && patch.transition !== 'cut') patch.transition = 'fade';
+    if (patch.imageUrl !== undefined) patch.imageUrl = cleanUrl(patch.imageUrl);
     if (patch.linesPerSlide !== undefined) patch.linesPerSlide = Math.max(1, Math.min(8, Math.round(Number(patch.linesPerSlide)) || 4));
     if (patch.fontScale !== undefined) patch.fontScale = Math.max(0.5, Math.min(2, Number(patch.fontScale) || 1));
     for (const k of ['background', 'textColor'] as const) if (patch[k] !== undefined && !/^#[0-9a-f]{3,8}$/i.test(String(patch[k]))) delete patch[k];

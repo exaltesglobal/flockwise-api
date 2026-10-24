@@ -1167,13 +1167,26 @@ export type Slide = {
   chords: string[];
   /** The lines in English letters when they are in an Indian script and the theme asks for it. */
   roman: string[];
+  /** Background picture or video for this item, chosen by the operator; replaces the theme's. */
+  bg?: string;
+  /** Added by the operator during the service rather than planned. */
+  added?: boolean;
 };
 export type PresentationTheme = {
   background: string; textColor: string; imageUrl: string; fontScale: number; linesPerSlide: number; showAlt: boolean; titleSlides: boolean; uppercase: boolean;
   /** Show Telugu, Hindi, Tamil (and other Indian-script) words in English letters under the lyrics. */
   transliterate?: boolean;
+  /** How one slide gives way to the next. */
+  transition?: 'fade' | 'cut';
 };
-export type PresentationMode = 'live' | 'blank' | 'logo' | 'countdown';
+/** live: the slide; clear: background only (words cleared); blank: black; logo; countdown. */
+export type PresentationMode = 'live' | 'clear' | 'blank' | 'logo' | 'countdown';
+/** Something the operator put up during the service: a Bible passage, a song from the library or a few lines of text. */
+export type AddedItem = { id: string; kind: 'reading' | 'song' | 'announcement'; title: string; text?: string; songId?: string | null };
+/** A countdown (endsAt) or a stopwatch (startedAt) shown big on the stage display. */
+export type StageTimer = { label: string; endsAt: string | null; startedAt: string | null };
+/** A Bible passage looked up for the screen. */
+export type BiblePassage = { reference: string; translation: string; verses: { verse: number; text: string }[] };
 /** A name strap for the livestream: speaker, reader, Bible reference or announcement. */
 export type LowerThird = { id: string; title: string; subtitle: string };
 export type PresentationState = {
@@ -1188,6 +1201,13 @@ export type PresentationState = {
   countdownTo?: string | null;
   /** Live sermon captions on the projector (see modules/present.ts). */
   captions?: CaptionsSettings;
+  /** Bible passages, songs and text the operator added during the service. They follow the plan. */
+  added?: AddedItem[];
+  /** A note only the stage display shows, e.g. "Wrap up" for the preacher. */
+  stageMessage?: string;
+  stageTimer?: StageTimer | null;
+  /** Background picture or video per plan item id. */
+  backgrounds?: Record<string, string>;
 };
 /** Live captions: the preacher's words, heard by the media desk's browser, translated for the screen. */
 export type CaptionsSettings = {
